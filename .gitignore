@@ -1,0 +1,11 @@
+# 官方技能仓库（grape-skills）
+# 本仓库仅存放官方技能内容（vod/issue/coding/qa/sre/chat/_template）与 skill-description.json。
+# 运行时目录（custom/、repo/）不属于本仓库，不在此忽略。
+
+# --- 通用垃圾 ---
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+.idea/
+.vscode/
