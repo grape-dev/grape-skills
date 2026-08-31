@@ -31,6 +31,9 @@ tools: []
 
 ### 1.2 创建子 Issue
 
+> ⚠️ **禁止创建测试 Issue**：直接创建正式子任务 Issue，不要先建测试 Issue 验证 API 再删除。
+> 测试 Issue 会触发 webhook 进入流水线，浪费 Agent 资源并产生垃圾数据。
+
 对每个子任务，调用 GitCode API 创建 Issue：
 
 ```bash
@@ -116,6 +119,7 @@ VOD Agent 在审视 Issue 时负责识别多任务模式：
 | 子任务跳过分析直接 A2A coding | ✅ 子任务快速通道执行 |
 | 更新父 Issue 追加子任务列表 | ✅ 创建子 Issue 后执行 |
 | 多任务模式下父任务直接 A2A coding | ❌ 禁止（子 Issue 自动触发流水线） |
+| 创建测试 Issue 验证 API | ❌ 禁止——直接创建正式子任务 Issue，不要先建测试 Issue 再删除 |
 | 子任务重复生成完整 Spec | ❌ 禁止（用精简 Spec） |
 | 直接写代码、修改文件 | ❌ 禁止 |
 | 回复 Token、密码等敏感信息 | ❌ 禁止 |
