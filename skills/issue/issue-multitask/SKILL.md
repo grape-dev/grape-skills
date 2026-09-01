@@ -372,7 +372,7 @@ curl -s -X PATCH ... -d '{"state": "close"}' \
 
 | 组件 | 行为 |
 |------|------|
-| `event_pipeline.run_pipeline` | 解析子任务 `parent_issue_id`；SRE 完成后登记父 Issue；父任务 Issue Agent done 后 `stage=done` |
+| `event_pipeline.run_pipeline` | 解析子任务 `parent_issue_id`；SRE 完成后登记父 Issue；**所有子任务完成后自动合入 PR + A2A 触发父任务统一部署验证**；父任务 Issue Agent done 后 `stage=done` |
 | `prompt_builder` | 子任务 VOD/Issue prompt 注入父任务上下文；单任务注入项目知识基线 |
 | `session_store` | `set/get_parent_issue`, `set/get_subtask_mode`, `is_subtask`, `get_subtask_issues` |
 | `webhook` A2A 端点 | 接收 `is_subtask_mode`/`parent_issue` 并持久化 |
