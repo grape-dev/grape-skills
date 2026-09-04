@@ -1,12 +1,16 @@
 {
-  "name": "skill-dev",
+  "name": "common-skill-dev",
   "version": "1.0.0",
-  "display_name": "华为云Skill开发",
-  "description": "华为云 Skill 开发场景，创建和发布华为云技能",
+  "display_name": "通用Skill开发",
+  "description": "通用 REST API 技能开发场景，使用 REST API 技能生成器快速开发和测试技能",
   "category": "skill-dev",
   "recommended_template": "hello-skill",
   "onboarding": "repo-onboarding",
-  "tags": [],
+  "tags": [
+    "skill",
+    "rest-api",
+    "framework"
+  ],
   "author": "grape-team",
   "nodes": [
     {
@@ -28,7 +32,7 @@
     {
       "id": "coding",
       "tag": "coding",
-      "skill": "skill-creator",
+      "skill": "rest-api-skill-creator",
       "mode": "emit",
       "next": "qa",
       "handoff": "a2a"
@@ -36,7 +40,7 @@
     {
       "id": "qa",
       "tag": "qa",
-      "skill": "skill-tester",
+      "skill": "rest-api-skill-tester",
       "mode": "emit",
       "next": "sre",
       "handoff": "a2a"

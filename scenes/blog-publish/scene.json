@@ -1,12 +1,16 @@
 {
   "name": "blog-publish",
   "version": "1.0.0",
-  "display_name": "博客发布",
-  "description": "博客系统开发与发布场景",
+  "display_name": "博客开发",
+  "description": "博客内容创作和发布场景，从选题到 AI 生成到自动发布，适合内容驱动型项目",
   "category": "content",
   "recommended_template": "",
   "onboarding": "repo-onboarding",
-  "tags": [],
+  "tags": [
+    "blog",
+    "content",
+    "ai-generation"
+  ],
   "author": "grape-team",
   "nodes": [
     {

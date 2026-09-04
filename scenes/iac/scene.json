@@ -2,11 +2,15 @@
   "name": "iac",
   "version": "1.0.0",
   "display_name": "IaC开发",
-  "description": "IaC 基础设施即代码开发场景，使用 Terraform 管理云资源",
+  "description": "基础设施即代码开发场景，使用 Terraform 管理云资源，适合 DevOps 基础设施团队",
   "category": "iac",
   "recommended_template": "tf-infra",
   "onboarding": "repo-onboarding",
-  "tags": [],
+  "tags": [
+    "iac",
+    "terraform",
+    "infrastructure"
+  ],
   "author": "grape-team",
   "nodes": [
     {

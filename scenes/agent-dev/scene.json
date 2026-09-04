@@ -2,11 +2,15 @@
   "name": "agent-dev",
   "version": "1.0.0",
   "display_name": "Agent开发",
-  "description": "Agent 开发场景，适合构建 AI Agent 项目",
+  "description": "AI Agent 应用开发场景，适合构建智能体应用和多 Agent 协作系统",
   "category": "ai",
   "recommended_template": "ai-interview-swarm",
   "onboarding": "repo-onboarding",
-  "tags": [],
+  "tags": [
+    "ai",
+    "agent",
+    "llm"
+  ],
   "author": "grape-team",
   "nodes": [
     {

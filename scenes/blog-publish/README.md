@@ -1,5 +1,20 @@
-# 博客发布
+# 博客开发场景
 
-博客系统开发与发布场景。
+博客内容创作和发布场景，从选题到 AI 生成到自动发布，适合内容驱动型项目。
 
-专用技能链路：blog-vod→blog-issue→ai-blog-generation→blog-publish。
+## 技能链路
+
+1. **VOD** — 博客选题与声音分析（blog-vod）
+2. **Issue** — 博客任务规划（blog-issue）
+3. **Coding** — AI 内容生成（ai-blog-generation）
+4. **SRE** — 博客自动发布（blog-publish）
+
+## 推荐模板
+
+无 — 适用于已有博客系统的内容创作
+
+## 适用场景
+
+- 博客内容创作
+- AI 辅助写作
+- 内容自动发布

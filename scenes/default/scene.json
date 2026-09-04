@@ -6,7 +6,10 @@
   "category": "general",
   "recommended_template": "hello-flask",
   "onboarding": "repo-onboarding",
-  "tags": [],
+  "tags": [
+    "general",
+    "full-cycle"
+  ],
   "author": "grape-team",
   "nodes": [
     {

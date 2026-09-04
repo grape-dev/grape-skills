@@ -1,12 +1,16 @@
 {
-  "name": "api-skill-dev",
+  "name": "huawei-skill",
   "version": "1.0.0",
-  "display_name": "通用Skill开发",
-  "description": "通用 Skill 开发场景，创建和发布通用技能",
+  "display_name": "华为云Skill开发",
+  "description": "华为云技能开发场景，使用 grape 技能框架开发和发布技能包到华为云",
   "category": "skill-dev",
   "recommended_template": "hello-skill",
   "onboarding": "repo-onboarding",
-  "tags": [],
+  "tags": [
+    "skill",
+    "huawei-cloud",
+    "framework"
+  ],
   "author": "grape-team",
   "nodes": [
     {
@@ -28,7 +32,7 @@
     {
       "id": "coding",
       "tag": "coding",
-      "skill": "rest-api-skill-creator",
+      "skill": "skill-creator",
       "mode": "emit",
       "next": "qa",
       "handoff": "a2a"
@@ -36,7 +40,7 @@
     {
       "id": "qa",
       "tag": "qa",
-      "skill": "rest-api-skill-tester",
+      "skill": "skill-tester",
       "mode": "emit",
       "next": "sre",
       "handoff": "a2a"
