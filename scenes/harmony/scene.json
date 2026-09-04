@@ -1,0 +1,53 @@
+{
+  "name": "harmony",
+  "version": "1.0.0",
+  "display_name": "鸿蒙开发",
+  "description": "鸿蒙应用开发场景，适合 HarmonyOS 应用开发",
+  "category": "mobile",
+  "recommended_template": "harmony-ecommerce",
+  "onboarding": "repo-onboarding",
+  "tags": [],
+  "author": "grape-team",
+  "nodes": [
+    {
+      "id": "vod",
+      "tag": "vod",
+      "skill": "vod",
+      "mode": "emit",
+      "next": "issue",
+      "handoff": "a2a"
+    },
+    {
+      "id": "issue",
+      "tag": "issue",
+      "skill": "issue-advance",
+      "mode": "emit",
+      "next": "coding",
+      "handoff": "a2a"
+    },
+    {
+      "id": "coding",
+      "tag": "coding",
+      "skill": "implementation",
+      "mode": "emit",
+      "next": "qa",
+      "handoff": "a2a"
+    },
+    {
+      "id": "qa",
+      "tag": "qa",
+      "skill": "pr",
+      "mode": "emit",
+      "next": "sre",
+      "handoff": "a2a"
+    },
+    {
+      "id": "sre",
+      "tag": "sre",
+      "skill": "cloud-deploy",
+      "mode": "emit",
+      "next": "done",
+      "handoff": "complete"
+    }
+  ]
+}
