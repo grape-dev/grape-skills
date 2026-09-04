@@ -1,0 +1,101 @@
+# GitCode API 参考
+
+## Base URL
+
+```
+https://api.gitcode.com/api/v5
+```
+
+## Authentication
+
+```
+Authorization: Bearer {token}
+# or
+PRIVATE-TOKEN: {token}
+```
+
+Token 已在 prompt 中给出：`$BOT_GITCODE_TOKEN`
+（**不要**从代码或 env 文件中找其他值，那不是 API token。）
+
+## 安全与边界（必须遵守）
+
+1. **只使用系统注入的 token**：调用 GitCode API 只能用 prompt 中给出的 token
+   （BOT_GITCODE_TOKEN / USER_GITCODE_TOKEN）。不得从数据库、配置文件、日志、
+   历史记录、环境变量或任何文件中寻找、猜测、读取其他 token。
+2. **禁止访问 Grape 内部数据**：不得读取 data/sessions.db、
+   user_accounts 表、managed_repos 表、configs/ 目录（含 global-bot-token.json 等）、
+   global-bot-token.json 或任何 Grape 运行目录下的数据。那是 Grape 内部基础设施。
+3. **403/无权限处理**：若 API 返回 403 或权限不足，直接回复用户
+   "该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试"，
+   不要尝试通过其他 token 或绕行手段执行。
+4. **不得写入 token 到任何文件**：不要将 token 写进日志、脚本、issue 评论或工具调用以外的地方。
+
+## 影响范围评估常用端点
+
+### Pull Requests
+
+| Action | Method | Endpoint |
+|--------|--------|----------|
+| Get PR | GET | `/repos/:owner/:repo/pulls/:number` |
+| PR files (含 diff) | GET | `/repos/:owner/:repo/pulls/:number/files` |
+| PR comments (行内) | POST | `/repos/:owner/:repo/pulls/:number/comments` (body: `body`, `commit_id`, `path`, `position`) |
+| List PR comments | GET | `/repos/:owner/:repo/pulls/:number/comments` |
+| Resolve comment | PUT | `/repos/:owner/:repo/pulls/:number/comments/:discussion_id` (body: `{"resolved": true}`) |
+| PR review comment (总结) | POST | `/repos/:owner/:repo/pulls/:number/comments` (body: `body`) |
+
+### Repository
+
+| Action | Method | Endpoint |
+|--------|--------|----------|
+| Get file content | GET | `/repos/:owner/:repo/contents/:path?ref=:branch` |
+| List commits | GET | `/repos/:owner/:repo/commits` |
+
+### Search
+
+| Action | Method | Endpoint |
+|--------|--------|----------|
+| Search code (找符号引用) | GET | `/search/code?q=:keyword` |
+
+### Issues（关联 Issue 评论）
+
+| Action | Method | Endpoint |
+|--------|--------|----------|
+| Create comment | POST | `/repos/:owner/:repo/issues/:number/comments` (body: `body`) |
+
+## PR files 响应结构
+
+`GET /repos/:owner/:repo/pulls/:number/files` 返回数组，每个元素：
+
+```json
+{
+  "filename": "src/api/event_pipeline.py",
+  "status": "modified",
+  "additions": 12,
+  "deletions": 3,
+  "changes": 15,
+  "sha": "abc123",
+  "patch": "@@ -239,7 +239,9 @@ def run_pipeline(...):\n def run_pipeline(...):\n+    strict_mode=False\n..."
+}
+```
+
+- `patch` 为 unified diff 文本，解析 hunk 头 `@@ -old,count +new,count @@` 定位行号
+- `status`：added / modified / removed / renamed
+- 大 PR 可能分页，用 `?page=1&per_page=100` 翻页
+
+## 行内评论 position 计算
+
+发布行内评论需 `position`（diff 中的行号）：
+1. 从 PR files API 的 `patch` 解析 hunk
+2. `position` = 问题行在 hunk 中的相对位置（从 hunk 新侧 `+` 行起算）
+3. `commit_id` = PR head SHA
+4. `path` = 问题文件路径
+
+## Pagination
+
+```
+?page=1&per_page=20    (max per_page=100)
+```
+
+## Rate Limit
+
+Default: 400 req/min, 4000 req/hour. Returns `429 Too Many Requests` when exceeded.
