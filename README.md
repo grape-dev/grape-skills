@@ -26,7 +26,7 @@ grape-skills/
 | vod | vod、repo-onboarding、event-dialogue、blog-vod、iac-vod |
 | issue | issue、issue-advance、skill-issue、blog-issue、iac-issue |
 | coding | implementation、skill-creator、rest-api-skill-creator、iac-coding、wan-video-generation、qwen-image-generation、ai-blog-generation |
-| qa | qa、pr、skill-pr、skill-tester、rest-api-skill-tester、iac-qa |
+| qa | qa、impact-analysis、pr、skill-pr、skill-tester、rest-api-skill-tester、iac-qa |
 | sre | cloud-deploy、build-debug、deploy-guard、changelog-gen、incident-triage、skill-publish、huawei-cloud、runtime-install、blog-publish、blog-manager、iac-sre、os-disk-list |
 | chat | chat、im-notify |
 
