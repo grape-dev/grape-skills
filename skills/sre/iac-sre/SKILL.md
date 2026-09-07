@@ -8,7 +8,6 @@ tools:
   - bash
   - curl
 requires:
-  - gitcode-publish
 tags:
   - build
   - deploy
