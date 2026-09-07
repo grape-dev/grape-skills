@@ -8,9 +8,6 @@ tools:
   - git
   - curl
 requires:
-  - huawei-cloud-computing-query
-  - huawei-cloud-network-query
-  - huawei-cloud-storage-query
 tags:
   - code-review
   - security

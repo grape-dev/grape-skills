@@ -8,8 +8,6 @@ tools:
   - curl
   - git
 requires:
-  - huawei-cloud-computing-query
-  - huawei-cloud-network-query
 tags:
   - issue-management
   - triage
@@ -72,7 +70,7 @@ tags:
 - 标记垃圾/违规评论
 
 ### 原始职责内化
-- 涉及 IaC 变更的 Issue：引用 huawei-cloud-computing-query / huawei-cloud-network-query 了解现有资源
+- 涉及 IaC 变更的 Issue：参考 iac-coding skill 的 TF 编码规范了解技术约束，辅助 Spec 生成
 - 开工前检索历史 Issue 和已关闭 PR，识别同类问题的处理模式，将相关经验作为约束附带
 
 ## 硬规则

@@ -8,11 +8,6 @@ tools:
   - git
   - curl
 requires:
-  - gitcode-publish
-  - huawei-cloud-terraform-generator
-  - huawei-cloud-computing-query
-  - huawei-cloud-network-query
-  - huawei-cloud-storage-query
 tags:
   - implementation
   - pr-management
@@ -60,7 +55,7 @@ tags:
 ### 2. 开发
 - 所有 TF 代码和脚本文件统一放在仓库的 `iac/` 子目录下，不得放在仓库根目录或其他目录
 - 如仓库中不存在 `iac/` 目录，新建该目录
-- 调用 huawei-cloud-terraform-generator skill 生成 TF 配置
+- 按 `references/huaweicloud-tf-conventions.md` 编写 TF 配置（目录结构、凭证映射、cn-north-4 避坑、provider 版本约束、backend 配置等规范）
 - 按方案执行 terraform fmt → terraform init → terraform validate → terraform plan -out=tfplan
   - `terraform plan` 只预览变更不创建资源，用于提前发现镜像/flavor/provider/API 等问题
   - ⚠️ 到 plan 为止，**不执行 terraform apply / terraform destroy**
@@ -70,7 +65,8 @@ tags:
 参考 `references/code-review-checklist.md` 逐项检查。
 
 ### 4. 提交 PR
-- 通过 gitcode-publish skill 推送代码、创建 MR
+- git push 推送特性分支到远端
+- 调用 GitCode API 创建 MR（POST /repos/:owner/:repo/pulls），参考 `references/gitcode-api-reference.md`
 - MR body 四段齐全：变更说明、资源清单、文件变更、后续步骤
 - 遵循 Conventional Commits
 
@@ -78,9 +74,6 @@ tags:
 创建 PR 后通过 A2A 通知 QA Agent 进行代码审查。
 
 ### 原始职责内化
-- gitcode-publish：代码推送与 MR 创建
-- huawei-cloud-terraform-generator：TF 配置生成
-- huawei-cloud-computing-query / huawei-cloud-network-query / huawei-cloud-storage-query：编码时查询华为云资源现状
 - 开工前按模块关键词搜索历史 Issue/PR，了解常见问题模式，避免重复踩坑
 
 ## 硬规则
