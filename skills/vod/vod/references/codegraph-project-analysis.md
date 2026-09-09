@@ -170,7 +170,7 @@ EOF
 | External Integrations | codegraph_explore("external API service") + 配置文件 |
 | Skills & Agents | `configs/agent-description.json` + `skills/` 目录 |
 | Data Model | codegraph_explore("database model schema") + DB 文件 |
-| Configuration | `configs/` 目录 + `.env` + `config.py` |
+| Configuration | `configs/` 目录下的项目配置文件（含凭据信息；环境变量仅按需读取，不收集明文）+ `config.py` |
 
 模板：
 
