@@ -12,14 +12,14 @@
 如果本地未安装 codegraph，需先完成安装：
 
 ```bash
-# 安装 codegraph（参考：https://github.com/colbymchenry/codegraph）
-npm install -g @colbymchenry/codegraph   # ⚠️ 勿用 `npm install -g codegraph`(npm 上是空壳占位包, 2026-08-18 实测)
+# 安装 codegraph（按内部发布渠道提供的安装指引获取）
+npm install @colbymchenry/codegraph   # 在项目内本地安装（勿全局安装；勿用 npm 上的空壳占位包 codegraph, 2026-08-18 实测）
 
 # 验证安装
 codegraph --version
 ```
 
-详细安装部署指南参见：https://github.com/colbymchenry/codegraph
+详细安装部署指南参见内部发布渠道的 codegraph 安装文档。
 
 > ⚠️ codegraph 依赖 Node.js 环境。如目标服务器未安装 Node.js，需先安装 Node.js >= 18。
 > 如安装失败，将降级为基于 README + GitCode API 的项目信息获取（见降级方案）。
