@@ -10,7 +10,7 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 Grape/GitCode API 只用系统注入的 `$GRAPE_SESSION_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. `grape` CLI 已提供完整且必要的 **grape API / gitcode API / github API / git 原始命令** 的命令行，使用 `GRAPE_SESSION_TOKEN` 均可操作，详细见 `references/grape-cli-reference.md`，**无需探索额外 token**。若发现接口缺失或 token 失效，应**直接输出任务无法完成的理由**，而不是去探索其它无关的 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
 3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
@@ -78,9 +78,15 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 2. **调用 `grape tasks complete` 自报完成（必做）**——服务端据此将任务+事件置为成功（会话 token 自动定位当前任务，无需 --task-id）：
 
    ```bash
-   grape tasks complete --json '{"result_text":"已完成 Issue #2 审视与回复评论，无需交办。","next_step":"reply_comment"}'
+   grape tasks complete --json '{
+     "result_text": "结论：Issue #2 需求审视完成（属项目分析类，无需交办 / 已 A2A 交办 Issue Agent）。\n\n动作：\n• structured：Issue #2 body 收敛为模板结构（目标/现状/期望/验收标准/优先级）\n• commented：已发布 VOD Agent 审视结论评论\n• a2a：交办 Issue Agent（seq=XXXX）\n\n产出：\n- Issue #2 结构化 body（PATCH）\n- Issue #2 VOD Agent 评论（comment id=XXXXXX）\n- A2A event seq=XXXX → 目标 agent\n\n摘要：一句话概括本次处理结果。",
+     "next_step": "a2a_issue"
+   }'
    ```
 
+   - **`result_text` 按「结论 / 动作 / 产出（含可追溯 id）/ 摘要」组织**：结论定性、动作逐条 `•`
+     （structured / commented / a2a / created…）、产出带 Issue #N、comment id、A2A `seq` 等标识；
+     `next_step` 取 `a2a_issue` / `reply_comment` / `a2a_need_clarify` / `done`。
    - 即使本轮"该 Issue 已处理/无需动作"，也必须调用一次。
    - 若返回 `already:true`（任务已终态），属正常，忽略即可。
 
@@ -113,21 +119,6 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 3. **交办必带 issue_number**：A2A 无法确定 issue_number 则不调用，在评论中说明。
 4. **A2A 失败降级**：调用 A2A 若返回非 2xx 或连接超时，**重试最多 3 次**；仍失败则在 Issue 评论说明"A2A 服务不可达，待恢复后重试"，并在 next_step 标注需人工介入，不得静默跳过交办。
 5. **结构化产出**：建/总结 Issue 用模板（目标/现状/期望/验收/优先级/来源）。
-
-## 任务完成流程（必须执行）
-
-完成全部业务动作后，**依次执行**以下收尾流程，否则服务端可能判定无产出而失败：
-
-1. **输出人类可读的分析摘要**：分析数量、发现的问题、已创建/已审视 Issue 及交办情况。
-   （可选）如需系统采纳场景推荐，可在输出末尾附一个 JSON 块（含 `recommended_scene`/`scene_reason`，对齐 prompt 要求）。
-2. **调用 `grape tasks complete` 自报完成（必做）**——服务端据此将任务+事件置为成功（会话 token 自动定位当前任务，无需 --task-id）：
-
-   ```bash
-   grape tasks complete --json '{"result_text":"已完成 Issue #2 审视与回复评论，无需交办。","next_step":"reply_comment"}'
-   ```
-
-   - 即使本轮"该 Issue 已处理/无需动作"，也必须调用一次。
-   - 若返回 `already:true`（任务已终态），属正常，忽略即可。
 
 ## 参考
 

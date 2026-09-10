@@ -1,8 +1,8 @@
 # Grape CLI 参考（VOD 试点版）
 
 > 本技能**只使用 `grape` CLI**（不再直连 `api.gitcode.com`，也不用 curl 调 API）。
-> 平台 token 不再注入/使用（`BOT_GITCODE_TOKEN` 已弃用）；认证一律用系统已注入的
-> **`$GRAPE_SESSION_TOKEN`**（任务级临时，随任务/会话失效）。
+> `grape` 已提供完整且必要的 **grape API / gitcode API / github API / git 原始命令** 的命令行，
+> 统一使用系统注入的 **`$GRAPE_SESSION_TOKEN`**（任务级临时，随任务/会话失效）即可操作。
 
 > 前提：执行环境需已安装 `grape` CLI（已随 worker 包 / 主控服务器预装；安装方式见下）。未就绪时请按「安装」指引处理，**不要改用 curl 直连**。
 
@@ -10,20 +10,21 @@
 
 `grape` 由运维/部署侧预装，agent **一般不需也不应自行安装**：
 
-- **worker**：重跑一键安装脚本即获得（`install-worker.sh` 会自动在 worker `.venv/bin` 生成 `grape` 并注入 PATH）；手建 worker 按 `DEPLOYMENT-WORKER.md §5.5` 手动安装。
+- **worker**：重跑一键安装脚本即获得（`install-worker.sh` 自动在 worker `.venv/bin` 生成 `grape` 并注入 PATH）；手建 worker 按实际部署方式手动安装到 `.venv/bin` 并打通 PATH。
 - **主控服务器**：已装于 `/opt/grape-cli`（`ln -sf /opt/grape-cli/bin/grape /usr/local/bin/grape`）。
-- **自装（有权限时）**：`python3 -m pip install <grape 源码 cli/ 目录>`（自动带 click/httpx 依赖）。
+- **自装（有权限时）**：`python3 -m pip install -e <grape-cli 源码>`（源码仓库 `gitcode.com/grape-dev/grape-cli`，自动带 click/httpx 依赖）。
 
 > ⚠️ **禁止 `pip3 install grape`**：PyPI 上的 `grape` 是**第三方公有包**，不是本项目的 CLI，装错会误导命令执行。
 
 agent 内若 `which grape` 无结果：说明执行环境未就绪，直接回复「当前执行环境未安装 grape CLI，请管理员在 worker 安装后重试」，**不要**自行安装，也**不要**改用 curl 直连。
 
-## 认证（无需手动设置）
+## 认证与配置（无需手动设置）
 
-- `$GRAPE_SESSION_TOKEN` **已由服务端注入环境变量**，`grape` 自动读取（优先级：`--token` 参数 > 该环境变量 > 配置文件）。
+- `$GRAPE_SESSION_TOKEN` **已由服务端注入环境变量**，`grape` 自动读取（优先级：`--token` 参数 > `GRAPE_SESSION_TOKEN` > `GRAPE_API_TOKEN`/`GRAPE_BASE_URL` > `~/.grape/config.json`）。
 - **不需要** `export GRAPE_SESSION_TOKEN=...`，也不需要写 `~/.grape/config.json`。
 - 服务端地址自动取**已注入的环境变量 `$GRAPE_SERVER_URL`**（`grape` 直接读取，无需每次 `--base-url`）；如需覆盖可用 `--base-url <url>`。
 - token 是**任务级临时**的：任务结束即失效；命令报 401 说明凭据已失效，直接说明「凭据已失效」即可，不尝试换 token。
+- 一次性参数：`grape --token tk_xxx --base-url https://... --timeout 120 <cmd>`（仅本次进程）。
 
 ## 常用命令（VOD 实际用到）
 
@@ -50,29 +51,34 @@ grape git-repo pulls list --owner {owner} --repo {repo} --state all --per_page 1
 grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
 grape git-repo commits --owner {owner} --repo {repo} --per_page 1 --json-out
 
-# git 本地传输（clone/push 等，token 进程内注入，agent 不接触平台 token）：
-# 用 --repo 指定仓库 + 透传任意 git 原生命令
-grape git --repo {owner}/{repo} status
+# A2A 交办 Issue Agent（专属命令）
+grape a2a handoff --json '{"agent":"issue","payload":{...}}'
+
+# 任务自报完成（收尾必做，见 SKILL「任务完成流程」）
+grape tasks complete --json '{"result_text":"...","next_step":"a2a_issue"}'
+
+# 轮询任务至终态
+grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 ```
 
-- 所有命令都支持 `--json-out`（机器可读单行 JSON，供自身解析）。
+- 所有命令支持 `--json-out`（机器可读单行 JSON）；`-h/--help` 查看参数；`grape commands [pattern]` 列出契约命令。
 - 分页：`--per_page 20`（max 100）；出参结构 = GitCode 平台实际结构。
+- 契约不可达时 CLI 自动回退**内置契约快照**（`grape refresh` 显示来源）。
 
-## 命令与 URL 对应（仅供排查，勿改用 curl）
+## git（本地执行，token 零暴露）
 
-| 命令 | 对应接口 |
-|------|----------|
-| `grape git-repo issues list` | `GET {{SERVER_URL}}/api/repos/{owner}/{repo}/issues` |
-| `grape git-repo issues create` | `POST …/issues` |
-| `grape git-repo issues update` | `PATCH …/issues/{number}` |
-| `grape git-repo issues comments create` | `POST …/issues/{number}/comments` |
-| `grape git-repo pulls list` | `GET …/pulls` |
-| `grape git-repo branches` | `GET …/branches` |
-| `grape git-repo commits` | `GET …/commits` |
-| `grape git --repo o/r <cmd>` | 本地 git 协议（token 经 CLI 进程内注入） |
+`grape git` 是 **git 原生命令透传**：**自动识别仓库**（clone 从 URL 解析，其余从当前目录 `remote.origin.url` 解析），
+再用会话 token 换券成**短期平台凭据**经 `GIT_CONFIG` env 注入 git 子进程——**不进命令行、不落磁盘、agent 感知不到**。
+仅 gitcode.com 宿主注入；换券失败仅告警、按本机原生行为执行。`grape git --help` 与 `git --help` 一致。
 
-> A2A 交办（`POST /api/a2a`）已有专属命令 **`grape a2a handoff`**（token/base_url 自动注入）：
-> `grape a2a handoff --json '{"agent":"issue","payload":{...}}'`——见 `requirement-elicit-guide.md` §五。
+```bash
+grape git status                                   # 本地命令（无需凭据）
+grape git clone https://gitcode.com/owner/repo.git # 从 URL 识别仓库 → 注入凭据
+grape git pull
+grape git push
+grape git checkout -b feat/issue-7
+grape git commit -m "fix: ..."
+```
 
 ## 通用兜底（`grape api`）
 
@@ -81,8 +87,13 @@ grape git --repo {owner}/{repo} status
 ```bash
 grape api GET /api/scenes --json-out
 grape api POST /api/tasks/create -d '{"repo_key":"{owner}/{repo}","title":"...","description":"..."}'
-# A2A 有专属命令，不在此列：grape a2a handoff
+# A2A / 自报完成有专属命令，不在此列：grape a2a handoff / grape tasks complete
 ```
+
+## 退出码
+
+`0` 成功 · `1` 通用/配置错误（缺 token/网络/超时） · `2` 用法错误 ·
+`>=400` HTTP 状态透传（如 `401`） · `130` Ctrl+C。
 
 ## 安全与边界（必须遵守）
 
@@ -93,4 +104,5 @@ grape api POST /api/tasks/create -d '{"repo_key":"{owner}/{repo}","title":"...",
 3. **403/无权限**：立即停止并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，
    不要尝试其他 token 或绕行手段。
 4. **401（token 失效）**：任务级 token 短命，失效属正常；说明凭据已失效即可，不尝试替换。
-5. **不写 token 到任何文件/日志/评论/工具调用之外的地方**。
+5. **接口缺失 / token 失效**：直接输出**任务无法完成的理由**，不要探索其它无关的 token。
+6. **不写 token 到任何文件/日志/评论/工具调用之外的地方**。
