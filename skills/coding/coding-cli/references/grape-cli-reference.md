@@ -106,7 +106,7 @@ grape git push origin feat/issue-7
 ```
 
 > 本地代码基线已就绪（coding 工作模型）：Grape 服务端已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`）。
-> 直接以 `grape git` 执行 checkout/add/commit/push 即可；若目录非 git 仓库（降级），改用 `grape git-repo contents` 读写文件。
+> 直接以 `grape git` 执行 checkout/add/commit/push 即可；若目录非 git 仓库（降级，无法 `grape git`），改用 `grape git-repo contents` **只读**仓库文件内容（仅 `get`，返回 Base64），写文件能力受限需在评论中说明。
 
 ## 通用兜底（`grape api`）
 

@@ -47,7 +47,23 @@ tools:
 ### 本地代码基线已就绪（coding 工作模型）
 Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`），可直接执行
 `grape git checkout -b` / `grape git add` / `grape git commit` / `grape git push` 等命令（凭据由 `grape git` 自动注入）。
-若目录非 git 仓库（降级），改用 `grape git-repo contents` 读写文件。
+若目录非 git 仓库（降级，无法 `grape git` 提交/推送），改用 `grape git-repo contents` **只读**仓库文件（如 README，返回 Base64）；写文件能力受限，需在评论中说明。
+
+## 评论前缀规范
+
+在 Issue / PR 上发评论、答复评论时，**所有评论 body 一律以 `[Coding Agent]` 开头**：
+
+```bash
+# Issue 评论（CLI，body 以 [Coding Agent] 开头；token/base_url 取已注入的 $GRAPE_SESSION_TOKEN/$GRAPE_SERVER_URL）
+grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \
+  --json '{"body": "[Coding Agent] 这是 Coding 的答复内容。"}'
+
+# PR 评论
+grape git-repo pulls comments create --owner {owner} --repo {repo} --number {pr} \
+  --json '{"body": "[Coding Agent] 已根据审查意见完成修改，请重新审查。"}'
+```
+
+覆盖：澄清追问、创建 PR 后告知、修改完成告知、降级/受限说明等评论。
 
 ## 场景识别
 
