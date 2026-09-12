@@ -117,7 +117,7 @@ grape git push origin feat/issue-{number}
 grape git-repo pulls create --owner {owner} --repo {repo} \
   --json '{
     "title": "feat: #{number} 标题",
-    "head": "feat/issue-{number}", "base": "main",
+    "head": "feat/issue-{number}",
     "inner_issue_nums": "{owner}/{repo}#{number}",
     "close_related_issue": true
   }'

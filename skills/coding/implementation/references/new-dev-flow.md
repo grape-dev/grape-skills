@@ -121,7 +121,7 @@ curl -sL -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "feat: #{number} 标题",
-    "head": "feat/issue-{number}", "base": "main",
+    "head": "feat/issue-{number}",
     "inner_issue_nums": "#{owner}/{repo}#{number}",
     "close_related_issue": true
   }' \
