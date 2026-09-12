@@ -69,7 +69,11 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 - ⚠️ **重复 A2A 检查（必须做）**：A2A 前先看 prompt 中的 Issue Pipeline 信息，如果当前 Issue 的 pipeline 中**已包含 `issue:a2a_event`**（即前一个 VOD 或其他 agent 已经 A2A 给了 Issue Agent），**不要重复 A2A**——只发评论回复即可，避免创建重复的 Issue Agent / Coding task。
 - ⚠️ **交办必带 issue_number**：无法确定则不调用 A2A，在评论中说明
 
-### ⑥ 任务完成流程（必做）
+> ⚠️ **A2A 交办完毕不代表任务结束**：完成 A2A / 发评论 / 结构化等业务动作后，**必须继续执行下方「任务完成流程」**（`grape tasks complete` 自报完成），不要在这里结束任务。
+
+## 任务完成流程（必须执行）
+
+> ⚠️ **不调用即失败**：完成全部业务动作后**必须调用 `grape tasks complete` 自报完成**，否则服务端会判定任务无产出而失败，即使业务动作（评论/结构化/A2A）已全部完成。
 
 完成全部业务动作后，**依次执行**：
 
@@ -126,4 +130,4 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 - 项目知识基线生成：`references/codegraph-project-analysis.md`
 - Grape CLI / API（认证用 `$GRAPE_SESSION_TOKEN`）：`references/grape-cli-reference.md`
 
-> ⚠️ **任务结束**：完成所有业务动作（发评论/结构化/A2A 交办）后，按「任务完成流程」输出摘要并调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。
+> ⚠️ **任务结束**：完成所有业务动作（发评论/结构化/A2A 交办）后，**必须按「任务完成流程」先输出摘要并调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。A2A 交办成功不等于任务结束。

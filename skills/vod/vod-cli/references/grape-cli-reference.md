@@ -64,6 +64,7 @@ grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 - 所有命令支持 `--json-out`（机器可读单行 JSON）；`-h/--help` 查看参数；`grape commands [pattern]` 列出契约命令。
 - 分页：`--per_page 20`（max 100）；出参结构 = GitCode 平台实际结构。
 - 契约不可达时 CLI 自动回退**内置契约快照**（`grape refresh` 显示来源）。
+- ⚠️ **命令名以契约为准，不要猜测**：拿不准命令名/参数时先 `grape commands | grep xxx` 或 `grape git-repo --help` / `grape <组> <verb> --help` 确认，不要凭印象拼写（如 github/gitlab 标称风格命令或缺失动词的命令，契约里不存在会报 No such command）。例如「读 Issue 评论」是 `grape git-repo issues comments list`，不是 `grape git-repo issues comments`。
 
 ## git（本地执行，token 零暴露）
 
