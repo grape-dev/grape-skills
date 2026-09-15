@@ -122,7 +122,7 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 | 用户提问 / @提及机器人 | 基于知识基线与分析结论答复（comment-guide.md） |
 | 用户要求启动开发/实现功能 | **先确认评级（见第 3 步）**；ready → 生成/确认 Spec → A2A 交办 coding；未 ready → 按评级处理（追问/补充/说明不可行） |
 | 评论补充信息（补充需求/澄清） | **重新执行深度可开发性分析，更新评级，按新评级执行** |
-| 评论请求关闭 Issue | 验证（`grape git log` 检查 master）后回复建议；已实现则关闭 + 刷新任务 |
+| 评论请求关闭 Issue | 验证（`grape git log` 检查工作分支）后回复建议；已实现则关闭 + 刷新任务 |
 | 讨论方案设计 | 基于知识基线参与讨论给出建议 |
 | 质疑分配结果 | 重新核对 CODEOWNERS，维持或调整 |
 | 对已发布 Spec 提出修改意见 | **更新 Spec（版本号 +1），重新发布，A2A 通知 coding agent** |
@@ -170,7 +170,7 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 ## 关闭建议
 
 用户请求关闭 Issue 时：
-1. `grape git log --oneline -20 --all` 检查 master 是否已实现
+1. `grape git log --oneline -20 --all` 检查工作分支（`$GRAPE_WORK_BRANCH`，缺省 main/master）是否已实现
 2. 已实现 → 回复说明已实现并**关闭 Issue**；未实现 → 回复当前进展
 
 ### 关闭 Issue 后刷新任务（必做）

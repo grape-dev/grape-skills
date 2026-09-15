@@ -45,9 +45,10 @@ tools:
 **所有信息通过 `grape git-repo` / `grape git` 获取**，不读取本地 Grape 数据文件。
 
 ### 本地代码基线已就绪（coding 工作模型）
-Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`），可直接执行
-`grape git checkout -b` / `grape git add` / `grape git commit` / `grape git push` 等命令（凭据由 `grape git` 自动注入）。
-若目录非 git 仓库（降级，无法 `grape git` 提交/推送），改用 `grape git-repo contents` **只读**仓库文件（如 README，返回 Base64）；写文件能力受限，需在评论中说明。
+Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`，基于工作基线分支 `$GRAPE_WORK_BRANCH` 创建），可直接执行
+`grape git add` / `grape git commit` / `grape git push` 等命令（凭据由 `grape git` 自动注入）。
+- **直接在当前分支（`feat/issue-{issue_number}`）上工作**，不要 `checkout -b` 另建分支——服务端已按 `$GRAPE_WORK_BRANCH` 准备好基线，另建分支会与 PR head 不一致。
+- 若目录非 git 仓库（降级，无法 `grape git` 提交/推送），改用 `grape git-repo contents` **只读**仓库文件（如 README，返回 Base64）；写文件能力受限，需在评论中说明。
 
 ## 评论前缀规范
 

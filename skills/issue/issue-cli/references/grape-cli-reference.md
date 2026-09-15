@@ -113,7 +113,7 @@ grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 仅 gitcode.com 宿主注入；换券失败仅告警、按本机原生行为执行。`grape git --help` 与 `git --help` 一致。
 
 ```bash
-grape git log --oneline -20 --all   # 关闭建议：检查 master 是否已实现（baseline 裸库）
+grape git log --oneline -20 --all   # 关闭建议：检查工作分支（$GRAPE_WORK_BRANCH，缺省 main/master）是否已实现（baseline 裸库）
 grape git status                     # 本地命令（无需凭据）
 ```
 

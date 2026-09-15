@@ -69,11 +69,16 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {nu
 
 当 context 中包含 CODEOWNERS 模块责任人信息时执行。从 context 中提取模块定义，生成 CODEOWNERS 文件并推送到 `codeowner` 分支。在 Issue 中评论告知完成。
 
-### 能力三：创建开发分支
+### 能力三：复用/创建开发分支
+
+> 服务端已基于工作基线分支 `$GRAPE_WORK_BRANCH`（缺省 main/master）建好 worktree 与分支 `feat/issue-{number}`，**直接在该分支上工作，不要另建分支名**。
 
 ```bash
-grape git checkout -b feat/issue-{number}-{简短描述}
-grape git push origin feat/issue-{number}
+# 默认：已就绪，直接确认当前在 feat/issue-{number} 上
+grape git status
+
+# 仅当分支不存在（降级场景）才创建（基于 origin/$GRAPE_WORK_BRANCH，缺省 main）
+grape git checkout -b feat/issue-{number} origin/"${GRAPE_WORK_BRANCH:-main}"
 ```
 
 ### 能力四：需求文档
@@ -113,11 +118,12 @@ grape git push origin feat/issue-{number}
 ⚠️ 创建 PR 后必须先发 Issue 评论告知用户，否则视为未完成。
 
 ```bash
-# 创建 PR
+# 创建 PR（base 用工作基线分支 $GRAPE_WORK_BRANCH，缺省 main/master；不要写死 main）
 grape git-repo pulls create --owner {owner} --repo {repo} \
   --json '{
     "title": "feat: #{number} 标题",
     "head": "feat/issue-{number}",
+    "base": "'"${GRAPE_WORK_BRANCH:-main}"'",
     "inner_issue_nums": "{owner}/{repo}#{number}",
     "close_related_issue": true
   }'

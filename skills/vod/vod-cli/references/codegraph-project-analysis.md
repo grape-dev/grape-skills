@@ -69,7 +69,7 @@ cat data/workspaces/{owner}/{repo}/project-info/.metadata.json
 
 | 条件 | 检查方式 |
 |------|---------|
-| 当前 main 分支 HEAD commit 与记录不同 | `grape git-repo commits --owner {owner} --repo {repo} --per_page 1 --json-out` 对比 sha |
+| 当前工作分支 HEAD commit 与记录不同 | 工作分支 = `$GRAPE_WORK_BRANCH`（缺省 main/master）；`grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out` 定位该分支的 `commit.id` 与 `.metadata.json` 对比 |
 | 距上次更新超过 7 天 | 对比 `.metadata.json.last_updated` |
 | project-graph.md 或 project-capabilities.md 缺失 | 检查文件是否存在 |
 
@@ -84,8 +84,8 @@ grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
 
 **筛选分析分支**（最多 3 个）：
 
-1. `main` 或 `master`（必须）
-2. 最近活跃的开发分支（按 `commit.last_activity_at` 排序取前 2）
+1. `$GRAPE_WORK_BRANCH`（场景工作基线分支，缺省 `main`/`master`——必须）
+2. 最近活跃的开发分支（按 `commit.last_activity_at` 排序取前 2，去重含工作分支）
 
 ### Step 4: 使用 codegraph 分析项目结构
 

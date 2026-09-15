@@ -92,18 +92,14 @@ Chat 对话只做查询和回答，**不修改任何 GitCode 仓库状态**：
 <at id={open_id}></at> 回复内容
 ```
 
-当前用户的 `open_id` 来自 prompt 的 `Feishu open_id` 字段。
+**open_id 解析（按 prompt 内联的「Name Resolution Workflow」）**：
+1. 目标用户（GitCode login，如 `Jason7602`）
+2. 在 prompt 的 **`### Known VCS -> Feishu Mappings`**（unified_user_mapping 缓存）中查 open_id → 命中直接用
+3. 未命中 → 从 prompt 的 **Collaborators** 列表中找该用户的 `nick_name`
+4. 用 nick_name 匹配 **Feishu Group Members（name -> open_id）** 得到 open_id
+5. 匹配成功 → 用 `<at id={open_id}>` 回复；匹配不到 → 直接用 `@nick_name` 文本提及即可
 
-其他 GitCode 用户通过用户映射接口获取 open_id（`grape` 无专属子命令，用通用兜底 `grape api`）：
-```bash
-grape api GET "/api/user-mapping?login={gitcode_login}&repo_key=gitcode:{owner}/{repo}" --json-out
-```
-返回示例：
-```json
-{"login":"weixin_45218422","open_id":"ou_xxx","nick_name":"肖斐"}
-```
-
-获取到 open_id 后，用 `<at id={open_id}>` 格式回复。**如果返回 404，直接使用 `@nick_name` 文本提及即可**。
+> ⚠️ **不用 `grape api` 查 user-mapping**：该逃生舱命令已移除，且 open_id 映射已由服务端内联到 prompt 中，按上述流程解析即可。
 
 ## 链接格式规范
 

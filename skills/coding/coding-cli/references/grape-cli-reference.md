@@ -42,9 +42,9 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 # 列 PR（是否已有方案 / 查自建 PR 编号）
 grape git-repo pulls list --owner {owner} --repo {repo} --state all --per_page 10 --json-out
 
-# 创建 PR（新开发场景；关联 Issue 可让合并后自动关闭）
+# 创建 PR（新开发场景；base 用工作基线分支 $GRAPE_WORK_BRANCH（缺省 main/master），不要写死 main；关联 Issue 可让合并后自动关闭）
 grape git-repo pulls create --owner {owner} --repo {repo} \
-  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"main","inner_issue_nums":"{owner}/{repo}#{n}","close_related_issue":true}'
+  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"'"${GRAPE_WORK_BRANCH:-main}"'","inner_issue_nums":"{owner}/{repo}#{n}","close_related_issue":true}'
 
 # 补充/更新 PR body 或标签（PATCH）
 grape git-repo pulls update --owner {owner} --repo {repo} --number {pr} \
@@ -96,17 +96,19 @@ grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 仅 gitcode.com 宿主注入；换券失败仅告警、按本机原生行为执行。`grape git --help` 与 `git --help` 一致。
 
 ```bash
-grape git status                                   # 本地命令（无需凭据）
-grape git checkout -b feat/issue-7                # 切换/创建开发分支
+grape git status                                   # 本地命令（无需凭据；确认在 feat/issue-7 上）
 grape git clone https://gitcode.com/owner/repo.git # 从 URL 识别仓库 → 注入凭据
 grape git pull
 grape git add -A
 grape git commit -m "feat: #7 描述"
 grape git push origin feat/issue-7
+# 仅当 feat/issue-7 不存在（降级）才创建，基于 origin/$GRAPE_WORK_BRANCH（缺省 main）
+grape git checkout -b feat/issue-7 origin/"${GRAPE_WORK_BRANCH:-main}"
 ```
 
-> 本地代码基线已就绪（coding 工作模型）：Grape 服务端已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`）。
-> 直接以 `grape git` 执行 checkout/add/commit/push 即可；若目录非 git 仓库（降级，无法 `grape git`），改用 `grape git-repo contents` **只读**仓库文件内容（仅 `get`），写文件能力受限需在评论中说明。
+> 本地代码基线已就绪（coding 工作模型）：Grape 服务端已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`，基于工作基线 `$GRAPE_WORK_BRANCH`）。
+> **直接在该分支（`feat/issue-{issue_number}`）上工作**，不要另建分支名，避免与 PR head 不一致；仅分支不存在时按上面降级命令创建。
+> 若目录非 git 仓库（降级，无法 `grape git`），改用 `grape git-repo contents` **只读**仓库文件内容（仅 `get`），写文件能力受限需在评论中说明。
 
 ## 错误排查
 
