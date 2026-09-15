@@ -1,38 +1,38 @@
 # Grape CLI 参考（Coding-CLI 版）
 
-> 本技能**只使用 `grape` CLI**（不再直连 `api.gitcode.com`，也不用 curl 调 API）。
-> `grape` 已提供完整且必要的 **grape API / gitcode API / github API / git 原始命令** 的命令行，
-> 统一使用系统注入的 **`$GRAPE_SESSION_TOKEN`**（任务级临时，随任务/会话失效）即可操作。
+> 本技能**只使用 `grape` CLI**，统一使用系统注入的 **`$GRAPE_SESSION_TOKEN`**（任务级临时，随任务/会话失效）即可操作。
+> 详细指南见 `grape-cli-guidance` 技能（命令分组 / token 作用域 / 错误排查 / 反模式），本文件是 Coding 实际用到的命令与要点。
 
-> 前提：执行环境需已安装 `grape` CLI（已随 worker 包 / 主控服务器预装；安装方式见下）。未就绪时请按「安装」指引处理，**不要改用 curl 直连**。
+## 核心原则（先读）
 
-## 安装（grape CLI）
+1. **命令是契约驱动的**：`grape <group> <verb> [--参数]` 由服务端 `/openapi.json`（或内置快照）动态生成。**不确定命令 → 先发现，别猜名字。**
+2. **token 决定你能做什么**：`GRAPE_SESSION_TOKEN`（`tk_`）= 会话级，任务环境默认注入，覆盖本技能全部日常操作（workflows / Agent Context / git-repo）。账户/平台管理类（skills/auth/repos-managed…）对 `tk_` 返回 **403**，需 `GRAPE_API_TOKEN`（`grape_`）或 Web JWT——**本技能一般用不到**。
+3. **读仓库用 `git-repo`，动工作流用 `tasks`/`a2a`，查 Issue/事件/上下文用 `issues`/`events`/`knowledge`。**
+4. **代码与 git 用 `grape git`**：本地 worktree 内的 clone/checkout/add/commit/push 一律用 `grape git`，凭据自动注入、token 零暴露。
+5. **机器可读输出加 `--json-out`**；长 JSON 用 `--json @file.json`（不手拼内联）。
 
-`grape` 由运维/部署侧预装，agent **一般不需也不应自行安装**：
+## 命令发现（拿不准命令名时必做）
 
-- **worker**：重跑一键安装脚本即获得（`install-worker.sh` 自动在 worker `.venv/bin` 生成 `grape` 并注入 PATH）；手建 worker 按实际部署方式手动安装到 `.venv/bin` 并打通 PATH。
-- **主控服务器**：已装于 `/opt/grape-cli`（`ln -sf /opt/grape-cli/bin/grape /usr/local/bin/grape`）。
-- **自装（有权限时）**：`python3 -m pip install -e <grape-cli 源码>`（源码仓库 `gitcode.com/grape-dev/grape-cli`，自动带 click/httpx 依赖）。
+```bash
+grape --help                       # 全部命令 + 分类 + token 作用域提示
+grape commands [pattern]           # 列出可调用命令；过滤：grape commands pulls
+grape <group> --help               # 该组动词（含方法/body/Token scope/示例）
+grape <group> <verb> --help        # 完整：参数 + Body fields + Examples
+grape refresh                      # 重拉最新契约（或回退内置快照）
+```
 
-> ⚠️ **禁止 `pip3 install grape`**：PyPI 上的 `grape` 是**第三方公有包**，不是本项目的 CLI，装错会误导命令执行。
-
-agent 内若 `which grape` 无结果：说明执行环境未就绪，直接回复「当前执行环境未安装 grape CLI，请管理员在 worker 安装后重试」，**不要**自行安装，也**不要**改用 curl 直连。
-
-## 认证与配置（无需手动设置）
-
-- `$GRAPE_SESSION_TOKEN` **已由服务端注入环境变量**，`grape` 自动读取（优先级：`--token` 参数 > `GRAPE_SESSION_TOKEN` > `GRAPE_API_TOKEN`/`GRAPE_BASE_URL` > `~/.grape/config.json`）。
-- **不需要** `export GRAPE_SESSION_TOKEN=...`，也不需要写 `~/.grape/config.json`。
-- 服务端地址自动取**已注入的环境变量 `$GRAPE_SERVER_URL`**（`grape` 直接读取，无需每次 `--base-url`）；如需覆盖可用 `--base-url <url>`。
-- token 是**任务级临时**的：任务结束即失效；命令报 401 说明凭据已失效，直接说明「凭据已失效」即可，不尝试换 token。
-- 一次性参数：`grape --token tk_xxx --base-url https://... --timeout 120 <cmd>`（仅本次进程）。
+> ⚠️ **命令名以契约为准，不要猜测**：不许 `grape commands | grep pulls`（用 `grape commands pulls`）；不许凭印象拼写，契约里不存在会报 `No such command`。
 
 ## 常用命令（Coding 实际用到）
 
 ```bash
 # 获取 Issue 完整内容（需求/评论，A2A context 只给摘要，必须用它拉全文）
+grape issues detail --owner {owner} --repo {repo} --number {n} --json-out   # 聚合视图（含阶段/状态）
+grape issues pipeline --owner {owner} --repo {repo} --number {n} --json-out # 路线图（判断已有规格）
 grape git-repo issues get --owner {owner} --repo {repo} --number {n} --json-out
 
 # 列 Issue（判断重复/已解决）
+grape issues list --owner {owner} --repo {repo} --json-out
 grape git-repo issues list --owner {owner} --repo {repo} --state all --per_page 20 --json-out
 
 # Issue 评论（body 一律以 [Coding Agent] 开头）
@@ -64,9 +64,10 @@ grape git-repo pulls files --owner {owner} --repo {repo} --number {pr} --json-ou
 grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
 grape git-repo commits --owner {owner} --repo {repo} --per_page 10 --json-out
 
-# 仓库信息 / 文件内容（降级：本地无 worktree 或代码基线缺失时）
+# 仓库信息 / 文件内容（降级：本地无 worktree 或代码基线缺失时；--raw 自动 base64 解码）
 grape git-repo repo --owner {owner} --repo {repo} --json-out
-grape git-repo contents --owner {owner} --repo {repo} --path README.md --json-out
+grape git-repo tree --owner {owner} --repo {repo} --ref main --json-out    # 目录树
+grape git-repo contents --owner {owner} --repo {repo} --path README.md --raw
 
 # A2A 交办 QA Agent（新开发/优化后通知 QA 审查或重新审查）
 grape a2a handoff --json '{"agent":"qa","payload":{...}}'
@@ -85,9 +86,8 @@ grape tasks complete --json '{
 grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 ```
 
-- 所有命令支持 `--json-out`（机器可读单行 JSON）；`-h/--help` 查看参数；`grape commands [pattern]` 列出契约命令。
+- 所有命令支持 `--json-out`（机器可读单行 JSON）；分页 `--per_page 20`（max 100）；出参结构 = GitCode 平台实际结构。
 - 契约不可达时 CLI 自动回退**内置契约快照**（`grape refresh` 显示来源）。
-- 命令形态：`grape <组> <动词> [--参数]`；组 `git-repo` 对应全部 GitCode 仓库 REST 接口（issues/pulls/contents/branches/commits/comments 等）。
 
 ## git（本地执行，token 零暴露）
 
@@ -106,22 +106,32 @@ grape git push origin feat/issue-7
 ```
 
 > 本地代码基线已就绪（coding 工作模型）：Grape 服务端已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`）。
-> 直接以 `grape git` 执行 checkout/add/commit/push 即可；若目录非 git 仓库（降级，无法 `grape git`），改用 `grape git-repo contents` **只读**仓库文件内容（仅 `get`，返回 Base64），写文件能力受限需在评论中说明。
+> 直接以 `grape git` 执行 checkout/add/commit/push 即可；若目录非 git 仓库（降级，无法 `grape git`），改用 `grape git-repo contents` **只读**仓库文件内容（仅 `get`），写文件能力受限需在评论中说明。
 
-## 通用兜底（`grape api`）
+## 错误排查
 
-对没有专门命令的 grape 内部端点，用 `grape api <METHOD> <path> [-d '<JSON>']`：
-
-```bash
-grape api GET /api/scenes --json-out
-grape api POST /api/tasks/create -d '{"repo_key":"{owner}/{repo}","title":"...","description":"..."}'
-# A2A / 自报完成有专属命令，不在此列：grape a2a handoff / grape tasks complete
-```
+| 现象 | 含义 | 处理 |
+|------|------|------|
+| `HTTP 401: ... re-inject` | token 无效/过期/缺失 | 任务级 token 短命，失效属正常：说明「凭据已失效」，不尝试换 token |
+| `HTTP 403: ... 不支持会话 token / use GRAPE_API_TOKEN` | 账户/平台类（D 类）拒绝会话凭据 | 本技能一般不涉及；确需时改用 `GRAPE_API_TOKEN`（`grape_`）或 Web JWT |
+| `No such command 'X'. Did you mean: A, B?` | 命令名写错 | 按建议改；或 `grape commands <关键词>` 查 |
+| `unknown request field(s): ... allowed for ...` | `--json` 字段不在请求体允许集 | 看 `grape <group> <verb> --help` 的 Body fields |
+| `(path not found; try --path '' to list root)` | `contents` 路径不存在 | 先 `--path ""` 看根列表定位 |
+| 403（无权限） | 写操作无权限 | 停止并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」 |
 
 ## 退出码
 
 `0` 成功 · `1` 通用/配置错误（缺 token/网络/超时） · `2` 用法错误 ·
 `>=400` HTTP 状态透传（如 `401`） · `130` Ctrl+C。
+
+## 反模式（禁止）
+
+- ❌ 凭印象/经验拼命令名或 `--参数` —— 先 `--help` 或 `grape commands <pattern>`。
+- ❌ `grape commands | grep ...` —— 用 `grape commands <pattern>`。
+- ❌ `grape api ...` —— 该命令**已移除**（曾是逃生舱），一律走契约命令。
+- ❌ 大 JSON 手拼内联 —— 用 `--json @file.json`。
+- ❌ 用 `tk_` 会话 token 打账户/平台管理接口（会 403）—— 需要时切换 `grape_`/JWT。
+- ❌ 在本地 worktree 用裸 `git` 绕过 `grape git`（会丢失凭据注入，token 暴露）—— 一律用 `grape git`。
 
 ## 安全与边界（必须遵守）
 
