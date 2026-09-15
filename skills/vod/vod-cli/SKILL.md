@@ -10,7 +10,7 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. `grape` CLI 已提供完整且必要的 **grape API / gitcode API / github API / git 原始命令** 的命令行，使用 `GRAPE_SESSION_TOKEN` 均可操作，详细见 `references/grape-cli-reference.md`，**无需探索额外 token**。若发现接口缺失或 token 失效，应**直接输出任务无法完成的理由**，而不是去探索其它无关的 token。
+1. `grape` CLI 已提供完整且必要的 **grape API / gitcode API / github API / git 原始命令** 的命令行，统一使用系统注入的 `GRAPE_SESSION_TOKEN`（任务级 `tk_`）即可覆盖 VOD 全部日常操作（workflows / Agent Context / git-repo），详细见 `references/grape-cli-reference.md`，**无需探索额外 token**。注意 token 有调用范围：会话级 `tk_` 对「账户/平台管理」类端点（skills/auth/repos-managed 等）返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按该指引说明，不要更换 token 或绕行。若发现接口缺失或 token 失效，应**直接输出任务无法完成的理由**，而不是去探索其它无关的 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
 3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
@@ -46,14 +46,14 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 ### ① 项目知识基线（必须最先）
 - 项目知识基线已由 Grape 服务端在 prompt 的「项目知识基线」章节**内联注入**（含 project-graph + project-capabilities 摘要）
 - 如需全文：读取 prompt 该章节末尾标注的**全文副本路径**（`project-info/` 下，执行前已被替换为实际落地目录，可用 read tool 读取）
-- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + GitCode API）
+- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + `grape git-repo` 命令取仓库信息）
 
 ### ② 项目历史全貌 + 需求判断
-- 近期 Issue 列表 `grape git-repo issues list --owner {owner} --repo {repo} --state all --per_page 20 --json-out` → 判断重复/已解决
+- 近期 Issue 列表 `grape issues list --owner {owner} --repo {repo} --json-out`（聚合视图，含阶段/状态）或 `grape git-repo issues list --owner {owner} --repo {repo} --state all --per_page 20 --json-out` → 判断重复/已解决
 - 近期 PR 列表 `grape git-repo pulls list --owner {owner} --repo {repo} --state all --per_page 10 --json-out` → 是否已有方案
 - 来源 A：历史反馈画像——聚类此前 `auto-submitted by VOD Agent` 的反馈 Issue，识别高频主题
-- 来源 B：读取该 Issue 完整内容（title/body/标签/评论），对照四要素；结合基线判断可执行性、重复、歧义
-- 已处理/已解决/无需动作 → 直接回复评论说明并进入**任务完成流程**（第 ⑥ 步收尾）
+- 来源 B：读取该 Issue 完整内容（`grape issues detail` / `git-repo issues get` + 评论），对照四要素；结合基线判断可执行性、重复、歧义
+- 已处理/已解决/无需动作 → 直接回复评论说明并进入**任务完成流程**收尾
 
 ### ③ 需求引导与澄清（≤3 轮）
 - 判断需求是否清晰（见 `references/requirement-elicit-guide.md` §二 漏斗规则）；已清晰 → 跳过进入 ④
