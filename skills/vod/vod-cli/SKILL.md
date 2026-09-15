@@ -60,6 +60,8 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 - **来源 A**（飞书）：飞书群多轮引导（每次 1-3 个澄清问题，结合知识基线）；超限仍不清晰 → 建「待澄清」Issue（body 列出已获取/缺失信息）
 - **来源 B**（已有 Issue）：Issue 评论 @开发者 追问；超限 → 评论列出已获取/缺失信息，标记「待澄清」
 
+> ⚠️ **发完澄清追问 = 本轮处理完成，必须收尾**：发出澄清追问/标记「待澄清」后，需求尚未收敛、不进入 ④⑤，但**本轮业务动作（发追问评论）已完成**——**必须继续执行下方「任务完成流程」**（`grape tasks complete`，`next_step` 用 `a2a_need_clarify`），不要因"等待用户回复"而跳过 complete，否则服务端判定任务无产出而失败。
+
 ### ④ 结构化产出（按「目标 Issue 是否存在」分支）
 - **已有 Issue → 更新收敛**：`grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"body":"..."}'`，按 `requirement-elicit-guide.md` §四 模板收敛 body（标注「VOD 审视结构化」）
 - **无 Issue（来源 A）→ 创建**：`grape git-repo issues create --owner {owner} --repo {repo} --json '{"title":"...","body":"..."}'`（标注 `auto-submitted by VOD Agent（Feishu）`）
@@ -89,8 +91,17 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
    ```
 
    - **`result_text` 按「结论 / 动作 / 产出（含可追溯 id）/ 摘要」组织**：结论定性、动作逐条 `•`
-     （structured / commented / a2a / created…）、产出带 Issue #N、comment id、A2A `seq` 等标识；
+     （structured / commented / a2a / created / clarified…）、产出带 Issue #N、comment id、A2A `seq` 等标识；
      `next_step` 取 `a2a_issue` / `reply_comment` / `a2a_need_clarify` / `done`。
+   - **澄清追问场景（需求未收敛）**：同样必须调用一次，`next_step` 用 `a2a_need_clarify`，`result_text` 写明"已发澄清追问/标记待澄清，等待用户补充，待清晰后再交办"：
+
+     ```bash
+     grape tasks complete --json '{
+       "result_text": "结论：Issue #{n} 需求暂不清晰，已发澄清追问等待用户补充。\n\n动作：\n• clarified：已在 Issue #{n} 发澄清追问（comment id=XXXXXX）\n• pending：需求待用户补充（目标/现状/期望/验收 缺失项）\n\n产出：\n- Issue #{n} 澄清追问评论\n\n摘要：一句话概括：已追问，待补充。",
+       "next_step": "a2a_need_clarify"
+     }'
+     ```
+
    - 即使本轮"该 Issue 已处理/无需动作"，也必须调用一次。
    - 若返回 `already:true`（任务已终态），属正常，忽略即可。
 
