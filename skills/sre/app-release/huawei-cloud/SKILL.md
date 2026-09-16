@@ -1,6 +1,6 @@
 ---
 name: huawei-cloud
-description: "华为云综合技能包 — 包含 ECS、VPC、OBS、CCE 等 22 个子技能"
+description: "HuaweiCloud DevKit插件工具，集成的华为云综合技能包 — 包含 ECS、VPC、OBS、CCE 等 22 个子技能"
 version: 1
 ---
 
