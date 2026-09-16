@@ -1,0 +1,33 @@
+{
+  "skill_name": "{{SKILL_NAME}}",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "A realistic user prompt that should trigger this skill. Include file paths, column names, or other realistic context.",
+      "expected_output": "Human-readable description of what success looks like.",
+      "files": [],
+      "assertions": [
+        "A specific, verifiable assertion about the output",
+        "Another verifiable assertion"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "A different phrasing of a similar task, perhaps more casual or terse.",
+      "expected_output": "Description of expected output for this case.",
+      "files": [],
+      "assertions": [
+        "A specific assertion"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "An edge case prompt — malformed input, unusual request, or ambiguous instruction.",
+      "expected_output": "How the skill should handle this edge case.",
+      "files": [],
+      "assertions": [
+        "An assertion about edge case handling"
+      ]
+    }
+  ]
+}
