@@ -35,7 +35,7 @@
 
 ```bash
 POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "> 用户的问题原文\n\n[Issue Agent] 这是机器人的回复内容。"}
 ```

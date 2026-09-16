@@ -8,11 +8,11 @@
 
 获取 Issue 的标题、正文、标签、评论等完整信息，判断需求的目标、范围、关键功能点。
 
-⚠️ A2A context 可能只包含摘要。必须通过 GitCode API 获取 Issue 完整内容：
+⚠️ A2A context 可能只包含摘要。必须通过 VCS API 获取 Issue 完整内容：
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}"
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/{owner}/{repo}/issues/{number}"
 ```
 
 如有不明确之处，先通过评论向用户确认，确认后再继续。
@@ -63,7 +63,7 @@ curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 ```bash
 POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "此需求是否启动开发？回复「启动」或「暂缓」。如需调整方案，请一并说明。"}
 ```
@@ -117,7 +117,7 @@ git push origin feat/issue-{number}
 
 ```bash
 # 创建 PR
-curl -sL -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -sL -X POST -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "feat: #{number} 标题",
@@ -125,20 +125,20 @@ curl -sL -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
     "inner_issue_nums": "#{owner}/{repo}#{number}",
     "close_related_issue": true
   }' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls
 
 # PATCH 补充 body
-curl -sL -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -sL -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "## 概述\n\n自动实现 Issue #{number}", "labels": "auto-pr", "prune_branch": true}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{pr_number}
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{pr_number}
 ```
 
 ### ⚠️ 必须执行：发 Issue 评论告知
 
 ```bash
 POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "[Coding Agent] ✅ 已完成实现，请审查 PR [#{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})。"}
 ```
@@ -151,7 +151,7 @@ Content-Type: application/json
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "qa",
@@ -201,5 +201,5 @@ context 应包含：
 **注意：**
 - 该 JSON 块放在**最终答复末尾**，是任务结束的唯一标记；
 - **不得**用长流程叙述（场景识别→方案→实现过程）替代该 JSON 块；
-- 若 PR 创建失败或某动作未完成，`actions`/`conclusion` 中如实说明（如 `"PR 创建失败：GitCode API 返回 xxx"`），不要伪造；
+- 若 PR 创建失败或某动作未完成，`actions`/`conclusion` 中如实说明（如 `"PR 创建失败：VCS API 返回 xxx"`），不要伪造；
 - `issue_summary` 覆盖 Issue 档案聚合结论，供下游 Agent 快速浏览。

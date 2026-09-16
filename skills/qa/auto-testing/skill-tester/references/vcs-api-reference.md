@@ -1,16 +1,16 @@
-# GitCode API 参考
+# VCS API 参考
 
 ## 使用规则（必须遵守）
 
-1. **所有端点都必须以 Base URL 为前缀**：本文件下表的 Endpoint 均为相对路径，调用时必须拼上 `https://api.gitcode.com/api/v5`（例：`Create PR` → `POST https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls`）。
+1. **所有端点都必须以 Base URL 为前缀**：本文件下表的 Endpoint 均为相对路径，调用时必须拼上 `$VCS_API_BASE`（例：`Create PR` → `POST $VCS_API_BASE/repos/{owner}/{repo}/pulls`）。
 2. **严禁凭经验/记忆/猜测拼接 API**：只使用本文件列出的端点与域名。**不得**使用 GitLab 风格（`/api/v3`、`/api/v4`、`projects/:id/merge_requests`）或其他域名（如 `gitcode.com/api/...`）。
-3. 遇到本文件未覆盖的 GitCode API 需求时，**不要臆造路径**：用 `GET /repos/{owner}/{repo}` 确认仓库信息，或在 Issue/PR 评论中说明"该操作无现成 API，需人工确认"。
+3. 遇到本文件未覆盖的 VCS API 需求时，**不要臆造路径**：用 `GET /repos/{owner}/{repo}` 确认仓库信息，或在 Issue/PR 评论中说明"该操作无现成 API，需人工确认"。
 4. 错误响应（404/405/500 等）说明**路径或方法有误**：先核对本文件表格，再重试；连续失败停止，不要绕行。
 
 ## Base URL
 
 ```
-https://api.gitcode.com/api/v5
+$VCS_API_BASE
 ```
 
 ## Authentication
@@ -21,19 +21,19 @@ Authorization: Bearer {token}
 PRIVATE-TOKEN: {token}
 ```
 
-Token 已在 prompt 中给出：`$BOT_GITCODE_TOKEN`
+Token 已在 prompt 中给出：`$BOT_TOKEN`
 （**不要**从代码或 env 文件中找其他值，那不是 API token。）
 
 ## 安全与边界（必须遵守）
 
-1. **只使用系统注入的 token**：调用 GitCode API 只能用 prompt 中给出的 token
-   （BOT_GITCODE_TOKEN / USER_GITCODE_TOKEN）。不得从数据库、配置文件、日志、
+1. **只使用系统注入的 token**：调用 VCS API 只能用 prompt 中给出的 token
+   （BOT_TOKEN / USER_TOKEN）。不得从数据库、配置文件、日志、
    历史记录、环境变量或任何文件中寻找、猜测、读取其他 token。
 2. **禁止访问 Grape 内部数据**：不得读取 data/sessions.db、
    user_accounts 表、managed_repos 表、configs/ 目录（含 global-bot-token.json 等）、
    global-bot-token.json 或任何 Grape 运行目录下的数据。那是 Grape 内部基础设施。
 3. **403/无权限处理**：若 API 返回 403 或权限不足，直接回复用户
-   "该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试"，
+   "该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试"，
    不要尝试通过其他 token 或绕行手段执行。
 4. **不得写入 token 到任何文件**：不要将 token 写进日志、脚本、issue 评论或工具调用以外的地方。
 
@@ -71,11 +71,11 @@ Token 已在 prompt 中给出：`$BOT_GITCODE_TOKEN`
 
 > 完整调用示例：
 > ```bash
-> curl -sL -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+> curl -sL -X POST -H "Authorization: Bearer $BOT_TOKEN" \
 >   -H "Content-Type: application/json" \
 >   -d '{"title": "feat: #7 标题", "head": "feat/issue-7", "base": "main",
 >        "inner_issue_nums": "Jason7602/gitcode-pr-assistant#7", "close_related_issue": true}' \
->   https://api.gitcode.com/api/v5/repos/Jason7602/gitcode-pr-assistant/pulls
+>   $VCS_API_BASE/repos/Jason7602/gitcode-pr-assistant/pulls
 > ```
 
 ### Repository
@@ -140,3 +140,25 @@ Token 已在 prompt 中给出：`$BOT_GITCODE_TOKEN`
 ## Rate Limit
 
 Default: 400 req/min, 4000 req/hour. Returns `429 Too Many Requests` when exceeded.
+
+
+## GitHub 与 GitCode 差异对照（重要！）
+
+调用 VCS API 前先确认仓库 provider（由 prompt 的 VCS API Access 段指定），按下表选择正确的参数格式：
+
+| 功能 | GitCode | GitHub |
+|------|---------|--------|
+| Issue 关闭 | `state="close"` | `state="closed"` |
+| labels 格式 | 逗号分隔字符串 `"bug,feature"` | 数组 `["bug","feature"]` |
+| assignees | `assignee` 单值字符串 | `assignees` 数组 `["user1"]` |
+| Create Issue body | 需带 `repo` 字段 | 不需要（repo 在 URL 里） |
+| PR 普通评论 | `POST /pulls/:n/comments` | `POST /issues/:n/comments`（GitHub 把 PR 视为 Issue） |
+| Create file | `POST /contents/:path` | `PUT /contents/:path` |
+| Update file | `PUT /contents/:path`（需 `sha`） | `PUT /contents/:path`（需 `sha`） |
+| Create branch | `POST /branches`（body: `branch_name`, `ref`） | `POST /git/refs`（body: `ref`, `sha`） |
+| Delete file | 不支持 | `DELETE /contents/:path` |
+| Accept header | 不需要 | `application/vnd.github+json`（必须带！） |
+| Create label | form-encoded | JSON body |
+| Add labels to issue | 通过 `PATCH /issues/:n` 的 `labels` 字段 | `POST /issues/:n/labels`（专用端点） |
+| Rate limit | 400 req/min | 5000 req/hour（认证用户） |
+| 关联 Issue | `inner_issue_nums` / `close_related_issue` | PR body 中 `Closes #N` / `Fixes #N` |

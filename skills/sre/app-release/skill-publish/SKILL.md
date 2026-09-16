@@ -22,7 +22,7 @@ tools:
    - 两者都**立即停止该平台任务，不重试、不用其他 token 绕行**
 5. token 绝不写入任何文件、日志、评论、脚本（项目知识库 JSON 由上层业务维护，本技能只读不写）
 6. 所有 curl / git 调用设 30s 超时（curl --max-time 30；git 用 timeout 30）——超时判定该平台任务失败，不 hang
-7. **调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径
+7. **调用 VCS API 一律以 `references/vcs-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径
 8. **重试策略**：
    - 401/403/配置缺失 → 不重试，直接跳过该平台
    - 5xx/连接超时/DNS 失败 → 最多 3 次指数退避重试（1s、2s、4s）
@@ -167,7 +167,7 @@ curl -s --max-time 30 -X POST \
   -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[SRE Agent] ✅ Skill 发布完成\n\n## 发布结果：{name}\n\n| 平台 | 状态 | 版本 | URL | 安装命令 |\n|------|------|------|-----|----------|\n| ClawHub | ✅ 已提交（安全扫描中）/ 🔴 失败 | v{clawhub_version} | https://clawhub.ai/{ownerHandle}/skills/{slug} | `clawhub install {slug}` |\n| GitHub | ✅ 成功/⚠️ 跳过 | v{github_version} | {url} | — |\n| GitCode | ✅ 成功/⚠️ 跳过 | v{gitcode_version} | {url} | — |\n\n**文件指纹**：{SHA-256 前 8 位}\n**发布时间**：{UTC ISO}\n\n**版本号说明**：ClawHub 可能因版本占用自动 bump，版本号与其他平台不同。跳过的平台版本填「—」。"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
 ```
 
 评论 body 格式：
@@ -256,7 +256,7 @@ curl -s --max-time 30 -X POST \
 ```
 
 ## 参考
-- 调用 GitCode API 时，**必须以 `references/gitcode-api-reference.md` 为准**——严禁自行拼写 API 路径
+- 调用 VCS API 时，**必须以 `references/vcs-api-reference.md` 为准**——严禁自行拼写 API 路径
 
 ## 环境变量
 
@@ -264,11 +264,11 @@ curl -s --max-time 30 -X POST \
 |------|------|------|
 | `CLAWHUB_TOKEN` | 项目知识 secrets / 环境变量 | ClawHub API Bearer token |
 | `GITHUB_TOKEN` | 项目知识 secrets / 环境变量 | GitHub PAT（x-access-token 格式） |
-| `GITCODE_TOKEN` | 项目知识 secrets / 环境变量 | GitCode API token（oauth2 格式） |
+| `GITCODE_TOKEN` | 项目知识 secrets / 环境变量 | VCS API token（oauth2 格式） |
 | `CLAWHUB_OWNER_HANDLE` | 项目知识 config / 环境变量 | ClawHub 组织 handle（可选，空=个人发布） |
 | `GITHUB_PUBLISH_REPO` | 项目知识 config / 环境变量 | GitHub 目标仓库 namespace/repo |
 | `GITCODE_PUBLISH_REPO` | 项目知识 config / 环境变量 | GitCode 目标仓库 namespace/repo |
-| `BOT_GITCODE_TOKEN` | 系统 prompt 注入 | GitCode Issue 评论发帖 token |
+| `BOT_TOKEN` | 系统 prompt 注入 | GitCode Issue 评论发帖 token |
 | `REPO_FULL_NAME` | 系统 prompt 注入 | 当前仓库全名 |
 | `ISSUE_NUMBER` | 系统 prompt 注入 | Issue 编号 |
 | `PR_NUMBER` | 系统 prompt 注入 | PR 编号 |

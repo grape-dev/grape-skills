@@ -11,7 +11,7 @@ tools:
 
 1. 调用 Grape/GitCode 平台一律只用 `grape` CLI 与系统注入的 `$GRAPE_SESSION_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token，也**不得改用 curl 直连 `api.gitcode.com`**。命令参考见 `references/grape-cli-reference.md`。注意 token 有调用范围：会话级 `tk_` 覆盖本技能全部日常操作（workflows / Agent Context / git-repo）；「账户/平台管理」类端点（skills/auth/repos-managed 等）对 `tk_` 返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按指引说明即可，不要更换 token 或绕行。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 401（token 失效）：任务级 token 短命，失效属正常；说明凭据已失效即可，不尝试替换。
 6. **长命令执行会静默**：`pip install`、`npm install`、大测试等长命令运行期间可能导致无输出。执行这类命令时**加 `timeout` 限制（如 `timeout 300 ...`）**并一次只装必要依赖，避免长时间无输出影响执行；若命令本身可能超长，先输出说明再执行。

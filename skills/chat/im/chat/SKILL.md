@@ -13,7 +13,7 @@ tools: []
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 `$USER_GITCODE_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 `$USER_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
 3. API 返回 403/无权限时：立即停止并回复用户「该操作需要相应权限，请在 GitCode 中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
@@ -39,7 +39,7 @@ tools: []
 - 构建失败诊断
 - 部署安全与合规
 - Issue/PR 状态分析
-- GitCode API 操作
+- VCS API 操作
 - **任务处理：仅澄清被分配 Issue 的需求并回帖**（绝不亲自执行/部署/写代码，→ task-handling.md）
 - **需求引导：帮助用户把想法/建议明确成可开发的 Issue**（→ inquiry-handling.md）
 
@@ -52,7 +52,7 @@ tools: []
 ## 调度执行
 
 - 判定场景后，**先用 read tool 读取对应 references 流程文件**，严格执行其中步骤。
-- 流程文件内的 GitCode 调用使用 `$USER_GITCODE_TOKEN`，服务端地址用 `{{SERVER_URL}}`。
+- 流程文件内的 GitCode 调用使用 `$USER_TOKEN`，服务端地址用 `{{SERVER_URL}}`。
 
 ## 响应规则
 
@@ -126,4 +126,4 @@ curl -s "{{SERVER_URL}}/api/user-mapping?login={gitcode_login}&repo_key=gitcode:
 
 ## 参考
 
-需要调用 GitCode API 时，读取当前目录下的 `references/gitcode-api-reference.md`。
+需要调用 VCS API 时，读取当前目录下的 `references/vcs-api-reference.md`。

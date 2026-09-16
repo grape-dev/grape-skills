@@ -54,13 +54,13 @@
 ## 创建引导 Issue 的 API 调用
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "[ACTION] 请配置仓库模块负责人",
     "body": "上述引导模板的完整内容"
   }' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues
+  $VCS_API_BASE/repos/{owner}/{repo}/issues
 ```
 
 ## 用户回复后的处理
@@ -88,7 +88,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "coding",

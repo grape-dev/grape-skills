@@ -11,9 +11,9 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 token，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 token，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 删除操作（如删 Issue/评论）需用户确认后执行；流程内已声明的写操作（建 Issue/发评论/A2A 交办）视为已获流程授权，其余写操作需用户确认后执行。
 
@@ -34,7 +34,7 @@ VOD 的职责：**把开发者声音变成清晰开发者需求**。
 
 | 依赖能力 | 用途 | 缺失时降级 |
 |---------|------|-----------|
-| 项目知识基线内联注入 | A1/B1 步骤的项目理解基础 | 降级为 README + GitCode API 分析并标注 [degraded] |
+| 项目知识基线内联注入 | A1/B1 步骤的项目理解基础 | 降级为 README + VCS API 分析并标注 [degraded] |
 | A2A 编排端点（POST /api/a2a） | A5/B6 交办 Issue Agent | 重试 ≤3 次后评论说明，next_step 标注人工介入 |
 | 飞书 VOD Bot 消息通道 | 来源 B 多轮引导 | 改用 Issue 评论渠道沟通 |
 | 事件注入（issue_opened / vod_signal） | 场景 A/B 的触发 | 无触发事件时不自行启动流程 |
@@ -61,7 +61,7 @@ VOD 的职责：**把开发者声音变成清晰开发者需求**。
 
 ```bash
 POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "[VOD Agent] 这是 VOD 的答复内容。"}
 ```
@@ -75,7 +75,7 @@ Content-Type: application/json
 #### A1 项目知识基线（必须最先）
 - 项目知识基线已由 Grape 服务端在 prompt 的「项目知识基线」章节**内联注入**（含 project-graph + project-capabilities 摘要）
 - 如需全文：读取 prompt 该章节末尾标注的**全文副本路径**（`project-info/` 下，执行前已被替换为实际落地目录，可用 read tool 读取）
-- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + GitCode API）
+- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + VCS API）
 
 #### A2 项目历史全貌（API 获取）
 - 近期 Issue 列表 `GET /repos/{owner}/{repo}/issues?state=all&per_page=20` → 判断重复/已解决
@@ -220,12 +220,12 @@ Content-Type: application/json
 | 断点续跑（resume） | 多轮引导中断后，从该 Issue 评论记录或飞书会话历史恢复对话上下文，重新确认当前轮次与已确认项后继续，不重复已完成步骤；A2A 交办前必查 pipeline 的 issue:a2a_event 状态，续跑不产生重复交办 |
 | 重试幂等 | A2A 失败重试 ≤3 次（硬约束 #5），配合 pipeline 检查保证重复执行无重复副作用；建 Issue 前先比对近期 Issue 列表（A2）查重，不重复创建；PATCH 收敛 body 为幂等操作，重复执行结果一致 |
 | 资源清理 | 执行全程不创建本地临时文件；涉及 project-info 文档写入时使用服务端指定路径并整体覆盖，无残留；任务结束输出最终 JSON 块即收口，不遗留挂起步骤 |
-| 降级策略 | 知识基线缺失 → README + GitCode API 降级分析并标注 [degraded]；codegraph 不可用 → 同上；A2A 端点不可达 → 重试 ≤3 次后评论说明并在 next_step 标注需人工介入 |
+| 降级策略 | 知识基线缺失 → README + VCS API 降级分析并标注 [degraded]；codegraph 不可用 → 同上；A2A 端点不可达 → 重试 ≤3 次后评论说明并在 next_step 标注需人工介入 |
 
 ## 参考
 
 - 需求引导 + 审视 + 模板 + A2A 交办：`references/requirement-elicit-guide.md`
 - 项目知识基线生成：`references/codegraph-project-analysis.md`
-- GitCode API：`references/gitcode-api-reference.md`
+- VCS API：`references/vcs-api-reference.md`
 
 > ⚠️ **任务结束**：完成所有业务动作（发评论/结构化/A2A 交办）后，输出最终 JSON 块并**结束任务**，不要继续思考或等待输入。

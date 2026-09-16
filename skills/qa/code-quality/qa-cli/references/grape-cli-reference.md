@@ -111,7 +111,7 @@ grape git log --oneline -20 --all    # 合并历史核对（工作流审查证�
 | `No such command 'X'. Did you mean: A, B?` | 命令名写错 | 按建议改；或 `grape commands <关键词>` 查 |
 | `unknown request field(s): ... allowed for ...` | `--json` 字段不在请求体允许集 | 看 `grape <group> <verb> --help` 的 Body fields |
 | `(path not found; try --path '' to list root)` | `contents` 路径不存在 | 先 `grape git-repo tree` / `--path ""` 看根列表定位 |
-| 403（无权限） | 写操作无权限 | 停止并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」 |
+| 403（无权限） | 写操作无权限 | 停止并回复「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」 |
 
 ## 退出码
 
@@ -131,10 +131,10 @@ grape git log --oneline -20 --all    # 合并历史核对（工作流审查证�
 ## 安全与边界（必须遵守）
 
 1. **只用系统注入的 `$GRAPE_SESSION_TOKEN`**：不得从数据库、配置文件、日志、历史、环境变量
-   中寻找/猜测其他 token；不得读取 `BOT_GITCODE_TOKEN`/`USER_GITCODE_TOKEN`（已不注入）。
+   中寻找/猜测其他 token；不得读取 `BOT_TOKEN`/`USER_TOKEN`（已不注入）。
 2. **禁止访问 Grape 内部数据**：不得读取 `data/sessions.db`、`user_accounts`、`managed_repos`、
    `configs/`（含 `global-bot-token.json` 等）等 Grape 内部基础设施（`data/workspaces/` 项目知识文档除外）。
-3. **403/无权限**：立即停止并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，
+3. **403/无权限**：立即停止并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，
    不要尝试其他 token 或绕行手段。
 4. **401（token 失效）**：任务级 token 短命，失效属正常；说明凭据已失效即可，不尝试替换。
 5. **接口缺失 / token 失效**：直接输出**任务无法完成的理由**，不要探索其它无关的 token。

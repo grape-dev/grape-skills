@@ -23,7 +23,7 @@ This skill enables users to:
 - **View Skill Details**: Fetch full SKILL.md content from GitHub for specific skills
 - **Install Skills**: Guide users through skill installation via `npx skills add` (GitCode default), `npx clawhub install`, or fallback GitHub method
 
-**Architecture**: GitCode API v5 (`index.json` + `cn-en-map.json`) → HTTP GET (base64 decode) → In-memory search → GitHub raw fetch for details → Install
+**Architecture**: VCS API v5 (`index.json` + `cn-en-map.json`) → HTTP GET (base64 decode) → In-memory search → GitHub raw fetch for details → Install
 
 ### Use Cases
 
@@ -73,7 +73,7 @@ RAW_BASE=https://raw.githubusercontent.com/$SKILLS_REPO/$SKILLS_BRANCH
 
 ## Index Source
 
-The search script fetches the skill index from GitCode API v5 via HTTP GET (base64 auto-decoded):
+The search script fetches the skill index from VCS API v5 via HTTP GET (base64 auto-decoded):
 
 ```
 SKILLS_INDEX_URL=https://gitcode.com/api/v5/repos/2501_91318609/skills-for-index/contents/skills-index/index.json?ref=main
@@ -98,7 +98,7 @@ node scripts/search-skills.mjs -c <category>
 → [scripts/search-skills.mjs](scripts/search-skills.mjs) (Node.js — cross-platform)
 
 **What the script does**:
-1. Fetches `index.json` and `cn-en-map.json` via HTTP GET from GitCode API v5 (auto-decodes base64 content)
+1. Fetches `index.json` and `cn-en-map.json` via HTTP GET from VCS API v5 (auto-decodes base64 content)
 2. Expands keywords via `cn-en-map.json` (bidirectional CN↔EN, e.g., "ECS" → "ECS, 弹性云服务器, 云服务器")
 3. Scores each skill: name match **+10**, trigger match **+8**, description match **+5**, service match **+3**
 4. Sorts by score descending, outputs formatted results with matched keywords
@@ -148,9 +148,9 @@ If all installation attempts fail, report the error message to the user. Do NOT 
 
 | Document | Description |
 |----------|-------------|
-| GitCode API v5 `index.json` | Skill index fetched via HTTP GET (base64 decoded) |
-| GitCode API v5 `cn-en-map.json` | Chinese-English keyword mapping fetched via HTTP GET (base64 decoded) |
-| [scripts/search-skills.py](scripts/search-skills.py) | Search script (Python) — fetches from GitCode API v5, expands keywords, scores, sorts |
+| VCS API v5 `index.json` | Skill index fetched via HTTP GET (base64 decoded) |
+| VCS API v5 `cn-en-map.json` | Chinese-English keyword mapping fetched via HTTP GET (base64 decoded) |
+| [scripts/search-skills.py](scripts/search-skills.py) | Search script (Python) — fetches from VCS API v5, expands keywords, scores, sorts |
 
 ## Search Heuristics
 
@@ -164,10 +164,10 @@ If all installation attempts fail, report the error message to the user. Do NOT 
 
 ### Issue: Script fails with "Failed to fetch index.json"
 
-**Cause**: GitCode API v5 URL unreachable
+**Cause**: VCS API v5 URL unreachable
 **Solution**: Verify network connectivity to `gitcode.com`
 
-### Issue: GitCode API v5 returns 404
+### Issue: VCS API v5 returns 404
 
 **Cause**: File path incorrect or default branch is not `main`
 **Solution**: Verify the skill's `category`, `service`, and `name` from search results
@@ -183,7 +183,7 @@ If all installation attempts fail, report the error message to the user. Do NOT 
 ## Notes
 
 - This skill is **read-only** and does not create any cloud resources
-- **No cache management needed** — index is fetched fresh from GitCode API v5 each run
+- **No cache management needed** — index is fetched fresh from VCS API v5 each run
 - **Network required** — index data is hosted on GitCode, fetched via HTTP GET (base64 decoded)
 - **MUST use script to search** — do not read index.json directly
 - Index repo: `https://gitcode.com/2501_91318609/skills-for-index` (branch: `main`)

@@ -14,9 +14,9 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 Grape/GitCode 平台一律只用 `grape` CLI 与系统注入的 `$GRAPE_SESSION_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token，也**不得改用 curl 直连 GitCode API**。命令参考见 `references/grape-cli-reference.md`。注意 token 有调用范围：会话级 `tk_` 覆盖本技能全部日常操作（workflows / Agent Context / git-repo）；「账户/平台管理」类端点（skills/auth/repos-managed 等）对 `tk_` 返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按指引说明即可，不要更换 token 或绕行。
+1. 调用 Grape/GitCode 平台一律只用 `grape` CLI 与系统注入的 `$GRAPE_SESSION_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token，也**不得改用 curl 直连 VCS API**。命令参考见 `references/grape-cli-reference.md`。注意 token 有调用范围：会话级 `tk_` 覆盖本技能全部日常操作（workflows / Agent Context / git-repo）；「账户/平台管理」类端点（skills/auth/repos-managed 等）对 `tk_` 返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按指引说明即可，不要更换 token 或绕行。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. AK/SK 必须从 Grape 控制台配置获取（`$HUAWEICLOUD_SDK_AK`/`$HUAWEICLOUD_SDK_SK` 由服务端注入），严禁从数据库/configs/日志/历史/其他文件中寻找或硬编码凭证。
 6. 如 Grape 控制台未配置 AK/SK，立即停止操作并回复用户「请在 Grape 控制台中配置华为云 AK/SK 后重试」，严禁尝试其他来源或绕行手段。

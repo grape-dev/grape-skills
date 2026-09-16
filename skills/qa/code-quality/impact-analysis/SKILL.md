@@ -12,9 +12,9 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 
 
@@ -42,7 +42,7 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 
 ### 禁止探索 Grape 内部
 不要执行 `ls`、`grep`、`cat` 等命令查看 workspace 目录、Grape 代码、日志文件或数据库。
-**所有仓库信息通过 GitCode API 获取**，不读取本地文件。
+**所有仓库信息通过 VCS API 获取**，不读取本地文件。
 **唯一例外**：`data/workspaces/history/{account}/{repo}/session_history.json` 会话历史文件是 Grape 明确提供给 Agent 读取的上下文，可以用 read 工具读取用于工作流审查的证据采集。
 
 ## 分析（每次执行前先分析，⚠️ 必须按 0→1→2→3 顺序依次执行，上一步未完成不得进入下一步）
@@ -117,10 +117,10 @@ GET /repos/{owner}/{repo}/pulls/{number}/comments
 - 如果已修复 → 调用 API 标记为已解决：
 
 ```bash
-curl -s -X PUT -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X PUT -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"resolved": true}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}/comments/{discussion_id}
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/comments/{discussion_id}
 ```
 
 其中 `discussion_id` 为评论对象的 `discussion_id` 字段（不是 `id` 字段）。
@@ -135,7 +135,7 @@ GET /repos/{owner}/{repo}/pulls/{number}/files
 从返回中获取每个文件在 diff 中的行号映射。然后在对应位置发布评论：
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "body": "[$AGENT_NAME] 🔴 Critical: 硬编码密钥，建议使用环境变量",
@@ -143,7 +143,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
     "path": "src/config.py",
     "position": 42
   }' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}/comments
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/comments
 ```
 
 - `commit_id` 为 PR 最新的 head.sha（阶段 0 已获取）
@@ -177,7 +177,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 **评估仓库 AI 编码工作流（Agent Work Loop），而非只审 diff。** 读取 `references/workflow-harness-review.md`，按五个维度（任务理解、受控执行、变更验证、可靠交付、经验沉淀）逐项评估：
 
 1. **收集证据**：
-   - 通过 GitCode API 读取仓库文件：`AGENTS.md`、`spec`/`DESIGN.md`、`skills/`、`tests/`、CI 配置（`.github/workflows`/`.gitlab-ci.yml`/`Jenkinsfile`）、Hook 配置、构建脚本
+   - 通过 VCS API 读取仓库文件：`AGENTS.md`、`spec`/`DESIGN.md`、`skills/`、`tests/`、CI 配置（`.github/workflows`/`.gitlab-ci.yml`/`Jenkinsfile`）、Hook 配置、构建脚本
    - 通过 read 工具读取会话历史：`data/workspaces/history/{account}/{repository}/session_history.json`
    - 对每个证据来源标注状态：**已观察（observed）** 或 **未观察（unobserved）**
 2. **逐维判定**：对照五维模型的问题清单，将具体差距转化为发现
@@ -255,7 +255,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "coding",
@@ -281,7 +281,7 @@ curl -X POST {{SERVER_URL}}/api/a2a \
 
 ```bash
 POST /repos/{owner}/{repo}/pulls/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "[$AGENT_NAME] 审查报告\n\n## 配置检查\n- ✅ Title：通过\n- ⚠️ Labels：缺少分类标签\n\n## 代码审查\n✅ 通过\n\n## 工作流审查\n⚠️ 2 项发现（见下）\n\n## 影响范围评估\n⚠️ 风险评级：高（见下）\n\n## 安全扫描\n✅ 安全\n\n## 合并检查\n⚠️ 测试未确认"}
 ```
@@ -364,7 +364,7 @@ Content-Type: application/json
 | 审查发现问题需要修改时调用 A2A 通知 implementation | ✅ **必须做** |
 | 所有评论统一在最后发送 | ✅ **必须做，不得在中间步骤发评论** |
 | ⚠️ **发送评论是最终强制步骤** | ✅ **必须做**（除非 SHA 未变更跳过） |
-| 只通过 GitCode API 获取仓库信息（session_history 例外） | ✅ **必须做** |
+| 只通过 VCS API 获取仓库信息（session_history 例外） | ✅ **必须做** |
 | 直接合并 PR | ❌ **禁止**（仅输出检查结论） |
 | 修改 PR 代码或文件 | ❌ **禁止** |
 | 删除 PR | ❌ **禁止** |
@@ -374,7 +374,7 @@ Content-Type: application/json
 
 ## 参考
 
-- 需要调用 GitCode API 时，读取 `references/gitcode-api-reference.md`
+- 需要调用 VCS API 时，读取 `references/vcs-api-reference.md`
 - 工作流五维评估模型与证据来源，读取 `references/workflow-harness-review.md`
 - 发现输出契约，读取 `references/findings-format.md`
 - 5 轴代码审查标准，读取 `references/code-review-and-quality.md`

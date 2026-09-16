@@ -21,19 +21,19 @@ tags:
 ## 前置条件
 
 - 已安装 curl 和 git
-- 已配置 `$BOT_GITCODE_TOKEN` 环境变量
+- 已配置 `$BOT_TOKEN` 环境变量
 - Grape 平台 A2A 服务可用（https://grape-dev.topxtopx.com/api/a2a）
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 
 ## 参考文件
 
-- 本地参考：`references/gitcode-api-reference.md`
+- 本地参考：`references/vcs-api-reference.md`
 - 本地参考：`references/labeling-guide.md`
 - 本地参考：`references/assignee-guide.md`
 - 本地参考：`references/comment-guide.md`

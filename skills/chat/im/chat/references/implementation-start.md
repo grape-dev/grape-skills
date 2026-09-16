@@ -13,8 +13,8 @@
 ## 1. 查询待启动 Feature
 
 ```bash
-curl -s -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues?state=open&assignee={login}&labels=feature
+curl -s -H "Authorization: Bearer $USER_TOKEN" \
+  $VCS_API_BASE/repos/{owner}/{repo}/issues?state=open&assignee={login}&labels=feature
 ```
 
 ## 2. 筛选标准
@@ -30,10 +30,10 @@ curl -s -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
 
 ```bash
 # 添加 PATCH 标签，触发 implementation skill
-curl -sL -X PATCH -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
+curl -sL -X PATCH -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"labels": "feature,triaged,PATCH"}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
 ```
 
 ## 4. 回复用户

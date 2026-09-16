@@ -7,8 +7,8 @@
 ## 获取 PR 详情
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}
 ```
 
 从返回中提取 `title`、`body`、`head.sha`、`labels`、`assignee`、`user.login` 等字段。

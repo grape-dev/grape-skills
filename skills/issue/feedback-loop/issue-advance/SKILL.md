@@ -28,7 +28,7 @@ tools:
 
 ### ⚠️ 任务通知硬规则（不可跳过）
 **在本 Issue 处理流程结束、责任人最终确定后（含机器人接管），必须调用 `POST /api/tasks/notify` 上报任务**（接口幂等）。
-- **assignee=机器人（grape_bot / gitcode_bot 等 bot 用户名）** → notify 会关闭该 Issue 旧的待处理任务（任务中心显示"已完成 / bot_takeover"），表示机器人已接管；
+- **assignee=机器人（grape_bot / grape_bot 等 bot 用户名）** → notify 会关闭该 Issue 旧的待处理任务（任务中心显示"已完成 / bot_takeover"），表示机器人已接管；
 - **assignee=人** → notify 创建/重派任务给该责任人（旧任务关闭为 reassigned，新建 active 任务）；
 - **唯一例外**：完全未确定责任人（如关闭 / 等待配置）。
 
@@ -37,10 +37,10 @@ tools:
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/tasks/notify \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "assignee": "<责任人GitCode用户名 或 grape_bot>",
+    "assignee": "<责任人VCS用户名 或 grape_bot>",
     "repo_key": "'"$REPO_FULL_NAME"'",
     "issue_number": "'"$ISSUE_NUMBER"'",
     "task_description": "Issue #'"$ISSUE_NUMBER"' 已分配给你，请处理：<简要任务描述>"
@@ -76,12 +76,12 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 
 ### 禁止探索 Grape 内部
 项目知识文档（data/workspaces/）和 codegraph 索引（.codegraph/）除外。
-其他信息通过 GitCode API 获取，不读取项目源代码文件。
+其他信息通过 VCS API 获取，不读取项目源代码文件。
 
 **硬约束（违反即违规）：**
-1. **只用系统注入的 token** — 调用 GitCode API 只能用 prompt 中给出的 `$BOT_GITCODE_TOKEN`。**严禁**从数据库、configs 目录、日志、历史记录或任何文件中寻找、读取、猜测其他 token。
+1. **只用系统注入的 token** — 调用 VCS API 只能用 prompt 中给出的 `$BOT_TOKEN`。**严禁**从数据库、configs 目录、日志、历史记录或任何文件中寻找、读取、猜测其他 token。
 2. **严禁访问 Grape 内部数据** — 不得读取 sessions.db、user_accounts 表等 Grape 运行数据（data/workspaces/ 下的项目知识文档除外）。
-3. **API 403/无权限** — 若 GitCode API 返回 403 或权限不足，**立即停止该操作并回复用户**。
+3. **API 403/无权限** — 若 VCS API 返回 403 或权限不足，**立即停止该操作并回复用户**。
 4. **token 不得落盘** — 不得将 token 写入任何文件、日志、评论或脚本。
 
 ## Issue 处理流程（⚠️ 统一流程，任何 issue 事件（issue_updated/issue_comment/issue_labeled）都执行）
@@ -89,13 +89,13 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 > 说明：`issue_opened` 已由 VOD Agent 接管（生命周期 `vod` 阶段审视澄清），本技能处理的是进入 `issue` 阶段的 Issue（含 VOD 交办后的后续）。所有事件类型共用以下流程，**不区分"新 Issue"与"评论"**——评论处理同样需要知识基线与深度可开发性分析，否则无法保证答复准确。
 
 ### 1. 确定 Issue 与上下文（必须最先）
-- 从事件 payload 提取 issue 编号；缺失则用 GitCode API 查询定位
+- 从事件 payload 提取 issue 编号；缺失则用 VCS API 查询定位
 - 读取该 Issue 全部评论/标签/关联 PR，了解完整上下文（含生命周期 `issue_state` 阶段）
 
 ### 2. 项目知识基线（⚠️ 必须执行，任何事件都需）
 - 项目知识基线已由 Grape 服务端在 prompt 的「项目知识基线」章节**内联注入**（含 project-graph + project-capabilities 摘要）
 - 如需全文：读取 prompt 该章节末尾标注的**全文副本路径**（`project-info/` 下，执行前已被替换为实际落地目录，可用 read tool 读取）
-- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + GitCode API）
+- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + VCS API）
 - ⚠️ 此步骤是后续分析与答复的基础，不可跳过——评论答复也要基于项目理解
 
 ### 3. 深度可开发性分析（⚠️ 每次处理都执行）
@@ -167,7 +167,7 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/tasks/close \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "repo_key": "'"$REPO_FULL_NAME"'",
@@ -189,7 +189,7 @@ curl -X POST {{SERVER_URL}}/api/tasks/close \
 | 分类、打标签、分配 | ✅ **按分析结论执行** |
 | 回复 Issue、追问澄清 | ✅ **鼓励做** |
 | **用户要求开发/实现前，先确认该 Issue 已深度可开发性分析且 ready** | ✅ **必须做（未 ready 不 A2A 交办 coding）** |
-| 只通过 GitCode API 获取信息 | ✅ **鼓励做** |
+| 只通过 VCS API 获取信息 | ✅ **鼓励做** |
 | 直接写代码、修改文件 | ❌ **禁止** |
 | 提交 PR、合并 PR | ❌ **禁止** |
 | 回复 Token、密码等敏感信息 | ❌ **禁止** |
@@ -203,19 +203,19 @@ POST /repos/:owner/:repo/labels
 name=feature&color=a2eeef
 
 # 更新 Issue
-curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"labels": "feature,triaged", "assignee": "younger_eric"}' \
-  https://api.gitcode.com/api/v5/repos/:owner/:repo/issues/:number
+  $VCS_API_BASE/repos/:owner/:repo/issues/:number
 
 # 关闭 Issue
 curl -s -X PATCH ... -d '{"state": "close"}' \
-  https://api.gitcode.com/api/v5/repos/:owner/:repo/issues/:number
+  $VCS_API_BASE/repos/:owner/:repo/issues/:number
 ```
 
 ## 参考
 
-需要调用更全面的 GitCode API 时，读取 `references/gitcode-api-reference.md`。
+需要调用更全面的 VCS API 时，读取 `references/vcs-api-reference.md`。
 需要使用 codegraph 工具时，读取 `references/codegraph-commands.md`。
 
 > 注：评论 body 前缀固定为 `[issue agent]`，不再使用 `$AGENT_NAME` 环境变量。

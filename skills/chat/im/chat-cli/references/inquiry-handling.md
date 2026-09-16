@@ -50,9 +50,9 @@ grape git-repo issues create --owner {owner} --repo {repo} \
   }'
 ```
 
-> **重要**：CLI 版默认用会话 token（`$GRAPE_SESSION_TOKEN`）创建；若 prompt 仍注入 `$USER_GITCODE_TOKEN` 且需以用户本人身份创建（避免 self-comment 过滤、让 issue agent 正常分诊），用一次性参数：
+> **重要**：CLI 版默认用会话 token（`$GRAPE_SESSION_TOKEN`）创建；若 prompt 仍注入 `$USER_TOKEN` 且需以用户本人身份创建（避免 self-comment 过滤、让 issue agent 正常分诊），用一次性参数：
 > ```bash
-> grape --token "$USER_GITCODE_TOKEN" git-repo issues create --owner {owner} --repo {repo} --json '{"title":"...","body":"..."}'
+> grape --token "$USER_TOKEN" git-repo issues create --owner {owner} --repo {repo} --json '{"title":"...","body":"..."}'
 > ```
 > 若建 Issue 后 issue agent 因 self-comment 过滤未分诊，在回复中如实提示用户。
 

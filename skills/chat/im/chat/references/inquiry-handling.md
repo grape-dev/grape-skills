@@ -43,16 +43,16 @@
 信息补充到位后，创建 Issue（不带标签），正文模板：
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
+curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "<清晰的需求标题>",
     "body": "**提交人**: @用户飞书昵称 (Feishu ID: xxx)\n**渠道**: 飞书\n**时间**: 当前时间\n**归属**: 🤖 Chat Agent 本身 / 📦 当前仓库\n\n**需求描述**:\n> 用户核心需求\n\n**使用场景**:\n> 场景说明\n\n**预期效果**:\n> 期望结果\n\n**验收标准**:\n> 可衡量的完成标准\n\n---\nauto-submitted by Chat Agent Feishu feedback"
   }' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues
+  $VCS_API_BASE/repos/{owner}/{repo}/issues
 ```
 
-> **重要**：创建 Issue 使用用户自己的 `$USER_GITCODE_TOKEN`。创建后会触发该仓库 webhook 事件，由于是用户本人（非 bot）创建，**不会被 self-comment 过滤**，issue agent 会正常分诊处理该 Issue。
+> **重要**：创建 Issue 使用用户自己的 `$USER_TOKEN`。创建后会触发该仓库 webhook 事件，由于是用户本人（非 bot）创建，**不会被 self-comment 过滤**，issue agent 会正常分诊处理该 Issue。
 
 ## 4. 回复用户
 

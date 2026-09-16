@@ -21,23 +21,23 @@ tags:
 ## 前置条件
 
 - 已安装 git 和 curl
-- 已配置 `$BOT_GITCODE_TOKEN` 环境变量
+- 已配置 `$BOT_TOKEN` 环境变量
 - Issue 的 git worktree 分支已就绪（feat/issue-{issue_number}）
 - Grape 平台 A2A 服务可用
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
-5. 调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准，严禁根据经验/记忆/猜测自行拼写 API 路径。
+5. 调用 VCS API 一律以 `references/vcs-api-reference.md` 为准，严禁根据经验/记忆/猜测自行拼写 API 路径。
 6. 长命令执行会静默，加 timeout 限制并一次只装必要依赖。
 7. 禁止前台运行长驻/服务类命令，改用后台启动+验证+关闭模式。
 
 ## 参考文件
 
-- 本地参考：`references/gitcode-api-reference.md`
+- 本地参考：`references/vcs-api-reference.md`
 - 本地参考：`references/code-review-checklist.md`
 - 本地参考：`references/huaweicloud-tf-conventions.md`（华为云 TF 编码规范、凭证设置约定、cn-north-4 避坑指南）
 
@@ -66,7 +66,7 @@ tags:
 
 ### 4. 提交 PR
 - git push 推送特性分支到远端
-- 调用 GitCode API 创建 MR（POST /repos/:owner/:repo/pulls），参考 `references/gitcode-api-reference.md`
+- 调用 VCS API 创建 MR（POST /repos/:owner/:repo/pulls），参考 `references/vcs-api-reference.md`
 - MR body 四段齐全：变更说明、资源清单、文件变更、后续步骤
 - 遵循 Conventional Commits
 
@@ -90,7 +90,7 @@ tags:
 | 代码优化场景修改完成后必须在 PR 评论告知 | ✅ **必须做** |
 | 每个提交一个原子变更 | ✅ **必须做** |
 | 所有 TF 代码和脚本放在仓库 `iac/` 子目录下 | ✅ **必须做** |
-| 只通过 GitCode API 获取信息 | ✅ **必须做** |
+| 只通过 VCS API 获取信息 | ✅ **必须做** |
 | 仅实现当前 Issue 描述的内容 | ✅ **保持范围** |
 | 直接合并 PR | ❌ **禁止（仅创建，等待人工审批）** |
 | 执行 terraform apply / terraform destroy | ❌ **禁止（部署是 SRE Agent 职责，Coding 只负责到 PR 创建）** |

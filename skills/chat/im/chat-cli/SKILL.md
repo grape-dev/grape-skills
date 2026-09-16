@@ -42,7 +42,7 @@ tools:
 - 构建失败诊断
 - 部署安全与合规
 - Issue/PR 状态分析
-- GitCode API 操作
+- VCS API 操作
 - **任务处理：仅澄清被分配 Issue 的需求并回帖**（绝不亲自执行/部署/写代码，→ task-handling.md）
 - **需求引导：帮助用户把想法/建议明确成可开发的 Issue**（→ inquiry-handling.md）
 

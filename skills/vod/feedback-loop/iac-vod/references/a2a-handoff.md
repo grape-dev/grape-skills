@@ -14,7 +14,7 @@ VOD 完成以下全部动作后，**必须** A2A 交办 Issue Agent：
 
 ```bash
 curl -X POST https://grape-dev.topxtopx.com/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "issue",

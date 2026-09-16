@@ -136,12 +136,12 @@
 ### 作为 Issue 评论发布
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "body": "[Issue Agent] 📋 Spec Document\n\n{spec 完整内容}"
   }' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}/comments
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}/comments
 ```
 
 格式要求：
@@ -151,10 +151,10 @@ curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 ### 同时打标签
 
 ```bash
-curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"labels": "{原有标签},spec-ready"}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
 ```
 
 新增 `spec-ready` 标签（颜色 `#0075ca`）。
@@ -162,10 +162,10 @@ curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 ### 分配给机器人
 
 ```bash
-curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"assignee": "{BOT_USERNAME}"}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
 ```
 
 使用 Grape 的 GitCode 用户名作为 assignee，表示机器人接管后续开发流程。
@@ -174,7 +174,7 @@ curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "coding",
@@ -223,7 +223,7 @@ curl -X POST {{SERVER_URL}}/api/a2a \
 coding agent 收到 A2A 调用后：
 
 1. 从 A2A context 获取 Spec 摘要
-2. 通过 GitCode API 获取 Issue 完整内容（含 Spec 评论）
+2. 通过 VCS API 获取 Issue 完整内容（含 Spec 评论）
 3. 基于 Spec，由 coding agent 按 implementation skill 的开发流程执行（spec 落在 Issue 评论作为上下文）
 4. Spec 中的 Technical Approach 对应方案设计
 5. Spec 中的 Acceptance Criteria 对应测试用例设计

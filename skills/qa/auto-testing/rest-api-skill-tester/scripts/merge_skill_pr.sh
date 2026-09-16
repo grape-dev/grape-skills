@@ -9,7 +9,7 @@
 #   merge_skill_pr.sh <pr_number>
 #
 # 环境变量（已由系统注入）：
-#   BOT_GITCODE_TOKEN  仓库 bot token（必填）
+#   BOT_TOKEN  仓库 bot token（必填）
 #   REPO_FULL_NAME     仓库全名 owner/repo（必填）
 #
 # 退出码：0=合并成功；1=参数/环境错误；2=merge API 调用失败
@@ -24,11 +24,11 @@ if [[ -z "$PR_NUMBER" ]]; then
   exit 1
 fi
 
-TOKEN="${BOT_GITCODE_TOKEN:-}"
+TOKEN="${BOT_TOKEN:-}"
 REPO_FULL="${REPO_FULL_NAME:-}"
 
 if [[ -z "$TOKEN" ]]; then
-  echo "[merge_skill_pr] ERROR: BOT_GITCODE_TOKEN 未设置"
+  echo "[merge_skill_pr] ERROR: BOT_TOKEN 未设置"
   exit 1
 fi
 if [[ -z "$REPO_FULL" ]]; then
@@ -38,7 +38,7 @@ fi
 
 OWNER="${REPO_FULL%%/*}"
 REPO="${REPO_FULL#*/}"
-API_BASE="https://api.gitcode.com/api/v5"
+API_BASE="$VCS_API_BASE"
 
 log() { echo "[merge_skill_pr] $*"; }
 

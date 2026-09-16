@@ -14,14 +14,14 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用环境变量 `$BOT_GITCODE_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
-2. GitCode API 调用格式（必须用 Bearer）：
+1. 调用 VCS API 只用环境变量 `$BOT_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
+2. VCS API 调用格式（必须用 Bearer）：
    ```bash
-   curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" "https://gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER"
+   curl -s -H "Authorization: Bearer $BOT_TOKEN" "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER"
    ```
-   ⚠️ 必须用 `Authorization: Bearer ***` `Authorization: token ***` 会被 GitCode API 返回 401。
+   ⚠️ 必须用 `Authorization: Bearer ***` `Authorization: token ***` 会被 VCS API 返回 401。
 3. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-4. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+4. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 5. token 不得写入任何文件/日志/评论。
 6. AK/SK 必须从 Grape 控制台配置获取，严禁从数据库/configs/日志/历史/其他文件中寻找或硬编码凭证。
 7. 如 Grape 控制台未配置 AK/SK，立即停止操作并回复用户「请在 Grape 控制台中配置华为云 AK/SK 后重试」，严禁尝试其他来源或绕行手段。
@@ -53,7 +53,7 @@ tools:
 **资源释放场景**：
 - 跳过构建/部署，直接走「资源释放流程」（见下方专节）。
 - 从 Issue 正文/评论中提取要释放的资源信息（ECS 名称/IP、RDS 实例名、OBS 桶名等）。
-- 如果 Issue 中没有明确的资源信息，先用 GitCode API 查 Issue 评论补充；仍无法确定时回帖追问用户。
+- 如果 Issue 中没有明确的资源信息，先用 VCS API 查 Issue 评论补充；仍无法确定时回帖追问用户。
 
 ### 入口 2：PR 合并触发（`pull_request_merged` 事件）
 
@@ -306,7 +306,7 @@ curl -s -o /dev/null -w '%{http_code}' "http://$ECS_IP:5000/post/1"  # Flask 示
 |------|------|------|
 | `HUAWEICLOUD_SDK_AK` | Grape 控制台 | 华为云 Access Key |
 | `HUAWEICLOUD_SDK_SK` | Grape 控制台 | 华为云 Secret Key |
-| `BOT_GITCODE_TOKEN` | account 配置 | GitCode API Token |
+| `BOT_TOKEN` | account 配置 | VCS API Token |
 
 ## 硬约束
 
@@ -331,10 +331,10 @@ curl -s -o /dev/null -w '%{http_code}' "http://$ECS_IP:5000/post/1"  # Flask 示
 - **OBS 桶**：桶名
 - **安全组/密钥对/EIP**：如有关联资源也一并释放
 
-如果 Issue 中资源信息不完整，用 GitCode API 查 Issue 评论补充：
+如果 Issue 中资源信息不完整，用 VCS API 查 Issue 评论补充：
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  "https://gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
 ```
 
 仍无法确定时，在 Issue 回帖追问用户，列出已知资源请用户确认。

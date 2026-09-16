@@ -9,9 +9,9 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 \\，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 \\，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 
 
@@ -31,7 +31,7 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 
 ### 禁止探索 Grape 内部
 不要执行 `ls`、`grep`、`cat` 等命令查看 workspace 目录、Grape 代码、日志文件或数据库。
-**所有信息通过 GitCode API 获取**，不读取本地文件。
+**所有信息通过 VCS API 获取**，不读取本地文件。
 
 ## 处理流程
 
@@ -41,8 +41,8 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 
 1. **获取 PR 详情**：
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}
 ```
 从返回中提取 `title`、`body`、`head.sha`、`labels`、`assignee`、`user.login` 等字段。
 
@@ -65,8 +65,8 @@ Skill 仓库 PR 标题必须符合以下格式：
 
 **2a. 获取 PR 变更文件列表**：
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}/files
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/files
 ```
 从返回中提取每个文件的 `filename` 和 `status`（added / modified）。
 
@@ -77,10 +77,10 @@ curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 **2c. 自动修复标题**：
 ```bash
-curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title": "add skill: qa"}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}
 ```
 
 3. **逐项检查**：
@@ -196,7 +196,7 @@ echo -n "{head.sha}" > ../.last_pr_review/{pr_number}.sha
 
 ```bash
 POST /repos/{owner}/{repo}/pulls/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "> 用户的问题原文\n\n[$AGENT_NAME] 这是机器人的回复内容。"}
 ```
@@ -207,7 +207,7 @@ Content-Type: application/json
 
 ```bash
 POST /repos/{owner}/{repo}/pulls/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "[$AGENT_NAME] 代码审查完成，结论：通过。"}
 ```
@@ -254,10 +254,10 @@ Content-Type: application/json
 - ❌ 禁止执行 `ls 项目根目录`、`grep *.log` 等无关命令
 - ❌ 禁止直接写代码修复问题
 - ✅ 可以审查、扫描、评论、关联 Issue
-- ✅ 只通过 GitCode API 获取 Issue/PR 信息
+- ✅ 只通过 VCS API 获取 Issue/PR 信息
 
 ## 参考
 
-需要调用 GitCode API 时，读取 `references/gitcode-api-reference.md`。
+需要调用 VCS API 时，读取 `references/vcs-api-reference.md`。
 
 > 注：`[$AGENT_NAME]` 中的 `$AGENT_NAME` 是当前 Agent 名称的环境变量（如 Issue Agent / QA Agent / Coding Agent），构造 curl body 时需用双引号包裹以触发 shell 展开（单引号内不展开）。

@@ -22,16 +22,16 @@
 
 ## 2. 读取 Issue 背景
 
-用 GitCode API 获取 Issue 详情和全部评论，完整理解背景：
+用 VCS API 获取 Issue 详情和全部评论，完整理解背景：
 
 ```bash
 # 获取 Issue 详情
-curl -s -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}
+curl -s -H "Authorization: Bearer $USER_TOKEN" \
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
 
 # 获取该 Issue 的全部评论（理解讨论过程）
-curl -s -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}/comments
+curl -s -H "Authorization: Bearer $USER_TOKEN" \
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}/comments
 ```
 
 > `{owner}/{repo}` 和 `{number}` 来自任务上下文消息（仓库 + Issue 号）。
@@ -71,13 +71,13 @@ curl -s -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
 用户澄清完整后，将「Issue 原始内容 + 用户的澄清补充」汇总，**以用户身份回帖到该 Issue**：
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $USER_GITCODE_TOKEN" \
+curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "**补充需求澄清**（由任务处理对话整理）：\n\n## 背景\n<原 Issue 核心内容>\n\n## 澄清后的需求\n- **使用场景**：<用户补充>\n- **预期效果**：<用户补充>\n- **验收标准**：<用户补充>\n\n---\n补充人：<用户昵称>（通过 Chat 对话整理）"}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}/comments
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}/comments
 ```
 
-> **重要**：回帖使用用户自己的 `$USER_GITCODE_TOKEN`（不是 Grape token）。回帖后会触发该 Issue 的 webhook 事件，由于是用户本人（非 bot）发出的评论，**不会被 self-comment 过滤**，issue agent 会重新分诊并刷新责任人。
+> **重要**：回帖使用用户自己的 `$USER_TOKEN`（不是 Grape token）。回帖后会触发该 Issue 的 webhook 事件，由于是用户本人（非 bot）发出的评论，**不会被 self-comment 过滤**，issue agent 会重新分诊并刷新责任人。
 
 ## 6. 回复用户
 

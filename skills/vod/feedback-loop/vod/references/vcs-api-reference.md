@@ -1,9 +1,9 @@
-# GitCode API 参考
+# VCS API 参考
 
 ## Base URL
 
 ```
-https://api.gitcode.com/api/v5
+$VCS_API_BASE
 ```
 
 ## Authentication
@@ -16,14 +16,14 @@ PRIVATE-TOKEN: {token}
 
 ## 安全与边界（必须遵守）
 
-1. **只使用系统注入的 token**：调用 GitCode API 只能用 prompt 中给出的 token
-   （BOT_GITCODE_TOKEN / USER_GITCODE_TOKEN）。不得从数据库、配置文件、日志、
+1. **只使用系统注入的 token**：调用 VCS API 只能用 prompt 中给出的 token
+   （BOT_TOKEN / USER_TOKEN）。不得从数据库、配置文件、日志、
    历史记录、环境变量或任何文件中寻找、猜测、读取其他 token。
 2. **禁止访问 Grape 内部数据**：不得读取 data/sessions.db、
    user_accounts 表、managed_repos 表、configs/ 目录（含 global-bot-token.json 等）、
    global-bot-token.json 或任何 Grape 运行目录下的数据。那是 Grape 内部基础设施。
 3. **403/无权限处理**：若 API 返回 403 或权限不足，直接回复用户
-   "该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试"，
+   "该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试"，
    不要尝试通过其他 token 或绕行手段执行。
 4. **不得写入 token 到任何文件**：不要将 token 写进日志、脚本、issue 评论或工具调用以外的地方。
 
@@ -95,3 +95,25 @@ PRIVATE-TOKEN: {token}
 ## Rate Limit
 
 Default: 400 req/min, 4000 req/hour. Returns `429 Too Many Requests` when exceeded.
+
+
+## GitHub 与 GitCode 差异对照（重要！）
+
+调用 VCS API 前先确认仓库 provider（由 prompt 的 VCS API Access 段指定），按下表选择正确的参数格式：
+
+| 功能 | GitCode | GitHub |
+|------|---------|--------|
+| Issue 关闭 | `state="close"` | `state="closed"` |
+| labels 格式 | 逗号分隔字符串 `"bug,feature"` | 数组 `["bug","feature"]` |
+| assignees | `assignee` 单值字符串 | `assignees` 数组 `["user1"]` |
+| Create Issue body | 需带 `repo` 字段 | 不需要（repo 在 URL 里） |
+| PR 普通评论 | `POST /pulls/:n/comments` | `POST /issues/:n/comments`（GitHub 把 PR 视为 Issue） |
+| Create file | `POST /contents/:path` | `PUT /contents/:path` |
+| Update file | `PUT /contents/:path`（需 `sha`） | `PUT /contents/:path`（需 `sha`） |
+| Create branch | `POST /branches`（body: `branch_name`, `ref`） | `POST /git/refs`（body: `ref`, `sha`） |
+| Delete file | 不支持 | `DELETE /contents/:path` |
+| Accept header | 不需要 | `application/vnd.github+json`（必须带！） |
+| Create label | form-encoded | JSON body |
+| Add labels to issue | 通过 `PATCH /issues/:n` 的 `labels` 字段 | `POST /issues/:n/labels`（专用端点） |
+| Rate limit | 400 req/min | 5000 req/hour（认证用户） |
+| 关联 Issue | `inner_issue_nums` / `close_related_issue` | PR body 中 `Closes #N` / `Fixes #N` |
