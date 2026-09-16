@@ -189,14 +189,14 @@
     "description": "Issue 运营（skill-dev 专用）：项目知识基线 → 深度可开发性分析 → Spec 生成 → 危险场景识别 → 用户确认 → A2A 触发开发"
   },
   "rest-api-skill-creator": {
-    "name": "通用Skill创建生成器",
+    "name": "通用REST API skill生成器",
     "agent_type": "coding",
     "sub_scene": "scaffolding",
     "path": "coding/scaffolding/rest-api-skill-creator",
     "description": "按需求自动创建 REST API 管理 skill：查重 → 读取 Spec → OpenAPI/文档/基础信息三级调研 → 骨架生成 → 自测 → 创建 PR → A2A 交棒 QA Agent 测试。通用不限目标系统"
   },
   "rest-api-skill-tester": {
-    "name": "通用Skill测试验证",
+    "name": "通用REST API skill功能验证",
     "agent_type": "qa",
     "sub_scene": "auto-testing",
     "path": "qa/auto-testing/rest-api-skill-tester",

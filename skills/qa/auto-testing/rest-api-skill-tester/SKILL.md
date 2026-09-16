@@ -11,7 +11,7 @@ tools:
   - git
 ---
 
-# REST API Skill Tester（通用 REST API skill 功能验证）
+# REST API Skill Tester（通用REST API skill功能验证）
 
 ## 安全硬约束（必须遵守）
 
