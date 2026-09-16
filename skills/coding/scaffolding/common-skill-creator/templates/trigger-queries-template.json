@@ -1,0 +1,102 @@
+[
+  {
+    "query": "A realistic prompt that SHOULD trigger this skill. Vary phrasing — formal, casual, with typos.",
+    "should_trigger": true,
+    "axis": "phrasing"
+  },
+  {
+    "query": "A prompt that names the skill's domain directly.",
+    "should_trigger": true,
+    "axis": "explicitness"
+  },
+  {
+    "query": "A prompt that describes the need WITHOUT naming the domain directly.",
+    "should_trigger": true,
+    "axis": "explicitness"
+  },
+  {
+    "query": "A terse, short prompt with minimal context.",
+    "should_trigger": true,
+    "axis": "detail"
+  },
+  {
+    "query": "A context-heavy prompt with file paths, specific details, and backstory.",
+    "should_trigger": true,
+    "axis": "detail"
+  },
+  {
+    "query": "A multi-step workflow where this skill is one part of a larger chain.",
+    "should_trigger": true,
+    "axis": "complexity"
+  },
+  {
+    "query": "A single-step task that directly maps to what the skill does.",
+    "should_trigger": true,
+    "axis": "complexity"
+  },
+  {
+    "query": "A prompt where the skill would help but the connection isn't obvious from the query alone.",
+    "should_trigger": true,
+    "axis": "implicit"
+  },
+  {
+    "query": "NEAR-MISS: shares keywords with the skill but needs something different (e.g., editing a spreadsheet vs analyzing one).",
+    "should_trigger": false,
+    "axis": "near-miss"
+  },
+  {
+    "query": "NEAR-MISS: involves the same file type/tool but the task is a different category (e.g., CSV upload to DB vs CSV analysis).",
+    "should_trigger": false,
+    "axis": "near-miss"
+  },
+  {
+    "query": "NEAR-MISS: similar domain but different specific operation.",
+    "should_trigger": false,
+    "axis": "near-miss"
+  },
+  {
+    "query": "Obviously irrelevant query with minimal keyword overlap.",
+    "should_trigger": false,
+    "axis": "irrelevant"
+  },
+  {
+    "query": "A general programming question that doesn't require domain-specific knowledge.",
+    "should_trigger": false,
+    "axis": "general"
+  },
+  {
+    "query": "A query about a completely different domain that happens to share a common word.",
+    "should_trigger": false,
+    "axis": "keyword-overlap"
+  },
+  {
+    "query": "A simple task the agent can handle without specialized knowledge.",
+    "should_trigger": false,
+    "axis": "simplicity"
+  },
+  {
+    "query": "A request for information/explanation rather than action.",
+    "should_trigger": false,
+    "axis": "info-vs-action"
+  },
+  {
+    "query": "Another near-miss with subtle distinction from the skill's scope.",
+    "should_trigger": false,
+    "axis": "near-miss"
+  },
+  {
+    "query": "A task in an adjacent but distinct domain.",
+    "should_trigger": false,
+    "axis": "adjacent-domain"
+  },
+  {
+    "query": "A prompt that uses similar tooling but for a fundamentally different purpose.",
+    "should_trigger": false,
+    "axis": "tool-mismatch"
+  },
+  {
+    "query": "A boundary case right at the edge of what the skill should cover — use your judgment.",
+    "should_trigger": false,
+    "axis": "boundary"
+  }
+]
