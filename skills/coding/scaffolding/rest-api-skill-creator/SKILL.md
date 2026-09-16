@@ -4,14 +4,14 @@ version: 0.2.0
 description: |
   按需求自动创建 REST API 管理 skill：查重 → 读取 Spec → OpenAPI/文档/基础信息三级调研 →
   骨架生成（脚本+SKILL.md+端点文档+测试用例）→ 自测 → 创建 PR → A2A 交棒 QA Agent 测试。
-  通用不限目标系统（博客/CMS/Wiki/商城），认证方式按 Spec 确认。
+  通用不限目标系统（博客/CMS/Wiki/商城等gitcode代码仓），认证方式按 Spec 确认。
   凭据变量名由 skill name 推导前缀（如 blog-manager → BLOG_MANAGER_*）。
 tools:
   - curl
   - git
 ---
 
-# REST API Skill Creator（通用 REST API skill 生成器）
+# REST API Skill Creator（通用REST API skill生成器）
 
 ## 安全硬约束（必须遵守）
 
