@@ -1,6 +1,6 @@
 # 新开发流程
 
-从 issue skill 通过 A2A 触发的新功能/fix 开发。
+由上游负责 Issue 处理的 Agent 通过 A2A 触发的新功能/fix 开发。
 
 ## 分析（按顺序执行，上一步未完成不得进入下一步）
 
@@ -49,7 +49,7 @@ curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 ```
 分析结论：
-- 场景：新开发（从 issue skill 触发）
+- 场景：新开发（由上游 Issue 处理 Agent 触发）
 - 任务类型：feature 开发
 - 复杂度：大型（涉及 OAuth 外部服务集成）
 - 必须执行：需求文档 → 方案设计 → 编码 → 测试 → 自审查 → 创建 PR → A2A 通知 QA 审查
