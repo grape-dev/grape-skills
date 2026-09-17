@@ -3,7 +3,7 @@
 ## When to Generate
 - Feature requests (type:feature)
 - Enhancement requests (type:enhancement)
-- When issue skill determines the issue requires implementation planning
+- When the Issue Agent determines the issue requires implementation planning
 
 ## Spec Template
 

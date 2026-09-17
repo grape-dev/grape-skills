@@ -1,6 +1,6 @@
 ---
 name: iac-vod
-version: 1.1.0
+version: 2.0.0
 description: |
   开发者声音分析（Voice of Developer）。收集开发者反馈，聚类分析共性诉求与痛点，
   提炼价值需求，自动创建 Issue 推进改进。
@@ -23,7 +23,7 @@ tags:
 - 已安装 curl 和 git
 - 已配置 `$BOT_GITCODE_TOKEN` 环境变量
 - 仓库已存在 Gitee/GitCode Issue 模块
-- Grape 平台 A2A 服务可用（https://grape-dev.topxtopx.com/api/a2a）
+- Grape 平台 A2A 服务可用（$GRAPE_A2A_URL）
 
 ## 安全硬约束（必须遵守）
 
@@ -71,6 +71,64 @@ VOD 完成分析、标签和评论后，**必须通过 A2A 将 Issue 交给 Issu
 ⚠️ **VOD 不得直接 A2A 交办 Coding/QA/SRE Agent**——VOD 的职责边界到分析评论为止，后续流转由 Issue Agent 主导。
 
 详见 `references/a2a-handoff.md`。
+
+## 声明
+
+### 输入参数（inputSchema）
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| repo_full_name | string | 是 | 仓库全名（owner/repo） |
+| issue_number | integer | 是 | 关联 Issue 编号 |
+| feedback_source | string | 否 | 反馈来源（issue_comment/pr_review/community） |
+| pipeline | array | 否 | 当前 Issue 的 A2A pipeline 事件列表 |
+
+非法输入（缺失必填项、类型不匹配）时立即终止并输出结构化错误，不降级执行。
+
+### 输出格式（outputSchema）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| issue_title | string | `[VOD] <聚类标签>: <问题简述>` 格式 |
+| issue_body | string | 完整分析链路（现象→影响面→建议方案） |
+| labels | array | 包含 `vod` 及聚类分类标签 |
+| frequency | integer | 同类反馈频次 |
+| priority | string | P0/P1/P2 |
+| a2a_dispatched | boolean | 是否已 A2A 交办 Issue Agent |
+
+### 读写语义
+
+| 操作类型 | 行为 | 示例 |
+|----------|------|------|
+| 读操作 | 自动执行 | GET Issue 列表、GET Issue 评论、搜索历史 Issue/PR |
+| 写操作 | A2A 流水线自动执行（非交互式流水线设计，无需用户逐次确认） | POST 创建 Issue、POST Issue 评论、POST A2A |
+| 删除操作 | 禁止 | 不执行任何删除/关闭/合并操作 |
+
+### 性能预算
+
+| 指标 | 预算 | 说明 |
+|------|------|------|
+| Skill 加载时延 | < 3s | 纯文档型 skill，无加载期脚本 |
+| 反馈分析执行时延 | P95 ≤ 5 min | 含 API 调用 + 聚类分析 + Issue 创建 |
+| LLM token 消耗 | ≤ 8000 tokens/次 | 含参考文件按需加载 |
+| API 调用次数 | ≤ 10 次/次执行 | GET Issue + GET 评论 + POST Issue + POST 评论 + POST A2A |
+
+### 兼容性声明
+
+| 依赖 | 版本要求 | 说明 |
+|------|----------|------|
+| GitCode API | v5 | 所有 API 调用基于 v5 端点 |
+| Grape A2A | >= 1.0 | A2A payload 结构遵循 Grape 平台约定 |
+| 版本演进策略 | — | 本 Skill 版本号在 frontmatter 中声明，新旧版本行为差异通过版本号识别；A2A 调用方按 issue_number 传参，不依赖 Skill 版本号 |
+
+### 可靠性声明
+
+| 机制 | 声明 |
+|------|------|
+| 超时处理 | API 调用默认 30s 超时，超时后重试 1 次，仍失败则降级为评论回复 |
+| 重试幂等 | 创建 Issue 前按关键词搜索去重；A2A 前检查 pipeline 是否已有 issue:a2a_event，避免重复交办 |
+| 失败降级 | A2A 失败时在 Issue 评论中标注「待人工交办 Issue Agent」；API 403 时立即停止并告知用户 |
+| 资源清理 | 本 Skill 为分析型，不创建临时文件或临时资源；创建的 Issue 为最终产物，无中间态需清理；失败的半成品 Issue 在创建后标注「[草稿]」前缀，由人工决定关闭或完善 |
 
 ## 硬规则
 
