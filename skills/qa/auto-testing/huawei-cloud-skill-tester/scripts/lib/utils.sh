@@ -275,11 +275,12 @@ discover_siblings() {
 # Two-tier resolution. NO interactive prompt is ever used (not even in TTY):
 #   1. Environment variables (HUAWEI*/HW*/HWC* prefixed AK/SK pairs)
 #   2. hcloud CLI config (~/.hcloud/config.json profile)
-# If neither source yields credentials, the framework prints the env-var
-# setup template to stderr and exits 77. The Agent's job is to OUTPUT that
-# template to the user — NEVER read, type, ask for, or echo back the literal
-# AK/SK value in chat. The user fills in the values out-of-band (in their
-# shell profile / .zshrc / PowerShell $PROFILE) and re-runs the failing phase.
+# If neither source yields credentials, the framework prints a THREE-OPTION
+# guide to stderr and exits 77. The Agent's job is to OUTPUT that guide to the
+# user in the issue comment and wait for their choice: ① machine owner exports
+# the missing env vars out-of-band; ② grape 环境在平台「通用设置」菜单配置凭据;
+# ③ DRYRUN_MODE=1 以 dryrun/mock 继续（用例标 dryrun, 绝不标 pass）.
+# NEVER read, type, ask for, or echo back the literal AK/SK value in chat.
 #
 # Exit codes (used by phase-4 / phase-6 / run-test-pipeline / calling agents):
 #   0  — credentials obtained (env or hcloud config)
@@ -288,11 +289,11 @@ discover_siblings() {
 #
 # Agent protocol (when running non-interactively, e.g. via an AI agent):
 #   - On exit 77, the script has emitted the HUAWEI_CREDENTIALS_REQUIRED
-#     sentinel + the env-var template to stderr. The agent should:
-#     1) OUTPUT the template to the user (verbatim) — do NOT ask the user to
-#        paste AK/SK into chat, do NOT read credential files
-#     2) Tell the user to fill in their AK/SK in their shell and re-run
-#     3) Re-run with HUAWEI_ACCESS_KEY and HUAWEI_SECRET_KEY set
+#     sentinel + the three-option guide to stderr. The agent should:
+#     1) POST the guide to the user verbatim in the issue comment and wait
+#        for their choice (① export env vars ② grape 通用设置 ③ DRYRUN_MODE=1)
+#     2) NOT ask the user to paste AK/SK into chat, NOT read credential files
+#     3) Re-run per the chosen option (with DRYRUN_MODE=1 for option 3)
 #   - The agent MUST NOT silently skip Phase 4/6 — that defeats the test.
 #   - If the user declines to provide credentials, the agent may abort the
 #     pipeline (preferred) or skip live phases at the agent's discretion,
@@ -300,6 +301,13 @@ discover_siblings() {
 
 # Sentinel emitted to stderr when credentials are required and cannot be obtained
 CRED_REQUEST_SENTINEL="__HUAWEI_SKILL_TESTER_CRED_REQUEST_v1__"
+
+# DRYRUN mode — user-selected option 3 (no credentials): the pipeline runs
+# without real API calls and marks every live case as 'dryrun' (never 'pass').
+# Report explicitly labels the mode so a dryrun result cannot be mistaken for
+# a real pass. Enabled by the calling agent after the user picks option 3.
+DRYRUN_MODE="${DRYRUN_MODE:-0}"
+is_dryrun() { [ "${DRYRUN_MODE:-0}" = "1" ]; }
 
 # Helper: scan env for HUAWEI*/HW*/HWC* prefixed AK/SK pairs
 _scan_env_ak_sk() {
@@ -380,10 +388,27 @@ _emit_cred_request_sentinel() {
     echo "active hcloud CLI profile was found."
     echo ""
     echo "Huawei Cloud Skill Tester NEVER accepts AK/SK via stdin, chat, or any"
-    echo "interactive prompt. To unblock live tests, the user must set env vars"
-    echo "out-of-band in their shell profile and re-run."
+    echo "interactive prompt. This script is exiting with code 77 so the calling"
+    echo "agent MUST post the three options below to the user (issue comment for"
+    echo "grape runs, or the current session otherwise) and wait for their choice."
     echo ""
-    echo "===== copy from here (do NOT echo or paste the values into chat) ====="
+    echo "===== 给调用方(大模型)的三选项引导 — 请在 issue 评论中原样转述给用户，等待选择其一 ====="
+    echo ""
+    echo "❓ 需要提供华为云访问凭据（AK/SK）才能继续真实环境测试，请选择以下任一种方式："
+    echo ""
+    echo "【选项 1】环境变量（适用于机器拥有者）"
+    echo "  在当前机器的环境变量中通过 export 方式添加缺失的环境变量（模板见下方），"
+    echo "  添加完成后回复确认，测试将自动重新执行。"
+    echo ""
+    echo "【选项 2】grape 平台通用设置（适用于 grape 环境）"
+    echo "  若测试运行于 grape 环境，请在 grape 平台的「通用设置」菜单中配置相应凭据"
+    echo "  （Access Key / Secret Key），配置完成后回复确认，测试将重新执行。"
+    echo ""
+    echo "【选项 3】dryrun/mock 模式继续后续测试流程"
+    echo "  以 dryrun/mock 方式继续：运行方设置 DRYRUN_MODE=1 后重新执行（命令见下方），"
+    echo "  所有真实 API 用例将被标记为 dryrun 而不是 pass，报告会显式标注该模式。"
+    echo ""
+    echo "===== 选项 1 的 env-var 设置模板 (copy from here) ====="
     echo ""
     echo "  # Linux / macOS"
     echo "  export HUAWEI_ACCESS_KEY=\"<your-access-key-id>\""
@@ -397,18 +422,17 @@ _emit_cred_request_sentinel() {
     echo ""
     echo "===== copy ends ====="
     echo ""
-    echo "  # any HUAWEI*/HW*/HWC* prefixed *_AK / *_SK / *_ACCESS_KEY / *_SECRET_KEY"
-    echo "  # env pair is also accepted; HUAWEI_REGION can be any valid Huawei region."
+    echo "  # 任何 HUAWEI*/HW*/HWC* 前缀的 *_AK / *_SK / *_ACCESS_KEY / *_SECRET_KEY"
+    echo "  # 环境变量对同样被接受；HUAWEI_REGION 可为任意有效华为云区域。"
+    echo "  # 也可由用户在自身终端内带外执行 hcloud configure 配置 CLI profile（不在本会话内）。"
     echo ""
-    echo "Alternatively, set up an hcloud CLI profile (interactive, OUTSIDE this session):"
-    echo "  hcloud configure    # prompts for AK/SK in the user's terminal only"
-    echo ""
-    echo "Then re-run the failing phase:"
-    echo "  bash run-test-pipeline.sh --skills <name> --phase 4"
+    echo "===== 选项 3 的执行方式 ====="
+    echo "  DRYRUN_MODE=1 bash run-test-pipeline.sh --skills <name> --phase 4"
+    echo "  DRYRUN_MODE=1 bash run-test-pipeline.sh --skills <name> --phase 6"
+    echo "  （dryrun 用例 status=dryrun，绝不标记为 pass）"
     echo ""
     echo "This script is now exiting with code 77 as a signal to the calling agent."
-    echo "The agent should OUTPUT the template above and tell the user to re-run;"
-    echo "it MUST NOT ask the user to type or paste AK/SK in chat."
+    echo "The agent MUST NOT ask the user to type or paste AK/SK in chat."
   } >&2
 }
 

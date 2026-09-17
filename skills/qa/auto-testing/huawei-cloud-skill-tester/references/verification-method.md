@@ -141,7 +141,7 @@ $phase3.result.statistics
 
 **目标**：跑 Phase 3 的用例（只读自动，写操作需 ALLOW_WRITES=1）。
 
-**前置**：AK/SK 凭证（`HUAWEI_ACCESS_KEY` / `HUAWEI_SECRET_KEY` 任意 HUAWEI* 开头）。**缺失时不再弹 prompt —— 框架直接输出 env-var 设置模板到 stderr 并 exit 77**，用户必须在自己的 shell profile / PowerShell $PROFILE 中带外设置后再重跑。
+**前置**：AK/SK 凭证（`HUAWEI_ACCESS_KEY` / `HUAWEI_SECRET_KEY` 任意 HUAWEI* 开头）。**缺失时不再弹 prompt —— 框架直接输出三选项引导到 stderr 并 exit 77**：① 机器拥有者 export 缺失环境变量 ② grape 环境在平台「通用设置」菜单配置凭据 ③ `DRYRUN_MODE=1` 以 dryrun/mock 继续（用例标 `dryrun` 非 pass）。用户带外配置后回复确认，或选择选项 3 后以 dryrun 重跑。
 
 **跑 phase 4（默认只读）**：
 
@@ -313,7 +313,7 @@ HUAWEI_ACCESS_KEY=<your-access-key-id> HUAWEI_SECRET_KEY=<your-secret-access-key
 | 现象 | 排查 |
 |------|------|
 | `Phase N: 链式验证失败` | 检查 `phases/phase-(N-1)-summary.json` 是否存在；缺失则 `--fresh` 或 `--phase N-1` 补跑 |
-| `AK/SK 凭证缺失（exit 77）` | 框架不会向 agent 或终端索要 AK/SK 明文；stderr 中已输出 env-var 设置模板。Agent / 调用方应将该模板原样输出给用户，引导其在 shell profile / PowerShell $PROFILE 带外设置 `HUAWEI_ACCESS_KEY` + `HUAWEI_SECRET_KEY`，然后用 `--phase 4` 重跑。 |
+| `AK/SK 凭证缺失（exit 77）` | 框架不会向 agent 或终端索要 AK/SK 明文；stderr 中已输出三选项引导。Agent / 调用方应将该引导原样发布到 issue 评论并等待用户选择：① 机器 export 环境变量 ② grape 通用设置配置凭据 ③ `DRYRUN_MODE=1` 以 dryrun/mock 继续（用例标 `dryrun` 非 pass）；用户带外配置后用 `--phase 4` 重跑。 |
 | 兄弟 skill 没被扫到 | 检查 `SIBLING_LIMIT` 是否被设为 0，或目录结构（必须 `huawei-cloud-*`） |
 | Phase 7 verdict=pass 但 `test_cases_pass` 偏低 | 看 `Phase 4` fail 归类，按推荐修 SKILL.md 或 templates |
 | 报告 `report_dir` 不是绝对路径 | 这是 bug — 重跑 Phase 7 |

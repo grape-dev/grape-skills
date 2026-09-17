@@ -79,24 +79,29 @@ if [ "$SKILL_COUNT" -le 1 ]; then
 
   check_phase_deps "$local_skill_dir" 6 || exit 1
 
-  # Force AK/SK check before any SDK/CLI execution
-  step "检查 AK/SK 凭证..."
-  set +e
-  ensure_ak_sk
-  cred_rc=$?
-  set -e
-  if [ $cred_rc -ne 0 ]; then
-    if [ $cred_rc -eq 77 ]; then
-      fail "AK/SK 凭证缺失（exit 77 — 详见 stderr 中的 env-var 设置模板）"
-      fail "  sentinel: $CRED_REQUEST_SENTINEL"
-      fail "  调用方应将该模板原样输出给用户，让用户带外设置环境变量后重跑"
-      fail "  --phase 6 或 --resume，禁止直接索要 AK/SK 明文"
-      exit 77
+  # DRYRUN mode (option 3): derive steps without credentials, no real API
+  if is_dryrun; then
+    info "DRYRUN 模式（用户三选项之 3）：跳过凭证检查，全流程以 dryrun 派生步骤执行"
+  else
+    # Force AK/SK check before any SDK/CLI execution
+    step "检查 AK/SK 凭证..."
+    set +e
+    ensure_ak_sk
+    cred_rc=$?
+    set -e
+    if [ $cred_rc -ne 0 ]; then
+      if [ $cred_rc -eq 77 ]; then
+        fail "AK/SK 凭证缺失（exit 77 — 详见 stderr 中的三选项引导）"
+        fail "  sentinel: $CRED_REQUEST_SENTINEL"
+        fail "  调用方应在 issue 评论中向用户提供三选项：①机器 export 环境变量 ②grape 通用设置"
+        fail "  ③DRYRUN_MODE=1 以 dryrun/mock 继续；配置完成后用 --phase 6 或 --resume 重跑"
+        fail "  禁止直接索要 AK/SK 明文"
+        exit 77
+      fi
+      fail "AK/SK 凭证检查失败（exit=$cred_rc），无法执行全流程测试"
+      exit 1
     fi
-    fail "AK/SK 凭证检查失败（exit=$cred_rc），无法执行全流程测试"
-    exit 1
   fi
-
   p1_file=$(phase_file "$local_skill_dir" 1)
   
   p6_py_tmp=$(mktemp)
@@ -153,7 +158,12 @@ if not steps:
         })
 
 # Execute each step with real commands
+_dryrun = os.environ.get('DRYRUN_MODE', '0') == '1'
 for step in steps:
+    if _dryrun:
+        step['status'] = 'dryrun'
+        step['output'] = '[DRYRUN] 无有效凭证，未调用真实华为云 API（用户在 issue 评论选择 dryrun/mock 模式）'
+        continue
     step['status'] = 'pending'
     step['output'] = ''
     step['error'] = None
@@ -239,11 +249,12 @@ _step_total = len(steps)
 _step_pass = sum(1 for s in steps if s.get('status') == 'pass')
 _step_fail = sum(1 for s in steps if s.get('status') == 'fail')
 _step_skip = sum(1 for s in steps if s.get('status') == 'skip')
+_step_dryrun = sum(1 for s in steps if s.get('status') == 'dryrun')
 # state_consistency is True only if no steps failed (skips are acceptable)
 _state_ok = _step_fail == 0 and _step_total > 0
 
 result = {
-    'mode': 'downgraded_single_skill_flow',
+    'mode': 'dryrun' if _dryrun else 'downgraded_single_skill_flow',
     'scenario': {
         'name': f"单技能完整功能闭环 — {caps.get('metadata', {}).get('name', local_skill_name)}",
         'skills_involved': [local_skill_name],
@@ -253,9 +264,11 @@ result = {
         'steps': steps
     },
     'state_consistency': {
-        'pass': _state_ok,
-        'detail': f'{_step_pass}/{_step_total} 步通过, {_step_fail} 步失败, {_step_skip} 步跳过',
-        'final_state_summary': '功能点全部走通' if _state_ok else f'{_step_fail} 步失败, 需排查'
+        'pass': False if _dryrun else _state_ok,
+        'detail': (f'DRYRUN 模式：{_step_dryrun}/{_step_total} 步标记为 dryrun（未调用真实 API）'
+                   if _dryrun else
+                   f'{_step_pass}/{_step_total} 步通过, {_step_fail} 步失败, {_step_skip} 步跳过'),
+        'final_state_summary': 'DRYRUN 派生完成（未验证真实环境）' if _dryrun else ('功能点全部走通' if _state_ok else f'{_step_fail} 步失败, 需排查')
     },
     'cleanup': {
         'verdict': 'pass',
@@ -267,7 +280,8 @@ result = {
         'total': _step_total,
         'pass': _step_pass,
         'fail': _step_fail,
-        'skip': _step_skip
+        'skip': _step_skip,
+        'dryrun': _step_dryrun
     }
 }
 print(json.dumps(result, indent=2, ensure_ascii=False))
@@ -287,7 +301,7 @@ else
   # Multi-skill 模式当前只做"派生计划"（按 phase-1 派生 create→query→delete
   # 步骤，步骤 status=pass 是派生标记，不真跑 API）。所以 AK/SK 不是必填。
   # 兄弟 skill 大多没跑过 phase 4（无 phase 4 JSON），所以不调真 API。
-  if [ "${ALLOW_REAL_E2E:-0}" = "1" ]; then
+  if [ "${ALLOW_REAL_E2E:-0}" = "1" ] && ! is_dryrun; then
     step "检查 AK/SK 凭证（ALLOW_REAL_E2E=1 模式: 真跑 E2E 步骤）..."
     set +e
     ensure_ak_sk
@@ -295,17 +309,17 @@ else
     set -e
     if [ $cred_rc -ne 0 ]; then
       if [ $cred_rc -eq 77 ]; then
-        fail "AK/SK 凭证缺失（exit 77 — 详见 stderr 中的 env-var 设置模板）"
+        fail "AK/SK 凭证缺失（exit 77 — 详见 stderr 中的三选项引导）"
         fail "  sentinel: $CRED_REQUEST_SENTINEL"
-        fail "  调用方应将该模板原样输出给用户，让用户带外设置环境变量后重跑"
-        fail "  --phase 6 或 --resume，禁止直接索要 AK/SK 明文"
+        fail "  调用方应在 issue 评论中向用户提供三选项：①机器 export 环境变量 ②grape 通用设置"
+        fail "  ③DRYRUN_MODE=1 以 dryrun/mock 继续；配置完成后用 --phase 6 或 --resume 重跑"
+        fail "  禁止直接索要 AK/SK 明文"
         exit 77
       fi
       fail "AK/SK 凭证检查失败（exit=$cred_rc），无法执行全流程测试"
       exit 1
     fi
   fi
-
   flow_result=""
   p6_multi_py_tmp=$(mktemp)
   cat > "$p6_multi_py_tmp" << 'PYEOF'
@@ -463,7 +477,7 @@ for sn in all_orchestrated:
         chosen['skills_involved'].append(sn)
 
 result = {
-    'mode': 'full',
+    'mode': 'dryrun' if os.environ.get('DRYRUN_MODE', '0') == '1' else 'full',
     'scenario': chosen,
     'state_consistency': {
         'pass': True,
@@ -523,7 +537,11 @@ STEP_COUNT = int(sys.argv[7])
 _step_stats = data.get('step_stats', {})
 _spass = _step_stats.get('pass', 0)
 _sfail = _step_stats.get('fail', 0)
-if _sfail > 0 and _spass == 0:
+_sdryrun = _step_stats.get('dryrun', 0)
+if _sdryrun > 0:
+    # DRYRUN (option 3): derived steps only, no real API — never 'pass'
+    _verdict = 'dryrun'
+elif _sfail > 0 and _spass == 0:
     _verdict = 'fail'
 elif _sfail > 0:
     _verdict = 'partial'

@@ -19,7 +19,7 @@
 ## Quality Gates（critical，必须满足）
 
 - 全部 4 个目录完整性检查必须通过（Phase 0）
-- AK/SK 凭证缺失时直接终止 Phase 4 / Phase 6 并把 env-var 设置模板输出到 stderr（exit 77 + sentinel）—— **任何模式（TTY / agent / pipe）都走这一路径，不再有任何形式的交互 prompt**
+- AK/SK 凭证缺失时直接终止 Phase 4 / Phase 6 并把**三选项引导**（① 机器 export 环境变量 ② grape 通用设置 ③ `DRYRUN_MODE=1` dryrun/mock）输出到 stderr（exit 77 + sentinel）—— **任何模式（TTY / agent / pipe）都走这一路径，不再有任何形式的交互 prompt**；选项 3 的 dryrun 用例必须标记为 `dryrun`（绝不为 pass），报告必须显式标注该模式
 - 链式验证（`lib/chain-verify.sh: check_phase_deps`）必须通过才能进入下一 phase
 - 写操作无 AK/SK 不执行；非交互模式下 `ALLOW_WRITES=0` 是默认安全门
 - 跨 skill 触发词完全相同 = `severity=high`，会拉低 Phase 5 verdict 到 `fail`
