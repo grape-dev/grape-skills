@@ -112,7 +112,7 @@ gitcode_write("PATCH", f"/repos/{owner}/{repo}/issues/{number}",
 - GET /repos/:owner/:repo/pulls/:number/files - List PR changed files
 
 ### A2A
-- POST https://grape-dev.topxtopx.com/api/a2a - Trigger agent-to-agent handoff
+- POST $GRAPE_A2A_URL - Trigger agent-to-agent handoff
 
 ## Notes
 - All endpoints use v5 API unless specified
