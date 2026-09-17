@@ -18,6 +18,78 @@ run_phase4() {
 
   check_phase_deps "$skill_dir" 4 || return 1
 
+  # DRYRUN mode (user-selected option 3 — no credentials): skip the credential
+  # check and generate a dryrun result. Every live case is marked 'dryrun',
+  # NEVER 'pass', so a credential-less run can never masquerade as a real pass.
+  if is_dryrun; then
+    info "DRYRUN 模式（用户三选项之 3）：跳过凭证检查与真实 API 调用，用例标记为 dryrun"
+    local p3_file; p3_file=$(phase_file "$skill_dir" 3)
+    local dry_py_tmp; dry_py_tmp=$(mktemp)
+    cat > "$dry_py_tmp" << 'PYEOF'
+import json, sys
+
+p3 = json.load(open(sys.argv[1]))
+cases = p3.get('result', {}).get('functional_cases', []) + p3.get('result', {}).get('api_cases', [])
+DRY_NOTE = '[DRYRUN] 无有效凭证，未调用真实华为云 API（用户在 issue 评论选择 dryrun/mock 模式）'
+exec_results = []
+for tc in cases:
+    exec_results.append({
+        'tc_id': tc.get('id', 'TC-??'),
+        'name': tc.get('name', ''),
+        'type': tc.get('type', ''),
+        'command': tc.get('command', ''),
+        'status': 'dryrun',
+        'duration_s': 0,
+        'output_snippet': DRY_NOTE,
+        'error': None,
+        'resource_changes': [],
+        'user_confirmed': False,
+    })
+total = len(cases)
+result = {
+    'mode': 'dryrun',
+    'execution_results': exec_results,
+    'statistics': {'total': total, 'pass': 0, 'fail': 0, 'warn': 0, 'skip': 0, 'error': 0, 'dryrun': total, 'pass_rate': 0.0},
+    'all_resources_changed': [],
+    'manual_test_items': [],
+    'doc_gap_issues': [],
+}
+print(json.dumps(result, indent=2, ensure_ascii=False))
+PYEOF
+    local dry_json
+    dry_json=$(python3 "$dry_py_tmp" "$p3_file")
+    rm -f "$dry_py_tmp"
+    local dts; dts=$(timestamp)
+    local dst; dst=$(date +%s)
+    local dry_total; dry_total=$(echo "$dry_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['statistics']['total'])")
+    local tmp_dj; tmp_dj=$(mktemp)
+    echo "$dry_json" > "$tmp_dj"
+    local dry_sum_py; dry_sum_py=$(mktemp)
+    cat > "$dry_sum_py" << 'PYEOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+r = {
+    "phase": 4, "phase_name": "test-execution", "tier": 1,
+    "target": {"type": "single_skill", "skills": [sys.argv[2]]},
+    "timestamp": sys.argv[3],
+    "execution_meta": {"duration_s": int(sys.argv[4]), "retry_count": 0, "user_confirmed": False,
+                       "mode": "dryrun",
+                       "note": "DRYRUN/选项3：无凭证，未调用真实 API，所有用例标记为 dryrun（非 pass）"},
+    "result": data,
+    "summary": {"verdict": "dryrun", "pass_checks": 0, "fail_checks": 0, "warn_checks": 0}
+}
+print(json.dumps(r, indent=2, ensure_ascii=False))
+PYEOF
+    ensure_test_files_dir "$skill_dir" > /dev/null
+    local dry_dur=$(( $(date +%s) - dst ))
+    python3 "$dry_sum_py" "$tmp_dj" "$skill_name" "$dts" "$dry_dur" > "$(phase_file "$skill_dir" 4)"
+    rm -f "$dry_sum_py" "$tmp_dj"
+    echo ""
+    info "DRYRUN 完成: ${dry_total} 个用例标记为 dryrun（0 pass）— 报告将显式标注该模式"
+    return 0
+  fi
+
   # Force AK/SK check before any SDK/CLI execution
   step "检查 AK/SK 凭证..."
   set +e
@@ -25,21 +97,23 @@ run_phase4() {
   cred_rc=$?
   set -e
   if [ $cred_rc -ne 0 ]; then
-    if [ $cred_rc -eq 77 ]; then
-      # Credentials required but not provided — env-var template has been
-      # emitted to stderr by ensure_ak_sk(). The calling agent (or human)
-      # MUST output that template to the user and ask them to set env vars
-      # out-of-band (shell profile / PowerShell $PROFILE). Do NOT ask the
-      # user to type or paste AK/SK in chat. See SKILL.md "Agent Protocol".
-      fail "AK/SK 凭证缺失（exit 77 — 详见 stderr 中的 env-var 设置模板）"
-      fail "  sentinel: $CRED_REQUEST_SENTINEL"
-      fail "  调用方应将该模板原样输出给用户，让用户带外设置环境变量后重跑"
-      fail "  --phase 4 或 --resume，禁止直接索要 AK/SK 明文"
-      return 77
+      if [ $cred_rc -eq 77 ]; then
+        # Credentials required but not provided — the three-option guide has
+        # been emitted to stderr by ensure_ak_sk(). The calling agent (or
+        # human) MUST post those options to the user in the issue comment and
+        # wait for their choice: ① export env vars (machine owner) ② grape
+        # 通用设置 ③ DRYRUN_MODE=1 dryrun/mock continue. Do NOT ask the user
+        # to type or paste AK/SK in chat. See SKILL.md "Agent Protocol".
+        fail "AK/SK 凭证缺失（exit 77 — 详见 stderr 中的三选项引导）"
+        fail "  sentinel: $CRED_REQUEST_SENTINEL"
+        fail "  调用方应在 issue 评论中向用户提供三选项：①机器 export 环境变量 ②grape 通用设置"
+        fail "  ③DRYRUN_MODE=1 以 dryrun/mock 继续；配置完成后用 --phase 4 或 --resume 重跑"
+        fail "  禁止直接索要 AK/SK 明文"
+        return 77
+      fi
+      fail "AK/SK 凭证检查失败（exit=$cred_rc）"
+      return 1
     fi
-    fail "AK/SK 凭证检查失败（exit=$cred_rc）"
-    return 1
-  fi
 
   local ts; ts=$(timestamp)
   local start_ts; start_ts=$(date +%s)

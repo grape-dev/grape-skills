@@ -66,7 +66,7 @@
 | 0 个 skill 被指定 | 报错退出 | `❌ 未指定任何 skill。使用 --skills 或 --all-installed` |
 | 网络/API 超时 | 重试 3 次，失败则标记 fail | `⚠️ TC-F-01 超时，重试 1/3...` |
 | 用户 Ctrl+C | 已输出 JSON 保留 | `🛑 中断于 Phase 4，下次 --resume 可恢复` |
-| AK/SK 凭证缺失 | Phase 4 / Phase 6 启动时输出 env-var 设置模板到 stderr 并 exit 77（任何模式均不再 prompt） | `⛔ AK/SK 凭证缺失，请在 shell profile / PowerShell $PROFILE 中设置 HUAWEI_ACCESS_KEY / HUAWEI_SECRET_KEY 后重跑 --phase 4 / 6` |
+| AK/SK 凭证缺失 | Phase 4 / Phase 6 启动时输出三选项引导（① export 环境变量 ② grape 通用设置 ③ `DRYRUN_MODE=1` dryrun/mock）到 stderr 并 exit 77（任何模式均不再 prompt） | `⛔ AK/SK 凭证缺失，请在 issue 评论向用户提供三选项并等待选择：① 机器 export HUAWEI_ACCESS_KEY / HUAWEI_SECRET_KEY ② grape 通用设置 ③ DRYRUN_MODE=1 以 dryrun 继续 --phase 4 / 6` |
 | Phase 0 目录不完整（缺 iam-policies.md） | 整体 verdict=fail | `❌ directory_integrity pass=false` |
 
 ## 5. resume 逻辑

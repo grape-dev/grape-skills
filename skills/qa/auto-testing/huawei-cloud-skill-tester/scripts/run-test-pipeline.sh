@@ -241,16 +241,17 @@ for ((p = START_PHASE; p <= 7; p++)); do
   exit_code=$?
   if [ $exit_code -ne 0 ]; then
     if [ $exit_code -eq 77 ]; then
-      # Sentinel: Phase 4/6 已向 stderr 输出 env-var 设置模板。
+      # Sentinel: Phase 4/6 已向 stderr 输出三选项引导（① export 环境变量 ② grape 通用设置 ③ DRYRUN_MODE=1 dryrun/mock）。
       # 立即停止流水线，不要跳过、不要 fall through。
       # 调用方（agent 或终端）必须将模板原样输出给用户，
       # 引导用户在自己的 shell / PowerShell $PROFILE 中带外设置环境变量，
       # 然后用 --phase $p 续跑。整个流程禁止向用户索要 AK/SK 明文。
       fail "Phase $p 凭证缺失（exit code: 77）"
-      warn "已在 stderr 输出 env-var 设置模板（sentinel: $CRED_REQUEST_SENTINEL）"
-      warn "调用方必须：① 将模板原样输出给用户，② 禁止在对话中索要 AK/SK 明文"
-      warn "         ③ 用户带外设置后，用 --phase $p 续跑"
-      warn "         ④ 或者用 --phase 5 跳过 Phase 4 进入离线分析"
+      warn "已在 stderr 输出三选项引导（sentinel: $CRED_REQUEST_SENTINEL）"
+      warn "调用方必须：① 将三选项原样发布到 issue 评论并等待用户选择"
+      warn "         ② 选项1=机器 export 环境变量；选项2=grape 通用设置配置凭据"
+      warn "         ③ 选项3=DRYRUN_MODE=1 以 dryrun/mock 继续（用例标 dryrun 非 pass）"
+      warn "         ④ 用户配置完成后，用 --phase $p 续跑"
       exit 77
     fi
     fail "Phase $p 执行失败（exit code: $exit_code）"
