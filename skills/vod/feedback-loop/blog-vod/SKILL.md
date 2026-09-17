@@ -1,14 +1,83 @@
 ---
 name: blog-vod
-version: 1.0.0
 description: |
   博客需求精细化引导（Voice of Developer for Blog）。
   接管 issue_opened 事件的博客需求审视：
   通过结构化问卷逐步收敛用户对博客主题、风格、配图、视频等需求，
   输出高质量需求摘要供 Issue Agent / Coding Agent 继承。
 tools:
-  - curl
+  - name: curl
+    min_version: "7.68.0"
 requires:
+  - env: BOT_GITCODE_TOKEN
+    description: GitCode API 访问令牌
+  - env: REPO_FULL_NAME
+    description: 仓库全名（owner/repo 格式）
+  - env: ISSUE_NUMBER
+    description: Issue 编号
+inputSchema:
+  type: object
+  required:
+    - REPO_FULL_NAME
+    - ISSUE_NUMBER
+  properties:
+    REPO_FULL_NAME:
+      type: string
+      pattern: "^[\\w-]+/[\\w-]+$"
+      description: 仓库全名，owner/repo 格式
+    ISSUE_NUMBER:
+      type: integer
+      minimum: 1
+      description: GitCode Issue 编号
+    BOT_GITCODE_TOKEN:
+      type: string
+      description: GitCode API 访问令牌（从环境变量获取）
+outputSchema:
+  type: object
+  required:
+    - actions
+    - conclusion
+    - artifacts
+    - next_step
+  properties:
+    actions:
+      type: array
+      items:
+        type: string
+      description: 执行动作列表
+    conclusion:
+      type: string
+      description: 结论（需求已收敛 / 用户未完全回复）
+    artifacts:
+      type: object
+      properties:
+        requirement_summary:
+          type: object
+          properties:
+            topic:
+              type: string
+            focus:
+              type: string
+            structure_sections:
+              type: integer
+            image_count:
+              type: integer
+            image_style:
+              type: string
+            has_video:
+              type: boolean
+            labels:
+              type: array
+            length:
+              type: string
+            tone:
+              type: string
+    next_step:
+      type: string
+      description: 下一步动作描述
+    issue_summary:
+      type: string
+      description: Issue 摘要
 tags:
   - blog
   - requirement
@@ -169,6 +238,8 @@ curl -s -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
 
 用户回复完所有轮次后，汇总输出结构化需求摘要。**如果用户在某些轮次没有回复，用已有信息和合理默认值填充，标记为「默认值」。**
 
+> **断点续跑（Checkpoint）**：每轮对话结束后，将已收敛的字段以 JSON 格式写入 Issue 评论（以 `<!-- checkpoint: round N -->` 注释标记）。若会话因超时或中断重启，先读取 Issue 评论中的 checkpoint 标记，从最后完成的轮次继续，不重复已确认的提问。
+
 ```json
 {
   "requirement_summary": {
@@ -200,22 +271,49 @@ curl -s -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
 }
 ```
 
-### 5. 标签管理
+### 5. 用户确认（写操作前置确认）
+
+输出需求清单后，**必须等待用户确认**后方可执行写操作（标签创建、评论发布、A2A 交办）。
+
+**确认提示：**
+```
+[blog-vod Agent] 📋 需求清单已生成（见上方 JSON）。
+请确认是否执行以下写操作：
+  1. 给 Issue 添加标签：blog-vod, type:feature
+  2. 发布需求确认评论
+  3. A2A 交办 Issue Agent
+回复「确认」继续，或修改需求后重新确认。
+```
+
+- 用户回复「确认」或等同意思 → 继续步骤 6-8
+- 用户提出修改 → 回到对应轮次重新收敛，重新输出需求清单
+- 用户明确拒绝 → 结束流程，不执行任何写操作
+
+### 6. 标签管理
 
 - 给 Issue 加上 `blog-vod`、`type:feature` 标签
 - 如评级为 ready，加 `spec-ready` 标签
 
-### 6. 评论发布
+### 7. 评论发布
 
 按 `references/comment-guide.md` 格式回复，评论 body 前缀固定为 `[blog-vod Agent]`。
 
-### 7. A2A 交办 Issue Agent
+### 8. A2A 交办 Issue Agent
 
 需求收敛完成后，**必须**通过 A2A 将 Issue 交给 Issue Agent。上下文中传递「博客需求清单」结构化摘要，让 Issue Agent / Coding Agent 直接继承。
 
 详见 `references/a2a-handoff.md`。
 
 ⚠️ **VOD 不得直接 A2A 交办 Coding/QA/SRE Agent**——VOD 的职责边界到需求澄清为止，后续流转由 Issue Agent 主导。
+
+### 9. 收尾与资源清理
+
+A2A 交办完成后，执行收尾检查：
+
+1. **确认写操作结果**：验证标签已添加、评论已发布、A2A 响应 status=ok
+2. **清理临时状态**：确认 Issue 评论中的 checkpoint 标记已无需要（A2A 成功后可保留作为记录，不需要删除）
+3. **输出生成**：输出最终结构化 JSON 块（见「输出格式」章节）
+4. **生命周期声明**：本 skill 负责 create/update 操作（创建标签、添加评论、A2A 交办），不负责 delete 操作。Issue/标签/评论的删除由下游技能或管理员手动处理。
 
 ## 硬规则
 
@@ -225,13 +323,18 @@ curl -s -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
 | 三轮递进式提问（大方向→细节→边界） | ✅ **必须做** |
 | 每轮只问 2-4 个问题，不一次性给用户太多 | ✅ **必须做** |
 | 输出结构化「博客需求清单」json | ✅ **必须做** |
+| 执行写操作前（如创建标签、发布评论、A2A 交办）须先向用户确认 | ✅ **必须做** |
+| 执行删除操作前（如删除标签/评论）须先向用户确认 | ✅ **必须做** |
+| 每轮对话后持久化已收敛字段（checkpoint），支持断点续跑 | ✅ **必须做** |
 | 用户未回复的维度用合理默认值填充并标注 | ✅ **根据判断** |
 | 创建 Issue 标签 `blog-vod` 和 `type:feature` | ✅ **必须做** |
 | 需求收敛后通过 A2A 交办 Issue Agent | ✅ **必须做，不可跳过** |
+| 写操作幂等性：相同输入重复执行不产生重复副作用（标签先查后建、评论带唯一标识） | ✅ **必须做** |
 | 单条反馈价值不足时标记存档不创建 Issue | ✅ **根据判断** |
 | 修改非博客相关 Issue | ❌ **禁止** |
 | 回复 Token/密码等敏感信息 | ❌ **禁止** |
 | 直接关闭/合并 Issue | ❌ **禁止** |
+| 未经用户确认执行删除操作 | ❌ **禁止** |
 | 直接 A2A 交办 Coding/QA/SRE Agent | ❌ **禁止（必须先经 Issue Agent）** |
 
 ## 输出格式
@@ -268,3 +371,30 @@ curl -s -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
 - `$SKILL_DIR/references/labeling-guide.md` — 标签管理规范
 - `$SKILL_DIR/references/comment-guide.md` — 评论格式规范
 - `$SKILL_DIR/references/a2a-handoff.md` — A2A 交办 Issue Agent 规范
+
+## 性能预算
+
+| 指标 | 预算值 | 说明 |
+|------|--------|------|
+| P95 执行时延 | < 120s | 从 Issue 读取到 A2A 交办完成（含用户交互等待不计入） |
+| LLM 调用次数 | ≤ 5 次 | 初始化分析(1) + 三轮提问生成(3) + 需求清单汇总(1) |
+| Token 消耗 | ≤ 8000 tokens | SKILL.md ~3500 tokens + references ~2500 tokens + 运行时上下文 ~2000 tokens |
+| 上下文压缩 | 超过 6000 tokens 时触发 | 自动压缩早期轮次对话，保留最近 2 轮完整内容 |
+
+## 版本管理策略
+
+- 当前版本：v1.0（frontmatter 不声明 version 字段，遵循 v1.0 规范）
+- 变更日志记录在仓库根目录 CHANGELOG.md 中
+- 向后兼容策略：outputSchema 新增字段为可选（非 required），不破坏下游解析
+- 灰度机制：通过 GitCode 分支管理（dev → main），合并前需通过 linter + tester + auditor 三阶段测试
+
+## 幂等性保证
+
+| 操作 | 幂等策略 |
+|------|----------|
+| 标签创建 | 先 GET /labels 查询是否已存在同名标签，存在则跳过创建 |
+| Issue 加标签 | 先 GET /issues/:number 查询已有标签，去重后 PATCH 更新 |
+| 评论发布 | 评论 body 包含唯一标识 `<!-- blog-vod:{issue_number}:{timestamp} -->`，发布前查询已有评论是否包含相同标识 |
+| A2A 交办 | A2A payload 携带 idempotency_key（issue_number + skill_name），下游去重 |
+
+重复执行相同 skill（如 Issue 被重新打开触发）不会产生重复标签、评论或 A2A 请求。
