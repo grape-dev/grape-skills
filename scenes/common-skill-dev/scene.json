@@ -1,14 +1,14 @@
 {
   "name": "common-skill-dev",
   "version": "1.0.0",
-  "display_name": "通用Skill开发",
-  "description": "通用 REST API 技能开发场景，使用 REST API 技能生成器快速开发和测试技能",
+  "display_name": "通用 Skill 开发（自定义）",
+  "description": "通用技能开发场景（用户自定义技能使用场景），基于 grape 基础技能框架开发和发布技能包",
   "category": "skill-dev",
   "recommended_template": "hello-skill",
   "onboarding": "repo-onboarding",
   "tags": [
     "skill",
-    "rest-api",
+    "common",
     "framework"
   ],
   "author": "grape-team",
@@ -32,7 +32,7 @@
     {
       "id": "coding",
       "tag": "coding",
-      "skill": "rest-api-skill-creator",
+      "skill": "common-skill-creator",
       "mode": "emit",
       "next": "qa",
       "handoff": "a2a"
@@ -40,7 +40,7 @@
     {
       "id": "qa",
       "tag": "qa",
-      "skill": "rest-api-skill-tester",
+      "skill": "common-skill-tester",
       "mode": "emit",
       "next": "sre",
       "handoff": "a2a"
