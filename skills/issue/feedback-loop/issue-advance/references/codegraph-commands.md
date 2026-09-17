@@ -7,11 +7,11 @@ Codegraph 是代码图谱分析工具，通过静态分析构建项目的符号�
 ## 安装
 
 ```bash
-# 全局安装
-npm install -g codegraph
+# 项目内本地安装（勿全局安装；`codegraph` 是 npm 空壳占位包，严禁安装）
+npm install @colbymchenry/codegraph
 
 # 验证
-codegraph --version
+npx --no-install codegraph --version
 ```
 
 安装部署指南：https://github.com/colbymchenry/codegraph
