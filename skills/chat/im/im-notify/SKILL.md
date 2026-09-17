@@ -1,4 +1,5 @@
 ---
+name: im-notify
 description: |
   Monitor repository events and send Feishu notifications based on event context.
   Handles issue assignments, PR reviews, deployment results, and other notable events.

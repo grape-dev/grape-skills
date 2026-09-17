@@ -16,9 +16,8 @@ tools:
 2. 调用 ModelArts API 只用此 Key，严禁从数据库 / 配置文件 / 日志 / 历史中寻找其他 token。
 3. token 不得写入日志或回复。
 4. API 返回 403 / 429 时：停止重试并报告用户。
-5. **调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
-6. **长命令执行会静默**：`pip install`、`git clone` 等长命令运行时无输出。执行时加 `timeout 300 ...` 限制。
-7. **禁止前台运行长驻/服务类命令**：如 `python -m http.server`、`npm run dev` 等。改用后台启动 + curl 验证 + kill 的一次性验证模式。
+5. **长命令执行会静默**：`pip install`、`git clone` 等长命令运行时无输出。执行时加 `timeout 300 ...` 限制。
+6. **禁止前台运行长驻/服务类命令**：如 `python -m http.server`、`npm run dev` 等。改用后台启动 + curl 验证 + kill 的一次性验证模式。
 
 # 视频/媒体生成流程
 
@@ -245,5 +244,4 @@ print(f"✅ {final}")
 
 ## 参考
 
-- 需要调用 GitCode API 时，读取 `references/gitcode-api-reference.md`。
 - Edge TTS 语音列表：`edge-tts --list-voices`。
