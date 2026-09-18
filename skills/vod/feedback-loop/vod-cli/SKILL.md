@@ -1,10 +1,11 @@
 ---
 name: vod-cli
-version: 2.0.0
+version: 3.0.0
 description: |
-  开发者声音（VOD）分析技能。基于服务端注入的项目知识基线（project-graph + project-capabilities）收集、分析、引导、提炼开发者需求。
+  开发者声音（VOD）分析技能（CLI 版）。通过全命令走查表（vod-runbook）逐步执行：知识基线 → 读 Issue/历史 → 清晰度判断 → 收敛 / 澄清追问 / 纯咨询 → A2A 交办 → tasks complete 收尾。
   双职责：①从 Issue / 飞书收集开发者声音，多轮引导收敛为清晰需求并建 Issue；
   ②接管 issue_opened 审视非 VOD 创建的 Issue，澄清后结构化总结并 A2A 交办 Issue Agent。
+  全部操作使用 grape CLI 命令行（含验证过的环境变量 $ACCOUNT/$REPO_NAME/$ISSUE_NUMBER 等），评论以 [VOD Agent] 开头。
 tools:
   - grape
 ---
@@ -17,7 +18,7 @@ tools:
 
 ## 环境变量（服务端已注入，直接使用）
 
-> 完整参考见 grape `help/usage/agent-environment-variables.md`。VOD 用到的变量如下，均为服务端注入、无需自行设置；`grape` 自动读取认证。
+> VOD 用到的变量如下，均为服务端注入、无需自行设置；`grape` 自动读取认证。
 
 | 变量 | 语义 | 用途 |
 |------|------|------|
