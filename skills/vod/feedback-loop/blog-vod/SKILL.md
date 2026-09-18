@@ -1,400 +1,127 @@
 ---
 name: blog-vod
+version: 2.0.0
 description: |
   博客需求精细化引导（Voice of Developer for Blog）。
-  接管 issue_opened 事件的博客需求审视：
-  通过结构化问卷逐步收敛用户对博客主题、风格、配图、视频等需求，
-  输出高质量需求摘要供 Issue Agent / Coding Agent 继承。
+  接管 issue_opened 事件的博客需求审视：通过结构化问卷逐轮收敛博客主题、风格、配图、视频、结构、长度、语调等需求，
+  输出高质量需求摘要（「博客需求清单」JSON）供 Issue Agent / Coding Agent 继承。触发场景：含「博客」「文章」「图文」
+  「写文章」等关键词 + 产品/概念/服务名称的需求 Issue；非博客 Issue 不做处理。
 tools:
-  - name: curl
-    min_version: "7.68.0"
-requires:
-  - env: BOT_GITCODE_TOKEN
-    description: GitCode API 访问令牌
-  - env: REPO_FULL_NAME
-    description: 仓库全名（owner/repo 格式）
-  - env: ISSUE_NUMBER
-    description: Issue 编号
-inputSchema:
-  type: object
-  required:
-    - REPO_FULL_NAME
-    - ISSUE_NUMBER
-  properties:
-    REPO_FULL_NAME:
-      type: string
-      pattern: "^[\\w-]+/[\\w-]+$"
-      description: 仓库全名，owner/repo 格式
-    ISSUE_NUMBER:
-      type: integer
-      minimum: 1
-      description: GitCode Issue 编号
-    BOT_GITCODE_TOKEN:
-      type: string
-      description: GitCode API 访问令牌（从环境变量获取）
-outputSchema:
-  type: object
-  required:
-    - actions
-    - conclusion
-    - artifacts
-    - next_step
-  properties:
-    actions:
-      type: array
-      items:
-        type: string
-      description: 执行动作列表
-    conclusion:
-      type: string
-      description: 结论（需求已收敛 / 用户未完全回复）
-    artifacts:
-      type: object
-      properties:
-        requirement_summary:
-          type: object
-          properties:
-            topic:
-              type: string
-            focus:
-              type: string
-            structure_sections:
-              type: integer
-            image_count:
-              type: integer
-            image_style:
-              type: string
-            has_video:
-              type: boolean
-            labels:
-              type: array
-            length:
-              type: string
-            tone:
-              type: string
-    next_step:
-      type: string
-      description: 下一步动作描述
-    issue_summary:
-      type: string
-      description: Issue 摘要
-tags:
-  - blog
-  - requirement
-  - clarification
-  - vod
-  - media
+  - curl
+  - git
 ---
-
-## 概述
-
-本技能是 VOD（开发者声音分析）的博客领域特化版。在保留 VOD 原始框架（Socratic 澄清、聚类分析、A2A 交办 Issue Agent）的基础上，针对博客/文章/图文内容生成场景增加了细颗粒度的需求引导。
-
-## 前置条件
-
-- 已安装 curl
-- 已配置 `$BOT_GITCODE_TOKEN` 环境变量
-- 仓库已存在 GitCode Issue 模块
-- Grape 平台 A2A 服务可用
-
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 `$BOT_GITCODE_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
-2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+1. 调用 GitCode API 只用服务端注入的 `$BOT_GITCODE_TOKEN`，A2A 交办只用 `$GRAPE_SESSION_TOKEN`，两种 token 严禁混用；严禁从数据库/configs/日志/历史中寻找其他 token。
+2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
+5. 写操作（创建标签/发布评论/A2A 交办）执行前先向用户确认；流程内已声明的写操作视为已获流程授权。
 
-## 核心原则
+## 定位
 
-### 1. 依赖前序分析
-本技能被 event_dispatch 调用时，prompt 顶部已包含「项目知识基线」章节和 Issue 上下文。先读懂 Issue 标题和正文，判断是否属于博客场景。
+VOD 的职责：**把博客需求从模糊想法收敛为清晰可执行的需求摘要**。
+- 不负责 spec 设计、打标签、分配（那是 Issue Agent 的职责）；不写代码、不建 PR。
+- 通过三轮递进式问卷：大方向（主题/风格/标签）、内容细节（结构/配图/视频）、边界（长度/语调）。
 
-### 2. Socratic 澄清方法
-不使用一次性填空式提问，而是**递进式收敛**：
-- 第一轮：确认大方向（主题 + 风格 + 平台）
-- 第二轮：深入细节（结构 + 配图 + 视频）
-- 第三轮：确认边界（长度 + 语调 + 参考）
+## 输入 Schema（inputSchema）
 
-每轮只问 2-4 个问题，避免一次性给用户太多。
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| REPO_FULL_NAME | string | 是 | 仓库全名，owner/repo 格式 |
+| ISSUE_NUMBER | integer | 是 | GitCode Issue 编号（正整数） |
+| issue_title / issue_body | string | 是 | 待审视 Issue 的标题与正文 |
 
-### 3. 超出范围时请求支援
-如果用户需求涉及非博客场景（如代码实现、部署、通用的 PR 审查等），不做处理直接结束，由系统按原始路由继续。
-
-### 4. A2A 交办唯一出口
-VOD 完成分析后，**必须**通过 A2A 交办 Issue Agent，由 Issue Agent 接力进行分类确认、Spec 生成，再触发 Coding Agent。
-
-### 5. 格式校验
-输出需求摘要时，使用统一的「博客需求清单」格式，便于下游 Agent 解析。
-
-## 参考文件
-
-- 本地参考：`references/gitcode-api-reference.md`
-- 本地参考：`references/labeling-guide.md`
-- 本地参考：`references/comment-guide.md`
-- 本地参考：`references/a2a-handoff.md`（A2A 交办 Issue Agent 的触发时机与示例）
+合法输入：issue_number 为正整数、issue_body 非空。
+非法输入：issue_number 缺失/非正整数、issue_body 为空，则不执行任何写操作，在评论中说明缺失字段。
 
 ## 场景识别
 
 | 特征关键词 | 场景 | 执行流程 |
 |-----------|------|---------|
-| 含「博客」「文章」「图文」「写文章」「发博客」「推荐」「介绍」等 + 产品/概念/服务名称 | **博客需求引导** | 按博客需求引导流程执行 |
-| 含「视频」「配音」「配图」「图片」等博客相关关键词 | **博客需求引导** | 同样按博客需求引导流程执行 |
-| 以上关键词同时含「代码」「bug」「编译」「部署」等非博客关键词 | **不做处理，结束** | 非博客场景，由其他技能处理 |
-| 不含任何博客相关关键词 | **不做处理，结束** | — |
+| 含「博客」「文章」「图文」「写文章」「发博客」等 + 产品/概念/服务名称 | 博客需求引导 | 按本文档流程执行 |
+| 含「视频」「配音」「配图」「图片」等博客相关关键词 | 博客需求引导 | 同样按流程执行 |
+| 同时含「代码」「bug」「编译」「部署」等非博客关键词 | 不做处理，结束 | 非博客场景 |
+| 不含任何博客相关关键词 | 不做处理，结束 | 无 |
 
-## 工作流
+## 处理流程
 
-### 0. 初始化（读取 Issue 内容）
+1. **读 Issue（必先）**：GET /repos/{owner}/{repo}/issues/{number} 读取标题+正文，输出需求摘要初稿（标记已明确/缺失维度）。
+2. **第一轮收敛（大方向）**：确认主题聚焦、参考风格、标签分类；每轮只问 2-4 个问题。
+3. **第二轮收敛（内容细节）**：确认文章结构（章节/特殊元素）、配图风格（数量/封面）、视频方向（画面/旁白）。
+4. **第三轮收敛（边界）**：确认文章长度（标准/深度）、语调偏好。
+5. **小结**：用户未回复的维度用合理默认值填充并标注「默认值」；将已收敛字段写入「博客需求清单」并贴到 Issue 评论（作为续跑依据）。问卷与示例见 references/requirement-elicit-guide.md。
+6. **用户确认**：写操作前输出确认提示，等待用户回复「确认」；用户修改则回对应轮次重新收敛，拒绝则结束。
+7. **收尾动作**：按 references/comment-labeling-guide.md 创建标签、发布评论（body 前缀固定 [blog-vod Agent]）。
+8. **A2A 交办 Issue Agent**：POST /api/a2a（认证用 $GRAPE_SESSION_TOKEN），context 携带「博客需求清单」，见 references/a2a-handoff.md。
+9. **任务收尾**：输出最终 JSON 块（见输出格式），完成所有动作后结束任务。
 
-用 GitCode API 读取 Issue 标题和 body：
+## 读写语义
 
-```bash
-curl -s -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER"
-```
+| 操作类型 | 类别 | 执行方式 |
+|---------|------|---------|
+| GET issues / comments / labels | 读 | 自动执行，无需确认 |
+| 创建标签、发布评论、A2A 交办 | 写（流程内声明） | 视为已获流程授权，直接执行 |
+| 删除评论 / 删除标签 / 关闭 Issue | 写（流程外） | 需用户确认后执行 |
 
-输出需求摘要初稿，标记已有信息和新缺失的信息（用 ✅/❌ 标记每个维度）。
+上表未列出的任何写操作，一律需用户确认后执行。
 
-### 1. 第一轮收敛：大方向确认
-
-**针对已确认的场景表执行。** 从 Issue 正文提取以下维度，用 ✅ 标注已明确的、❌ 标注缺失的：
-
-| 维度 | 引导提问 | 判断标准 |
-|------|---------|---------|
-| ① 主题聚焦 | 文章围绕哪个具体产品或概念展开？侧重什么角度？ | 主题描述包含具体对象 + 角度 |
-| ② 参考风格 | 你有想模仿的文章/博客链接吗？或者想要什么风格（科技评测/轻松科普/营销推广）？ | 有 URL 或风格描述 |
-| ③ 标签分类 | 这篇文章归到哪个分类？如技术/生活/随笔/教程，或其他？ | 明确分类名称 |
-
-**提问示例：**
-```
-[blog-vod Agent] 📝 收到博客需求，我先确认几个方向：
-
-❌ 主题聚焦：您提到「华为问界汽车」，想从哪个角度切入？
-   是产品横评（M5 vs M7 vs M9）、技术解析（ADS智驾/鸿蒙座舱）、
-   还是用户体验分享？
-
-❌ 参考风格：有没有想模仿的文章链接？或者想要什么风格？
-   - 科技评测：深度技术分析+参数对比
-   - 轻松科普：通俗易懂+生活化语言
-   - 营销推广：品牌宣传+情感共鸣
-
-❌ 标签分类：这篇文章发到博客的哪个分类？
-   （现有标签：1=技术、2=生活、3=随笔、4=教程，也可以新建）
-```
-
-### 2. 第二轮收敛：内容细节深入
-
-用户回复第一轮问题后，根据已有信息进入第二轮：
-
-| 维度 | 引导提问 | 判断标准 |
-|------|---------|---------|
-| ④ 文章结构 | 希望分几个章节来写？需要用表格做参数对比、或引用块突出亮点吗？ | 章节数量 + 特殊元素偏好 |
-| ⑤ 配图风格 | 配图偏实拍风格还是概念插画风？封面图有什么视觉要求？ | 风格描述 + 配图张数 |
-| ⑥ 视频方向 | 文章开头的 5 秒视频想展示什么画面？旁白文案写几句？ | 画面构想 + 语气 |
-
-**提问示例：**
-```
-[blog-vod Agent] ✅ 方向已明确，继续深入细节：
-
-✅ 主题聚焦：华为问界汽车的产品定位与技术亮点
-✅ 参考风格：科技评测风，深度技术分析+参数对比
-✅ 标签分类：2（生活）/ 或新建「汽车」
-
-❌ 文章结构：您希望分哪几个章节？比如：
-   - 产品矩阵总览 → 鸿蒙座舱 → ADS智驾 → 三电系统 → 购买建议
-   还需要表格做参数对比吗？
-
-❌ 配图风格：配图偏写实产品风格，还是概念科技风？
-   封面图有什么要求（场景、色调、构图）？
-
-❌ 视频方向：开头 5 秒视频，想展示什么画面？
-   比如「问界M9驰骋城市道路+智能座舱操作特写」
-   旁白想要什么语调？专业介绍/情感氛围？
-```
-
-### 3. 第三轮收敛：边界确认（如有需要）
-
-用户回复第二轮后，确认最终边界：
-
-| 维度 | 引导提问 | 判断标准 |
-|------|---------|---------|
-| ⑦ 文章长度 | 大概多少字？1000-1500 字（标准）、1500-2500（深度）？ | 字数区间 |
-| ⑧ 文章语调 | 行文语气偏技术深度、专业严谨、还是轻松易懂？ | 语气描述 |
-
-**提问示例：**
-```
-[blog-vod Agent] ✅ 细节基本完整，最后确认两个边界：
-
-✅ 文章结构：5 个章节 + 参数对比表格
-✅ 配图风格：写实产品风，封面图要求「问界M9 45度角行驶」
-✅ 视频方向：展示外观+内饰+HarmonyOS界面，专业介绍语调
-
-❌ 文章长度：标准（~1200字）还是深度（~2000字）？
-
-❌ 语调偏好：偏技术参数分析，还是偏用户体验描述？
-```
-
-### 4. 输出博客需求清单
-
-用户回复完所有轮次后，汇总输出结构化需求摘要。**如果用户在某些轮次没有回复，用已有信息和合理默认值填充，标记为「默认值」。**
-
-> **断点续跑（Checkpoint）**：每轮对话结束后，将已收敛的字段以 JSON 格式写入 Issue 评论（以 `<!-- checkpoint: round N -->` 注释标记）。若会话因超时或中断重启，先读取 Issue 评论中的 checkpoint 标记，从最后完成的轮次继续，不重复已确认的提问。
-
-```json
-{
-  "requirement_summary": {
-    "topic": "华为问界汽车：科技重塑出行，智驾引领未来",
-    "focus": "产品定位与技术亮点深度分析（M5/M7/M9 矩阵）",
-    "reference_style": {
-      "type": "科技评测",
-      "details": "深度技术分析+参数对比+多产品横评"
-    },
-    "structure": {
-      "sections": 5,
-      "chapter_titles": ["产品定位与品牌哲学", "鸿蒙座舱", "HUAWEI ADS 智驾", "三电系统", "购买建议"],
-      "special_elements": ["参数对比表格", "数据引用块", "高亮总结块"]
-    },
-    "images": {
-      "count": 5,
-      "style": "写实产品风",
-      "cover_description": "问界M9 45度角行驶场景"
-    },
-    "video": {
-      "duration_seconds": 5,
-      "scene": "问界M9城市道路行驶+智能座舱HarmonyOS界面",
-      "narration_tone": "专业介绍"
-    },
-    "labels": [{"id": 2, "name": "生活"}],
-    "length": "标准（约1200字）",
-    "tone": "技术评测风/专业严谨"
-  }
-}
-```
-
-### 5. 用户确认（写操作前置确认）
-
-输出需求清单后，**必须等待用户确认**后方可执行写操作（标签创建、评论发布、A2A 交办）。
-
-**确认提示：**
-```
-[blog-vod Agent] 📋 需求清单已生成（见上方 JSON）。
-请确认是否执行以下写操作：
-  1. 给 Issue 添加标签：blog-vod, type:feature
-  2. 发布需求确认评论
-  3. A2A 交办 Issue Agent
-回复「确认」继续，或修改需求后重新确认。
-```
-
-- 用户回复「确认」或等同意思 → 继续步骤 6-8
-- 用户提出修改 → 回到对应轮次重新收敛，重新输出需求清单
-- 用户明确拒绝 → 结束流程，不执行任何写操作
-
-### 6. 标签管理
-
-- 给 Issue 加上 `blog-vod`、`type:feature` 标签
-- 如评级为 ready，加 `spec-ready` 标签
-
-### 7. 评论发布
-
-按 `references/comment-guide.md` 格式回复，评论 body 前缀固定为 `[blog-vod Agent]`。
-
-### 8. A2A 交办 Issue Agent
-
-需求收敛完成后，**必须**通过 A2A 将 Issue 交给 Issue Agent。上下文中传递「博客需求清单」结构化摘要，让 Issue Agent / Coding Agent 直接继承。
-
-详见 `references/a2a-handoff.md`。
-
-⚠️ **VOD 不得直接 A2A 交办 Coding/QA/SRE Agent**——VOD 的职责边界到需求澄清为止，后续流转由 Issue Agent 主导。
-
-### 9. 收尾与资源清理
-
-A2A 交办完成后，执行收尾检查：
-
-1. **确认写操作结果**：验证标签已添加、评论已发布、A2A 响应 status=ok
-2. **清理临时状态**：确认 Issue 评论中的 checkpoint 标记已无需要（A2A 成功后可保留作为记录，不需要删除）
-3. **输出生成**：输出最终结构化 JSON 块（见「输出格式」章节）
-4. **生命周期声明**：本 skill 负责 create/update 操作（创建标签、添加评论、A2A 交办），不负责 delete 操作。Issue/标签/评论的删除由下游技能或管理员手动处理。
-
-## 硬规则
+## 操作边界
 
 | 行为 | 态度 |
-|------|-------|
-| 评论 body 前缀固定为 `[blog-vod Agent]` | ✅ **必须做** |
-| 三轮递进式提问（大方向→细节→边界） | ✅ **必须做** |
-| 每轮只问 2-4 个问题，不一次性给用户太多 | ✅ **必须做** |
-| 输出结构化「博客需求清单」json | ✅ **必须做** |
-| 执行写操作前（如创建标签、发布评论、A2A 交办）须先向用户确认 | ✅ **必须做** |
-| 执行删除操作前（如删除标签/评论）须先向用户确认 | ✅ **必须做** |
-| 每轮对话后持久化已收敛字段（checkpoint），支持断点续跑 | ✅ **必须做** |
-| 用户未回复的维度用合理默认值填充并标注 | ✅ **根据判断** |
-| 创建 Issue 标签 `blog-vod` 和 `type:feature` | ✅ **必须做** |
-| 需求收敛后通过 A2A 交办 Issue Agent | ✅ **必须做，不可跳过** |
-| 写操作幂等性：相同输入重复执行不产生重复副作用（标签先查后建、评论带唯一标识） | ✅ **必须做** |
-| 单条反馈价值不足时标记存档不创建 Issue | ✅ **根据判断** |
-| 修改非博客相关 Issue | ❌ **禁止** |
-| 回复 Token/密码等敏感信息 | ❌ **禁止** |
-| 直接关闭/合并 Issue | ❌ **禁止** |
-| 未经用户确认执行删除操作 | ❌ **禁止** |
-| 直接 A2A 交办 Coding/QA/SRE Agent | ❌ **禁止（必须先经 Issue Agent）** |
+|------|------|
+| 三轮递进式提问（大方向/细节/边界） | **必须做** |
+| 每轮只问 2-4 个问题 | **必须做** |
+| 输出结构化「博客需求清单」 | **必须做** |
+| 创建 Issue 标签 blog-vod / type:feature | **必须做** |
+| 需求收敛后 A2A 交办 Issue Agent | **必须做，不可跳过** |
+| 用户未回复维度用默认值填充并标注 | **根据判断** |
+| 直接关闭/合并 Issue | **禁止** |
+| 修改非博客相关 Issue | **禁止** |
+| 直接 A2A 交办 Coding/QA/SRE | **禁止（必须先经 Issue Agent）** |
+| 回复 Token/密码等敏感信息 | **禁止** |
 
-## 输出格式
+## 可靠性声明
 
-任务完成后，**必须在最终答复末尾输出结构化 JSON 块**：
+| 机制 | 声明 |
+|------|------|
+| 断点续跑 | 每轮收敛后把已确认字段以「需求清单 JSON」写入 Issue 评论；会话中断重启后先读该评论恢复轮次，不重复已确认项，不重复交办（A2A 前查 pipeline 是否已有 issue:a2a_event） |
+| 重试幂等 | A2A 失败重试 3 次（间隔数秒）后评论说明并在 next_step 标注人工介入；创建标签前先 GET /labels 查重；发布评论先查是否已有同前缀评论，不产生重复副作用 |
+| 资源清理 | 全程不落临时文件；A2A 成功后 checkpoint 评论保留作为记录；任务结束输出 JSON 块收口，不遗留挂起步骤 |
+| 降级策略 | GitCode API 403 时停止并回复需管理员权限；抓取/浏览器类步骤失败时跳过对应提问轮次用默认值；A2A 端点不可达时重试 3 次后评论说明 |
 
-```json
-{
-  "actions": ["博客场景识别", "第一轮收敛（主题+风格+标签）", "第二轮收敛（结构+配图+视频）", "第三轮收敛（长度+语调）"],
-  "conclusion": "需求已收敛 / 用户未完全回复（标注默认值）",
-  "artifacts": {
-    "requirement_summary": {
-      "topic": "主题",
-      "focus": "切入点",
-      "structure_sections": 5,
-      "image_count": 5,
-      "image_style": "风格描述",
-      "has_video": true,
-      "labels": [{"id": 2, "name": "生活"}],
-      "length": "标准/深度",
-      "tone": "语调描述"
-    }
-  },
-  "next_step": "已 A2A 交办 Issue Agent 接力",
-  "issue_summary": "博客需求已收敛：主题｜风格｜结构｜配图｜视频｜标签｜长度｜语调"
-}
-```
+## 版本管理
 
-**不输出 JSON 块视为任务未完成。**
-
-## 参考
-
-- `$SKILL_DIR/references/gitcode-api-reference.md` — GitCode API 调用规范
-- `$SKILL_DIR/references/labeling-guide.md` — 标签管理规范
-- `$SKILL_DIR/references/comment-guide.md` — 评论格式规范
-- `$SKILL_DIR/references/a2a-handoff.md` — A2A 交办 Issue Agent 规范
+- 当前版本：v2.0（Frontmatter version 与标题业务版本号一致；遵循技能规范基准 v1.0）
+- 兼容策略：inputSchema/outputSchema 字段只增不删，新增字段均为可选，既有字段语义不变，保证新旧版本输出可互认
+- 灰度策略：破坏性变更（A2A 端点、schema 字段移除）先在受控仓库试运行观察，再全量生效；变更经 PR 评审合并入 main
 
 ## 性能预算
 
-| 指标 | 预算值 | 说明 |
-|------|--------|------|
-| P95 执行时延 | < 120s | 从 Issue 读取到 A2A 交办完成（含用户交互等待不计入） |
-| LLM 调用次数 | ≤ 5 次 | 初始化分析(1) + 三轮提问生成(3) + 需求清单汇总(1) |
-| Token 消耗 | ≤ 8000 tokens | SKILL.md ~3500 tokens + references ~2500 tokens + 运行时上下文 ~2000 tokens |
-| 上下文压缩 | 超过 6000 tokens 时触发 | 自动压缩早期轮次对话，保留最近 2 轮完整内容 |
+| 指标 | 预算/基线 | 说明 |
+|------|-----------|------|
+| P95 执行时延 | < 60s | 三轮收敛 + 1 次评论 + 1 次 A2A，不含用户等待 |
+| LLM 调用次数 | <= 6 次 | 初稿分析(1) + 三轮收敛(3) + 需求清单汇总(1) + 终局摘要(1) |
+| token 消耗 | <= 8K token | SKILL.md + 按需加载的 references + 运行时上下文 |
+| 上下文压缩 | > 6K token 触发 | 压缩早期轮次对话，保留最近 2 轮完整内容 |
 
-## 版本管理策略
+## 输出格式（outputSchema）
 
-- 当前版本：v1.0（frontmatter 不声明 version 字段，遵循 v1.0 规范）
-- 变更日志记录在仓库根目录 CHANGELOG.md 中
-- 向后兼容策略：outputSchema 新增字段为可选（非 required），不破坏下游解析
-- 灰度机制：通过 GitCode 分支管理（dev → main），合并前需通过 linter + tester + auditor 三阶段测试
+任务结束输出最终 JSON 块（完整示例见 references/requirement-elicit-guide.md），核心字段如下：
 
-## 幂等性保证
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| actions | array[string] | 执行动作列表 |
+| conclusion | string | 需求已收敛 / 用户未完全回复 |
+| artifacts.requirement_summary | object | 博客需求清单（topic/focus/structure_sections/image_count/image_style/has_video/labels/length/tone） |
+| next_step | string | 下一步动作描述 |
+| issue_summary | string | Issue 聚合摘要 |
 
-| 操作 | 幂等策略 |
-|------|----------|
-| 标签创建 | 先 GET /labels 查询是否已存在同名标签，存在则跳过创建 |
-| Issue 加标签 | 先 GET /issues/:number 查询已有标签，去重后 PATCH 更新 |
-| 评论发布 | 评论 body 包含唯一标识 `<!-- blog-vod:{issue_number}:{timestamp} -->`，发布前查询已有评论是否包含相同标识 |
-| A2A 交办 | A2A payload 携带 idempotency_key（issue_number + skill_name），下游去重 |
+## 参考
 
-重复执行相同 skill（如 Issue 被重新打开触发）不会产生重复标签、评论或 A2A 请求。
+- 问卷示例与需求清单模板：references/requirement-elicit-guide.md
+- 评论与标签规范：references/comment-labeling-guide.md
+- A2A 交办（认证用 $GRAPE_SESSION_TOKEN）：references/a2a-handoff.md
+- GitCode API（认证用 $BOT_GITCODE_TOKEN）：references/gitcode-api-reference.md
+
+> **任务结束**：完成所有业务动作（标签/评论/A2A 交办）后，输出最终 JSON 块并结束任务，不要继续思考或等待输入。
