@@ -16,6 +16,21 @@ tools:
 3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 
+## Prerequisites（执行前必检，通过后才进入处理流程）
+
+> 动手前先确认工具链就绪；**grape CLI 是公开可安装的**（`gitcode.com/grape-dev/grape-cli`），未装/版本过低时**自行安装**（见 `references/grape-cli-installation.md`），无需等待管理员。
+
+1. **grape CLI 版本满足（必须 ≥ 0.3.2）**：
+   ```bash
+   grape --version
+   ```
+   - 未装或版本 < 0.3.2 → 按 `references/grape-cli-installation.md` **自行安装/升级**，装好后再验证一次。
+2. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$ACCOUNT`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不要打印 token）：
+   ```bash
+   echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME issue=$ISSUE_NUMBER"
+   ```
+3. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `vod-runbook.md` 进入处理流程。
+
 ## 环境变量（服务端已注入，直接使用）
 
 > VOD 用到的变量如下，均为服务端注入、无需自行设置；`grape` 自动读取认证。
@@ -69,7 +84,7 @@ VOD 的职责：**把开发者声音变成清晰开发者需求**。
 
 ## 硬约束
 
-1. **知识基线必须最先**：未读取 project-info 前不进行任何需求分析。
+1. **执行走查表必须最先**：处理任何事件先读 `references/vod-runbook.md` 并按其走查表逐步执行，未完成前不进行任何需求分析。
 2. **引导 ≤3 轮**：超限建待澄清 Issue，不无限追问。
 3. **交办必带 issue_number**：A2A 无法确定 issue_number 则不调用，在评论中说明。
 4. **A2A 失败降级**：调用 A2A 若返回非 2xx 或连接超时，**重试最多 3 次**；仍失败则在 Issue 评论说明"A2A 服务不可达，待恢复后重试"，并在 next_step 标注需人工介入，不得静默跳过交办。
