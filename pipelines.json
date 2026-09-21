@@ -97,6 +97,17 @@
         {"id": "sre", "tag": "sre", "skill": "cloud-deploy", "mode": "emit", "next": "done", "handoff": "complete"}
       ],
       "onboarding": "repo-onboarding"
+    },
+    "grape-skill-dev": {
+      "name": "Grape Skill 开发流程",
+      "nodes": [
+        {"id": "vod", "tag": "vod", "skill": "grape-vod-cli", "mode": "emit", "next": "issue", "handoff": "a2a"},
+        {"id": "issue", "tag": "issue", "skill": "grape-skill-issue", "mode": "emit", "next": "coding", "handoff": "a2a"},
+        {"id": "coding", "tag": "coding", "skill": "grape-skill-generator", "mode": "emit", "next": "qa", "handoff": "a2a"},
+        {"id": "qa", "tag": "qa", "skill": "grape-skill-validator", "mode": "emit", "next": "sre", "handoff": "a2a"},
+        {"id": "sre", "tag": "sre", "skill": "grape-skill-uploader", "mode": "emit", "next": "done", "handoff": "complete"}
+      ],
+      "onboarding": "repo-onboarding"
     }
   }
 }
