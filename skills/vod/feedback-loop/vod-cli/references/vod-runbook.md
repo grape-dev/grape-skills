@@ -63,6 +63,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
   --json '{"body":"[VOD Agent] <项目介绍 / 已解决说明 / 无需动作说明>"}'
 ```
 - **直接进入 Step 6，`next_step=reply_comment`**。
+- ⚠️ **发出评论后必须继续 Step 6**：没有调用 `grape tasks complete` 就是任务未完成，即使评论已发、即使没有 A2A/标签/Spec 等结构化产物——**不要因"纯咨询只是回条评论"就提前结束**。
 
 ### Step 5 · A2A 交办 Issue Agent（仅 Step 4a 收敛后）
 ```bash
@@ -82,6 +83,8 @@ grape a2a handoff --json '{
 - ⚠️ A2A 失败重试 ≤3 次；仍失败 → 评论说明，`next_step` 标注需人工介入。
 
 ### Step 6 · 任务完成流程（必做，任何分支都必须执行到最后）
+> ⚠️ **强约束：本技能收尾 = 调 `grape tasks complete`（情形一）**。这是**最后一个动作**，任何分支（4a/4b/4c/5、以及"已处理/无需动作"）都必须执行，**评论发完 ≠ 任务完成**。若先回读 prompt 的「处理记录输出要求」，应识别本技能属于情形一（提供 `tasks complete` 结构化收尾）——**只调 complete，不再输出 JSON 块**；不要因"读过情形二"而输出 JSON 块替代 complete。
+
 按分支选定 `next_step`：
 | 分支 | next_step |
 |------|-----------|

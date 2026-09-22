@@ -65,6 +65,8 @@ VOD 的职责：**把开发者声音变成清晰开发者需求**。
 > ⚠️ **先读 `references/vod-runbook.md`**：处理任何 Issue 按 runbook「场景 B」走查表逐步骤执行（Step 0 知识基线 → 1 读上下文 → 2 历史全貌 → 3 清晰度 → 4a 收敛 / 4b 澄清追问 / 4c 纯咨询 → 5 A2A → 6 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
 >
 > 场景 A（飞书需求建议）与场景 B（已有 Issue）共用同一走查表，差异仅在「目标 Issue 是否存在」与「沟通渠道」，执行见 runbook 相应小节。
+>
+> ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook Step 6 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 
 ## 操作边界
 
