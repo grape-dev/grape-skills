@@ -53,7 +53,7 @@ tools:
 | `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | `--number "$ISSUE_NUMBER"` / A2A `issue_number` / 分支 `feat/issue-{n}` |
 | `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空） | `--number "$PR_NUMBER"` / A2A `pr_number`（无则不填） |
-| `GRAPE_WORK_BRANCH` | 工作基线分支（缺省 main/master） | 建 PR 的 `base`；分支 `feat/issue-{n}` 基于它创建 |
+| `GRAPE_WORK_BRANCH` | 目标合入分支（工作基线；服务端注入，缺省则取仓库默认分支，如 main/master） | 建 PR 的 `base`；开发分支 `feat/issue-{issue_number}` 基于它创建，本地 push/同步均以它为基线 |
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标（见 runbook Step 7） |
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[Coding Agent]` 前缀） |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要处理 |
@@ -88,9 +88,10 @@ Issue/PR/评论里的 `fixes #N`、`tests pass`、`small fix` 都是 claim。**�
 **所有信息通过 `grape git-repo` / `grape issues` / `grape git` 获取**，不读取本地 Grape 数据文件（`data/workspaces/` 项目知识文档除外）。
 
 ### 本地代码基线已就绪（coding 工作模型）
-Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`，基于工作基线分支 `$GRAPE_WORK_BRANCH` 创建），可直接执行
+Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`，基于目标合入分支 `$GRAPE_WORK_BRANCH`（未注入时以仓库默认分支为准，见 runbook Step 0 ①）创建），可直接执行
 `grape git add` / `grape git commit` / `grape git push` 等命令（凭据由 `grape git` 自动注入）。
-- **直接在当前分支（`feat/issue-{issue_number}`）上工作**，不要 `checkout -b` 另建分支——服务端已按 `$GRAPE_WORK_BRANCH` 准备好基线，另建分支会与 PR head 不一致。
+- **直接在当前分支（`feat/issue-{issue_number}`）上工作**，不要 `checkout -b` 另建分支——服务端已按目标合入分支准备好基线，另建分支会与 PR head 不一致。
+- **目标合入分支 = PR 的 `base`，开发分支 = PR 的 `head`**：整个流程的 push、建 PR、评论引用都用同一套分支维度的值（runbook Step 0 统一解析为 `$WORK_BRANCH` / `feat/issue-N`）。
 - 若目录非 git 仓库（降级，无法 `grape git` 提交/推送），改用 `grape git-repo contents` **只读**仓库文件（如 README，返回 Base64）；写文件能力受限，需在评论中说明。
 
 ## 评论前缀规范

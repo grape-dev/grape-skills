@@ -47,20 +47,23 @@ grape git-repo pulls get --owner {owner} --repo {repo} --number {pr} --json-out
 grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
 grape git-repo commits --owner {owner} --repo {repo} --per_page 10 --json-out
 
+# 项目知识基线（部署前理解项目，支持会话 token）
+grape repos project info --owner {owner} --repo {repo} --json-out   # project-graph.md + capabilities 全文 + meta(degraded)
+
 # 仓库信息 / 文件内容（识别项目结构降级；--raw 自动 base64 解码）
 grape git-repo repo --owner {owner} --repo {repo} --json-out
 grape git-repo tree --owner {owner} --repo {repo} --ref main --json-out    # 目录树（先看根定位构建文件）
 grape git-repo contents --owner {owner} --repo {repo} --path README.md --raw
 grape git-repo contents --owner {owner} --repo {repo} --path package.json --raw
 
-# 任务自报完成（收尾必做，见 SKILL「任务完成流程」）
+# 任务自报完成（收尾必做，见 runbook Step 收尾；⚠️ 结构化字段必填，服务端据此组装 archive）
 grape tasks complete --json '{
-  "result_text": "结论：...",
+  "result_text": "结论：Issue #{n} 部署/资源释放完成。",
   "next_step": "done",
-  "actions": ["..."],
-  "conclusion": "...",
-  "artifacts": ["..."],
-  "issue_summary": "..."
+  "actions": ["构建并部署到华为云 ECS / 释放资源", "验证部署结果", "在 Issue #{n} 评论告知"],
+  "conclusion": "部署完成，http {http_code} / 资源 {状态}",
+  "artifacts": ["ECS {ecs_ip}", "Issue #{n} 评论（comment id=XXXXXX）"],
+  "issue_summary": "部署完成 | 访问 {url} | 验证 {http_code}"
 }'
 
 # 轮询任务至终态

@@ -1,0 +1,131 @@
+# QA-CLI 执行走查表（runbook）
+
+> 目的：把 QA Agent 审查 PR 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
+> 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$PR_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_WORK_BRANCH`（目标分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> **评论前缀硬规**：评论 body 一律以 `[$AGENT_NAME]`（当前 Agent 名）开头；构造 `--json` body 时用双引号使 `$AGENT_NAME` 展开。
+
+---
+
+## 分析（每次执行先分析，必须按 0→1→2→3 顺序；上一步未完成不得进入下一步）
+
+### Step A0 · A2A 触发识别
+- 事件为 `a2a_event` → 从 prompt「A2A 目标 PR：#N」/前序摘要提取 `$PR_NUMBER`；跳过 Step A1（PR 配置检查）；变更以首次审查处理。
+- `pull_request_opened` → 执行 Step A1 配置检查。
+- `pull_request_updated` / `push` / `note_hook_pr` → 跳过配置检查（已在创建时查过）。
+
+### Step A1 · PR 配置检查（仅首次 `pull_request_opened`）
+```bash
+grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+```
+- 按 `references/pr-config-check.md` 检查，不通过项记录到 `review_comments`（暂不评论）。
+- 有关联 Issue → `grape git-repo issues comments create ... --json '{"body":"[$AGENT_NAME] 📌 关联 PR #'"$PR_NUMBER"'"}'`；对应 Issue 是 bug → 更新标签 `bug,triaged`。
+
+### Step A2 · 变更检视
+```bash
+cat ../.last_pr_review/{$PR_NUMBER}.sha 2>/dev/null   # 本机标记文件
+```
+- 不存在 / SHA 不同 → 有新变更，继续。
+- SHA 相同 → 无新变更，跳过以下所有能力项（配置检查评论仍发送），进入 Step 6 收尾。
+
+### Step A3 · 任务类型判断
+| 判断条件 | 任务类型（按顺序执行） |
+|---------|----------------------|
+| PR 修改 `skills/` | 常规审查 → Skill 审查 → 工作流审查 → A2A → 评论 |
+| PR 含 IaC（K8s/Terraform/Dockerfile） | 常规审查 → IaC 审查 → 工作流审查 → A2A → 评论 |
+| 普通代码变更 | 常规审查 → 工作流审查 → A2A → 评论 |
+| 无新变更 | 不做处理，进入 Step 6 收尾 |
+
+---
+
+## 执行（能力项）
+
+### Step 1 · 常规审查（5 轴：正确性/可读性/架构/安全/性能）
+```bash
+grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 既有行内评论
+grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out           # 变更文件 + diff
+grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out             # PR 详情（head.sha）
+```
+- 对每条既有评论：若问题已修复 → 标记 resolved（⚠️ 契约当前无 `pulls comments update`，先 `grape commands pulls` 确认；不存在则在汇总评论说明"已在当前 PR 修复"，不拼不存在命令）。
+- 新问题 → 行内评论：
+  ```bash
+  grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+    --json '{"body":"[$AGENT_NAME] 🔴 Critical: 硬编码密钥，建议使用环境变量","commit_id":"'"$HEAD_SHA"'","path":"src/config.py","position":42}'
+  ```
+  - `commit_id` = PR 最新 head.sha；`path` = 文件路径；`position` = diff 行号。
+- 记录 Critical/Required 问题摘要供 A2A。
+
+### Step 2 · Skill 审查（仅 PR 改 `skills/`）
+按 `references/skill-review-and-quality.md` 审查格式规范/完整性/引用路径/兼容性，发现问题按 Step 1 格式行内评论。
+
+### Step 3 · IaC 审查（仅 PR 含 IaC 文件）
+按表扫描：K8s（特权容器/hostPath/securityContext/runAsRoot）、Terraform（开放 bucket/ingress 0.0.0.0/0/硬编码凭据）、Dockerfile（FROM latest/ADD/root）、Helm（敏感默认/RBAC/拉取策略）。发现问题行内评论。
+
+### Step 4 · 工作流审查（Agent Work Loop 五维：任务理解/受控执行/变更验证/可靠交付/经验沉淀）
+```bash
+grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref main --depth 2 --json-out                          # 目录树（无基线降级时）
+grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path AGENTS.md --raw                                # 任务理解/受控执行
+grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path spec --raw                                      # 任务理解
+grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path tests --raw                                    # 变更验证
+grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path .github/workflows --json-out                   # CI 门禁
+grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out                     # 审查/合并记录
+grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+```
+- 证据来源标注 **observed / unobserved**；未观察显式标注、不得推断/评分。
+- 发现按 `references/findings-format.md` 契约记录（维度/证据/严重度/影响/修复/验收）。
+
+### Step 5 · A2A 通知 coding（有 Critical/Required 问题需修改时）
+```bash
+grape a2a handoff --json '{
+  "agent": "coding",
+  "payload": {
+    "repository": "'"$REPO_FULL_NAME"'",
+    "account": "'"$ACCOUNT"'",
+    "issue_number": '"$ISSUE_NUMBER"',
+    "pr_number": '"$PR_NUMBER"',
+    "context": "PR #'"$PR_NUMBER"' 审查发现问题需要修改：'$REVIEW_SUMMARY'"
+  }
+}' --json-out
+```
+- ⚠️ `issue_number` 必填，`pr_number` 填 PR 编号，禁止混用；无法确定 issue_number 则不调 A2A，在评论说明。
+
+### Step 6 · 评论回复（⚠️ 所有能力项执行完毕最后统一发，不得中间单独发）
+```bash
+grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+  --json '{"body":"[$AGENT_NAME] 审查报告\n\n## 配置检查\n- ✅ Title：通过\n...\n## 代码审查\n✅ 通过\n\n## 工作流审查\n⚠️ 2 项发现（见下）\n\n## 安全扫描\n✅ 安全\n\n## 合并检查\n⚠️ 测试未确认"}'
+```
+- body 以 `[$AGENT_NAME]` 开头；按「输出规范」逐节组织；全部通过则评论「审查通过，所有检查项均正常」。
+- **发评论前必做「输出自检」**（模板/契约/占位符核对，见 SKILL「输出自检」），自检不通过禁止发送（重试一次，仍失败输出显式错误说明）。
+
+### Step 7 · 任务完成流程（必做，任何分支都必须执行到最后）
+> ⚠️ **强约束：本技能收尾 = 调 `grape tasks complete`（情形一）**。任何分支最后一步都必须调用，**评论发完 ≠ 任务完成**；只调 complete，不再输出 JSON 块。
+
+```bash
+grape tasks complete --json '{
+  "result_text": "结论：PR #'"$PR_NUMBER"' 审查完成（配置检查通过 / 发现 X 项问题）。",
+  "next_step": "done",
+  "actions": ["代码审查 + 工作流审查", "发布行内评论 + 汇总评论", "A2A 交办 coding Agent 修复"],
+  "conclusion": "PR #'"$PR_NUMBER"' 审查结论：{通过 / 需修改}；发现问题 {n} 项；A2A 交办 coding",
+  "artifacts": ["PR #'"$PR_NUMBER"' 审查评论（comment id=XXXXXX）", "A2A event seq=XXXX"],
+  "issue_summary": "PR #'"$PR_NUMBER"' 审查完成 | 结论 {通过/需修改} | 发现 {n} 项 | A2A {已/未}交办"
+}'
+```
+> `next_step` 取 `a2a_issue` / `reply_comment` / `a2a_need_clarify` / `done`。`already:true` 忽略。**然后结束任务**
+
+---
+
+## 错误排查速查
+
+| 现象 | 处理 |
+|------|------|
+| `No such command 'X'` | 命令名错，核对 runbook / reference；仍不确定才 `grape commands <关键词>` |
+| `unknown request field(s): ...` | `--json` 字段不在允许集，看 `--help` 的 Body fields 删多余字段 |
+| 401 凭据失效 | 说明"凭据已失效"，不换 token |
+| 403 账户/平台类 | 说明需 `grape_`/JWT，本技能一般不涉及 |
+| `contents` 路径不存在 / 无基线 | 用 `tree --depth 2` / `contents --path ""` 定位 |
+
+## 明确禁止
+
+- ❌ 用 `cat`/`ls`/`grep` 翻 workspace / Grape 系统文件采集证据（仅 `session_history.json` 例外可 read）。
+- ❌ 中间步骤单独发评论——所有评论统一最后发送。
+- ❌ 直接合并 PR / 修改 PR 代码 / 删除 PR。
+- ❌ 不因"等待"跳过 Step 7（tasks complete）。

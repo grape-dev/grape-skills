@@ -51,9 +51,10 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 # 列 PR（是否已有方案 / 查自建 PR 编号）
 grape git-repo pulls list --owner {owner} --repo {repo} --state all --per_page 10 --json-out
 
-# 创建 PR（新开发场景；base 用工作基线分支 $GRAPE_WORK_BRANCH（缺省 main/master），不要写死 main；关联 Issue 可让合并后自动关闭）
+# 创建 PR（新开发场景；base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支），不要写死 main；关联 Issue 可让合并后自动关闭）
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner {owner} --repo {repo} --json-out | jq -r '.default_branch // "main"')}"
 grape git-repo pulls create --owner {owner} --repo {repo} \
-  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"'"${GRAPE_WORK_BRANCH:-main}"'","inner_issue_nums":"{owner}/{repo}#{n}","close_related_issue":true}'
+  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"'"$WORK_BRANCH"'","inner_issue_nums":"{owner}/{repo}#{n}","close_related_issue":true}'
 
 # 补充/更新 PR body 或标签（PATCH）
 grape git-repo pulls update --owner {owner} --repo {repo} --number {pr} \
@@ -111,11 +112,12 @@ grape git pull
 grape git add -A
 grape git commit -m "feat: #7 描述"
 grape git push origin feat/issue-7
-# 仅当 feat/issue-7 不存在（降级）才创建，基于 origin/$GRAPE_WORK_BRANCH（缺省 main）
-grape git checkout -b feat/issue-7 origin/"${GRAPE_WORK_BRANCH:-main}"
+# 仅当 feat/issue-7 不存在（降级）才创建，基于目标合入分支（缺省仓库默认分支）
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner {owner} --repo {repo} --json-out | jq -r '.default_branch // "main"')}"
+grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 ```
 
-> 本地代码基线已就绪（coding 工作模型）：Grape 服务端已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`，基于工作基线 `$GRAPE_WORK_BRANCH`）。
+> 本地代码基线已就绪（coding 工作模型）：Grape 服务端已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`，基于目标合入分支 `$GRAPE_WORK_BRANCH`（未注入时取仓库默认分支））。
 > **直接在该分支（`feat/issue-{issue_number}`）上工作**，不要另建分支名，避免与 PR head 不一致；仅分支不存在时按上面降级命令创建。
 > 若目录非 git 仓库（降级，无法 `grape git`），改用 `grape git-repo contents` **只读**仓库文件内容（仅 `get`），写文件能力受限需在评论中说明。
 

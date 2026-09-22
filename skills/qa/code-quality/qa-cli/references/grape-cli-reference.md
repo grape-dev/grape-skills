@@ -76,10 +76,14 @@ grape git-repo commits --owner {owner} --repo {repo} --per_page 20 --json-out
 # A2A 交办 coding Agent（审查发现问题需修改时，专属命令）
 grape a2a handoff --json '{"agent":"coding","payload":{...}}'
 
-# 任务自报完成（收尾必做，见 SKILL「任务完成流程」）
+# 任务自报完成（收尾必做，见 runbook Step 7；会话 token 自动定位任务，无需 --task_id；⚠️ 结构化字段必填，服务端据此组装 archive）
 grape tasks complete --json '{
-  "result_text": "结论：...",
-  "next_step": "done"
+  "result_text": "结论：PR #N 审查完成。",
+  "next_step": "done",
+  "actions": ["代码审查 + 工作流审查", "发布行内评论 + 汇总评论", "A2A 交办 coding Agent 修复"],
+  "conclusion": "PR #N 审查结论：{通过 / 需修改}；发现问题 {n} 项；A2A 交办 coding",
+  "artifacts": ["PR #N 审查评论（comment id=XXXXXX）", "A2A event seq=XXXX"],
+  "issue_summary": "PR #N 审查完成 | 结论 {通过/需修改} | 发现 {n} 项 | A2A {已/未}交办"
 }'
 
 # 轮询任务至终态

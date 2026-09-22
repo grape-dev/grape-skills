@@ -26,7 +26,16 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out  # 系�
 
 - `meta.degraded=false` 且 `files` 非空 → 项目基线可用，基于它做分析，**不再**用 `grape git-repo` 逐文件探索。
 - `knowledge list` 命中的知识 → 按需 `grape knowledge detail --knowledge_id {id} --json-out` 读全文，作为分析/答复依据。
-- `meta.degraded=true` 或 `files` 空（无基线）→ 降级：`grape git-repo repo` / `grape git-repo tree --depth 2` / `contents README --raw`（相关结论标注 `[degraded]`）。
+- `meta.degraded=true` 或 `files` 空（无基线）→ 降级（**目标分支 = 优先 `$GRAPE_WORK_BRANCH`，否则仓库默认分支，兜底探测 main/master**）：
+  ```bash
+  # 目标分支：$GRAPE_WORK_BRANCH → repos project info 的 branches_analyzed 首个 → main/master 探测
+  TARGET_BRANCH="${GRAPE_WORK_BRANCH:-}"
+  grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out   # 取 default_branch（若有）
+  grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "${TARGET_BRANCH:-main}" --depth 2 --json-out
+  grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md --raw
+  # 若 main 不存在（404）→ 用 master 重试：--ref master
+  ```
+  （相关结论标注 `[degraded]`）。
 - 若上述任一命令报 403（会话 token 作用域不匹配等）→ 跳过该来源，其余正常执行；都不可用时降级 + 评论说明。
 
 ### Step 1 · 读 Issue 上下文（必做）

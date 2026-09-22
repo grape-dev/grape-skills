@@ -1,6 +1,6 @@
 ---
 name: qa-cli
-version: 2.0.0
+version: 2.1.0
 description: |
   PR 全生命周期审查 + 工作流质量审查（Agent Work Loop 五维模型）。pr 技能的平替与增强（CLI 版）：
   在代码审查基础上，增加对仓库 AI 编码工作流（AGENTS.md、spec、技能、Hook、CI 门禁、经验沉淀）的证据化审查，
@@ -9,18 +9,49 @@ description: |
 tools:
   - grape
 ---
+# QA 审查（PR 运营 + 工作流质量审查）— CLI 版
+
 ## 安全硬约束（必须遵守）
 
-1. 调用 Grape/GitCode 平台一律只用 `grape` CLI 与系统注入的 `$GRAPE_SESSION_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token，也**不得改用 curl 直连 `api.gitcode.com`**。命令参考见 `references/grape-cli-reference.md`。注意 token 有调用范围：会话级 `tk_` 覆盖本技能全部日常操作（workflows / Agent Context / git-repo）；「账户/平台管理」类端点（skills/auth/repos-managed 等）对 `tk_` 返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按指引说明即可，不要更换 token 或绕行。
+1. 调用 Grape/GitCode 平台一律只用 `grape` CLI 与系统注入的 `$GRAPE_SESSION_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token，也**不得改用 curl 直连 `api.gitcode.com`**。命令参考见 `references/grape-cli-reference.md`。注意 token 有调用范围：会话级 `tk_` 覆盖本技能全部日常操作（workflows / Agent Context / git-repo）；「账户/平台管理」类端点对 `tk_` 返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按指引说明即可，不要更换 token 或绕行。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 401（token 失效）：任务级 token 短命，失效属正常；说明凭据已失效即可，不尝试替换。
-6. 若 `grape` CLI 未安装，或缺少所需子命令：直接说明**任务无法完成的理由**，不探索其它无关 token、不改用 curl 直连。
+6. 若 `grape` CLI 未安装或缺少所需子命令：按 grape-cli 官方安装自行安装，装好再验证；仍不可用则说明**任务无法完成的理由**，不探索其它无关 token、不改用 curl 直连。
 
+## Prerequisites（执行前必检，通过后才进入处理流程）
 
+> 动手前先确认工具链就绪；**grape CLI 是公开可安装的**（`gitcode.com/grape-dev/grape-cli`），未装/版本过低时**自行安装**（`pip install git+https://gitcode.com/grape-dev/grape-cli.git`），无需等待管理员。
 
-# QA 审查（PR 运营 + 工作流质量审查）— CLI 版
+1. **grape CLI 版本满足**：
+   ```bash
+   grape --version
+   ```
+   - 未装或版本过低 → 自装/升级，装好再验证一次。
+2. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$ACCOUNT`/`$REPO_NAME`/`$PR_NUMBER` 有值（用 `${VAR:+ok}` 校验，不打印 token）：
+   ```bash
+   echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME pr=$PR_NUMBER issue=$ISSUE_NUMBER"
+   ```
+3. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `qa-runbook.md` 进入处理流程。
+
+## 环境变量（服务端已注入，直接使用）
+
+| 变量 | 语义 | 用途 |
+|------|------|------|
+| `GRAPE_SERVER_URL` | 服务端地址 | `grape` 自动读取（`--base-url` 可覆盖） |
+| `GRAPE_SESSION_TOKEN` | 会话级临时 token（`tk_`，任务生命周期有效） | `grape` 自动认证；终态后失效 |
+| `REPO_FULL_NAME` | `owner/repo` 仓库全名 | A2A 交办 `repository` / 场景查询 |
+| `ACCOUNT` | 仓库属主（owner） | `grape ... --owner "$ACCOUNT"` |
+| `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
+| `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | A2A `issue_number` |
+| `PR_NUMBER` | PR 编号 | `--number "$PR_NUMBER"` / A2A `pr_number` |
+| `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标 |
+| `GRAPE_WORK_BRANCH` | 目标分支（缺省 main/master） | 变更检视/工作流审查判断基准（PR 目标分支） |
+| `AGENT_NAME` | Agent 显示名 | 评论 body 前缀 `[$AGENT_NAME]`（构造 `--json` 时用双引号展开） |
+| `DEVOPS_EVENT_TYPE` | 事件类型（如 `pull_request_opened`） | 判断入口/是否执行配置检查 |
+
+> ⚠️ token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**。
 
 ## 核心原则
 
@@ -28,195 +59,24 @@ tools:
 PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 claim，不是事实。**先打开原对象核对**。
 
 ### 证据优先
-所有发现必须绑定证据。每个结论都要能指出证据来源（文件路径、行号、会话记录），区分**已观察（observed）**与**未观察（unobserved）**：
-- 未观察到的行为**显式标注**，不得用推断补齐、不得虚构证据。
-- **没有证据就不评分**。维度评分只在证据充分时给出；证据不足的维度标注 `unobserved` 并说明原因。
+所有发现必须绑定证据，区分**已观察（observed）** 与 **未观察（unobserved）**：
+- 未观察行为**显式标注**，不得用推断补齐、不得虚构证据。
+- **没有证据就不评分**。证据不足的维度标注 `unobserved` 并说明原因。
 
 ### Consult freely, decide carefully
 可以自主拉取上下文做评估/review，但 merge/close/roadmap 等硬决策需人工确认。
 
 ### 所有评论统一在能力项执行完毕后发送
-各能力项的分析结果先记录，最后统一合并为一条评论发送，不得在中间步骤单独发评论。
+各能力项分析结果先记录，最后统一合并为一条评论发送，不得在中间步骤单独发评论。
 
 ### 禁止探索 Grape 内部
-不要执行 `ls`、`grep`、`cat` 等命令查看 workspace 目录、Grape 代码、日志文件或数据库。
-**所有仓库信息通过 `grape` CLI（git-repo 组命令）获取**，不读取本地文件。
-**唯一例外**：`data/workspaces/history/{account}/{repo}/session_history.json` 会话历史文件是 Grape 明确提供给 Agent 读取的上下文，可以用 read 工具读取用于工作流审查的证据采集。
+不要执行 `ls`、`grep`、`cat` 查看 workspace 目录、Grape 代码、日志或数据库。所有仓库信息通过 `grape` CLI（git-repo 组命令）获取。**唯一例外**：`data/workspaces/history/{account}/{repo}/session_history.json` 可用 read 读取（工作流审查证据）。
 
-## 分析（每次执行前先分析，⚠️ 必须按 0→1→2→3 顺序依次执行，上一步未完成不得进入下一步）
+## 处理流程
 
-### 分析内容
-
-0. **A2A 触发识别**
-
-   如果事件类型为 `a2a_event`（即通过 A2A 被其他 Agent 主动调用）：
-
-   1. 从 prompt 上下文的「A2A 目标 PR：#N」或前序摘要中提取 PR 编号，设为 `$PR_NUMBER`
-   2. 跳过分析步 1（PR 配置检查，该步仅 `pull_request_opened` 时执行）
-   3. 变更检视（分析步 2）以首次审查处理（`.last_pr_review/{pr_number}.sha` 不存在 → 有新变更）
-   4. 继续执行分析步 3 及后续所有能力项
-
-1. **PR 配置检查（仅首次 `pull_request_opened` 事件时执行）**
-
-   如果是 `pull_request_updated`、`push` 或 `note_hook_pr` 事件，**跳过此步**（配置已在 PR 创建时检查过）。
-
-   读取 `references/pr-config-check.md` 执行检查，将不通过项记录到 `review_comments` 中（暂不评论，统一到最后处理）。
-
-   如果有关联 Issue，在对应 Issue 中评论 `📌 关联 PR #{pr_number}`，对应 Issue 是 bug 则更新标签 `labels="bug,triaged"`。
-
-2. **变更检视**
-
-   判断是否有新的代码变更：
-
-   ```bash
-   cat ../.last_pr_review/{pr_number}.sha 2>/dev/null
-   ```
-
-   - 文件不存在或 SHA 不同 → 有新的变更，继续
-   - SHA 相同 → 无新变更，**跳过以下所有能力项**（配置检查的评论仍会发送）
-
-3. **任务类型判断**
-
-   | 判断条件 | 任务类型（按顺序执行） |
-   |---------|----------------------|
-   | PR 修改了 `skills/` 目录下的文件 | 常规审查 → Skill 审查 → 工作流审查 → A2A 通知 → 回复评论 |
-   | PR 包含 IaC 文件（K8s/Terraform/Dockerfile） | 常规审查 → IaC 审查 → 工作流审查 → A2A 通知 → 回复评论 |
-   | 普通代码变更 | 常规审查 → 工作流审查 → A2A 通知 → 回复评论 |
-   | 无新变更 | 不做处理，结束 |
-
-### 分析结论示例
-
-```
-分析结论：
-- 配置检查：Title 和 Description 通过，缺少 Labels 和 Assignee
-- 变更检视：有新变更（首次审查）
-- 任务类型：常规审查 + 工作流审查（含 IaC 文件变更）
-- 需要执行：常规审查 → IaC 审查 → 工作流审查 → A2A 通知 → 评论回复
-```
-
-## 能力项
-
-审查过程中对每个发现的问题直接在对应代码位置发布行内评论，最后在「评论回复」中发一条总结性评论。
-
-### 能力一：常规审查
-
-读取 `references/code-review-and-quality.md`，按 5 轴标准逐项审查（正确性、可读性、架构、安全、性能）。
-
-**审查前先获取 PR 上已有行内评论，检查上次发现的问题是否已修复：**
-
-```bash
-# 获取 PR 所有行内评论（token/base_url 均取已注入的 $GRAPE_SESSION_TOKEN/$GRAPE_SERVER_URL）
-grape git-repo pulls comments list --owner {owner} --repo {repo} --number {number} --json-out
-```
-
-对每条已有评论：
-- 检查对应代码位置的代码是否已无问题（问题已修复）
-- 如果已修复 → 标记为已解决（⚠️ 该命令当前不在 grape-cli 契约中，先用 `grape commands pulls` 确认；不存在则改在「评论回复」汇总评论中说明"该问题已在当前 PR 修复"，不要拼不存在命令）：
-
-```bash
-grape git-repo pulls comments update --owner {owner} --repo {repo} --number {number} \
-  --discussion-id {discussion_id} --json '{"resolved": true}'
-```
-
-其中 `discussion_id` 为评论对象的 `discussion_id` 字段（不是 `id` 字段）。
-
-**然后审查新变更，对发现的每个问题发布行内评论：**
-
-```bash
-# 先获取 PR 变更文件列表和 diff 信息
-grape git-repo pulls files --owner {owner} --repo {repo} --number {number} --json-out
-```
-
-从返回中获取每个文件在 diff 中的行号映射。然后在对应位置发布评论：
-
-```bash
-grape git-repo pulls comments create --owner {owner} --repo {repo} --number {number} \
-  --json '{"body": "[$AGENT_NAME] 🔴 Critical: 硬编码密钥，建议使用环境变量", "commit_id": "'"$HEAD_SHA"'", "path": "src/config.py", "position": 42}'
-```
-
-- `commit_id` 为 PR 最新的 head.sha（阶段 0 已获取，来自 `grape git-repo pulls get`）
-- `path` 为问题所在的文件路径
-- `position` 为问题在 diff 中的行号（从 `grape git-repo pulls files` 返回的 diff 中获取）
-- 发现 Critical 或 Required 级别问题时，记录问题摘要用于后续 A2A 通知
-
-### 能力二：Skill 审查
-
-**仅当 PR 修改了 `skills/` 目录时执行。**
-
-读取 `references/skill-review-and-quality.md`，审查技能文件的格式规范、完整性、引用路径、向后兼容性。
-
-对发现的每个问题，参照能力一的格式在对应代码位置发布行内评论。
-
-### 能力三：IaC 审查（仅当 PR 包含 IaC 文件）
-
-额外扫描 IaC（基础设施即代码）文件：
-
-| 文件类型 | 关注点 |
-|---------|--------|
-| Kubernetes Manifest | 特权容器、hostPath 挂载、`securityContext` 缺失、`runAsRoot`、资源限制未设置 |
-| Terraform / OpenTofu | 公开 S3 bucket、`ingress` 全开放（`0.0.0.0/0`）、硬编码凭据、未启用加密 |
-| Dockerfile | `FROM latest`、`ADD` 替代 `COPY`、root 用户运行、多余端口暴露 |
-| Helm Chart | values 中的敏感默认值、RBAC 权限过度、镜像拉取策略不当 |
-
-对发现的每个问题，参照能力一的格式在对应代码位置发布行内评论。
-
-### 能力四：工作流审查（qa 技能增强核心）
-
-**评估仓库 AI 编码工作流（Agent Work Loop），而非只审 diff。** 读取 `references/workflow-harness-review.md`，按五个维度（任务理解、受控执行、变更验证、可靠交付、经验沉淀）逐项评估：
-
-1. **收集证据**：
-   - 通过 `grape git-repo contents` 读取仓库文件：`AGENTS.md`、`spec`/`DESIGN.md`、`skills/`、`tests/`、CI 配置（`.github/workflows`/`.gitlab-ci.yml`/`Jenkinsfile`）、Hook 配置、构建脚本（`contents` 返回的 `content` 为 Base64，需解码后读取）
-   - 通过 `grape git-repo pulls get` / `grape git-repo pulls files` 读取 PR 审查记录、合并记录
-   - 通过 read 工具读取会话历史：`data/workspaces/history/{account}/{repository}/session_history.json`
-   - 对每个证据来源标注状态：**已观察（observed）** 或 **未观察（unobserved）**
-2. **逐维判定**：对照五维模型的问题清单，将具体差距转化为发现
-3. **证据缺口显式标注**：未观察到的证据来源明确写出 `unobserved`，不得推断补齐、不得评分
-4. **输出发现**：按 `references/findings-format.md` 的契约记录每条发现（严重度 + 维度 + 证据 + 影响 + 预期输出 + 修复范围 + 验收检查）
-
-工作流审查发现的记录暂不发布行内评论，统一汇总到「评论回复」与「A2A 通知」。
-
-### 能力五：A2A 通知
-
-**当审查发现问题需要修改时，调用 A2A 通知 coding Agent（implementation）处理。**
-
-如果 `review_comments` 中存在 Critical 或 Required 级别的问题（代码问题或工作流问题），说明需要修改代码或补齐工作流资产。此时调用 A2A 通知 coding Agent（implementation）：
-
-```bash
-grape a2a handoff --json '{
-  "agent": "coding",
-  "payload": {
-    "repository": "'"$REPO_FULL_NAME"'",
-    "account": "'"$ACCOUNT"'",
-    "issue_number": "'"$ISSUE_NUMBER"'",
-    "pr_number": "'"$PR_NUMBER"'",
-    "context": "PR #'$PR_NUMBER' 审查发现问题需要修改：'$REVIEW_SUMMARY'"
-  }
-}'
-```
-
-> ⚠️ **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（本 PR 关联的真实 Issue 编号 `$ISSUE_NUMBER`），**无法确定则不要调用 A2A**，在最终审查评论中说明；`pr_number` 填 PR 编号；**严禁把 PR 编号填入 issue_number，两者不可混用**。
-
-其中 `$REVIEW_SUMMARY` 为上述审查中发现的 Critical 和 Required 级别问题（含工作流发现）的汇总。
-
-### 能力六：评论回复
-
-**⚠️ 所有能力项执行完毕后，最后统一执行此步。不得在中间步骤单独发评论。**
-
-将所有 `review_comments` 中的内容合并为一条评论发送：
-
-```bash
-grape git-repo pulls comments create --owner {owner} --repo {repo} --number {number} \
-  --json '{"body": "[$AGENT_NAME] 审查报告\n\n## 配置检查\n- ✅ Title：通过\n- ⚠️ Labels：缺少分类标签\n\n## 代码审查\n✅ 通过\n\n## 工作流审查\n⚠️ 2 项发现（见下）\n\n## 安全扫描\n✅ 安全\n\n## 合并检查\n⚠️ 测试未确认"}'
-```
-
-- body **必须**以 `[$AGENT_NAME]` 开头
-- 汇总所有能力项的发现，按章节组织
-- 工作流审查发现按 `findings-format.md` 契约列出（维度、证据状态、严重度、影响、修复、验收）
-- 如果全部通过，评论：`[$AGENT_NAME] 审查通过，所有检查项均正常。`
-
-**跳过此步 = 事件未完成处理。**
-
-**例外：** 变更检视判定 SHA 未变更而跳过时，不发评论。
+> ⚠️ **先读 `references/qa-runbook.md`**：按走查表逐步骤执行（Step A0-A3 分析 → 1 常规审查 → 2 Skill 审查 → 3 IaC 审查 → 4 工作流审查 → 5 A2A → 6 评论回复 → 7 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
+>
+> ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook Step 7 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 
 ## 输出规范
 
@@ -231,55 +91,28 @@ grape git-repo pulls comments create --owner {owner} --repo {repo} --number {num
 
 ### 代码审查
 **结论**: ✅ 通过 / ⚠️ 需修改 / ❌ 需重大修改
-
 | 级别 | 文件 | 行号 | 问题 | 建议 |
-|------|------|------|------|------|
-| 🔴 | src/main.go | 42 | 硬编码密钥 | 使用环境变量 |
 
 ### 工作流审查（Agent Work Loop）
 **结论**: ✅ 健康 / ⚠️ 需改进 / ❌ 差距明显
-
 | 维度 | 证据状态 | 严重度 | 发现 | 影响 | 修复 | 验收 |
-|------|---------|--------|------|------|------|------|
-| 变更验证 | ✅ 已观察 | 🔴 Critical | PR 无测试且 CI 未运行 | 回归风险 | A2A 补测试并跑 CI | 测试通过且 CI 绿 |
-| 经验沉淀 | ⚠️ 未观察 | 🟡 Required | 未发现可复用 skill | 问题易复发 | 沉淀修复为 skill | 新 skill 存在 |
 
 ### 安全扫描
 **结论**: ✅ 安全
 
 ### 合并检查
-- ✅ 安全通过
-- ✅ 审查通过
-- ⚠️ 测试未确认
+- ✅ 安全通过 / ✅ 审查通过 / ⚠️ 测试未确认
 ```
 
 ## 输出自检（发评论前必做）
 
-**发送任何审查评论前，必须执行输出完整性自检**（防止空报告/占位内容静默提交——QA 输出是下游合并决策的依据，空报告会导致门禁失效）：
+**发送任何审查评论前，必须执行输出完整性自检**（QA 输出是下游合并决策的依据，空报告会导致门禁失效）：
+1. **模板核对**：以 `[$AGENT_NAME]` 开头；各节（关联 Issue/变更摘要/代码审查/工作流审查/安全扫描/合并检查）**非空**（无内容显式写"未涉及"）；代码/工作流审查必须有结论行。
+2. **发现契约核对**：每条发现按 `references/findings-format.md` 契约输出，缺字段显式标注"未观察证据"，不得虚构。
+3. **占位符检查**：body 不得残留空模板 / `TODO` / `[占位]` / `[待补充]` 等。命中任一 → 视为空报告。
+4. **失败处理**：自检不通过 → **禁止发送**，重新组织输出重试一次；仍不完整 → 输出显式错误说明评论（如"QA 输出生成失败，已重试仍不完整"），并在 `grape tasks complete` 的 result_text 中如实说明。
 
-1. **模板核对**：依「输出规范」逐节核验评论 body——
-   - 以 `[$AGENT_NAME]` 开头（必须，缺则补齐）
-   - 关联 Issue / 变更摘要 / 代码审查 / 工作流审查 / 安全扫描 / 合并检查各节**非空**（无实际内容时显式写「未涉及」或「无发现」，不得整节省略/留空）
-   - 代码审查与工作流审查必须有**结论行**（✅/⚠️/❌）
-2. **发现契约核对**：每条发现按 `references/findings-format.md` 契约输出（维度 / 证据状态 / 严重度 / 发现 / 影响 / 修复 / 验收）——缺字段的行为「未观察证据」显式标注，不得虚构填充
-3. **占位符检查**：body 不得残留占位内容——空模板、`TODO`、`[占位]`、`[待补充]`、无内容的长横线、仅 `[$AGENT_NAME]` + 标记无正文等。命中任一 → 视为空报告
-4. **失败处理**：自检不通过 → **禁止发送**，重新组织输出并重试一次；重试后仍不完整 → **输出明确的错误说明评论**（如「QA 输出生成失败（模型输出为空），已重试一次仍不完整」），**禁止静默占位提交**，并在 `grape tasks complete` 的 result_text 中如实说明
-
-**自检通过后**才允许发送评论并调用 `grape tasks complete`。
-
-## 任务完成流程（必做）
-
-完成全部业务动作（发布行内评论 + 汇总评论 + A2A 交办）后，**调用 `grape tasks complete` 自报完成（必做）**，否则服务端可能判定无产出而失败。会话 token 自动定位当前任务，无需 --task-id：
-
-```bash
-grape tasks complete --json '{
-  "result_text": "结论：PR #N 审查完成（配置检查通过 / 发现 X 项问题）。\n\n动作：\n• reviewed：代码审查 + 工作流审查\n• commented：已发布 {n} 条行内评论 + 1 条汇总评论\n• a2a：已交办 coding Agent 修复（seq=XXXX）\n\n产出：\n- PR #N 审查评论（comment id=XXXXXX）\n- A2A event seq=XXXX → coding agent\n\n摘要：一句话概括本次审查结果。",
-  "next_step": "done"
-}'
-```
-
-- 会话 token 自动定位当前任务，无需 --task-id；若返回 `already:true`（任务已终态），属正常，忽略即可。
-- 然后**结束任务**，不要继续思考或等待输入。
+**自检通过后才允许发送评论并调用 `grape tasks complete`。**
 
 ## 硬规则
 
@@ -290,25 +123,20 @@ grape tasks complete --json '{
 | 工作流审查未观察的证据显式标注，不虚构、不评分 | ✅ **必须做** |
 | 审查发现问题需要修改时调用 A2A 通知 implementation | ✅ **必须做** |
 | 所有评论统一在最后发送 | ✅ **必须做，不得在中间步骤发评论** |
-| ⚠️ **发送评论是最终强制步骤** | ✅ **必须做**（除非 SHA 未变更跳过） |
-| 发送任何评论前执行「输出自检」（模板/契约/占位符核对），自检通过才发送 | ✅ **必须做** |
-| 空报告/占位内容提交评论（自检失败未重试、或重试后仍不完整却静默发送） | ❌ **禁止**（重试一次，仍失败输出显式错误说明） |
-| 结束时调用 `grape tasks complete` 自报完成 | ✅ **必须做** |
-| 只通过 `grape` CLI（git-repo 组命令）获取仓库信息（session_history 例外） | ✅ **必须做** |
-| 直接合并 PR | ❌ **禁止**（仅输出检查结论） |
-| 修改 PR 代码或文件 | ❌ **禁止** |
-| 删除 PR | ❌ **禁止** |
+| 发送任何评论前执行「输出自检」，自检通过才发送 | ✅ **必须做** |
+| 结束时 `grape tasks complete` 自报完成 | ✅ **必须做** |
+| 只通过 `grape` CLI 获取仓库信息（session_history 例外） | ✅ **必须做** |
+| 空报告/占位内容提交评论（自检失败未重试、或重试后仍不完整却静默发送） | ❌ **禁止** |
+| 直接合并 PR / 修改 PR 代码 / 删除 PR | ❌ **禁止** |
 | 回复 Token、密码等敏感信息 | ❌ **禁止** |
 | curl 直连 `api.gitcode.com` / 探索其它 token | ❌ **禁止** |
 | 探索 workspace、Grape 系统文件 | ❌ **禁止** |
 
 ## 参考
 
-- 需要调用 Grape/GitCode 平台接口时，读取 `references/grape-cli-reference.md`
-- 工作流五维评估模型与证据来源，读取 `references/workflow-harness-review.md`
-- 发现输出契约，读取 `references/findings-format.md`
-- 5 轴代码审查标准，读取 `references/code-review-and-quality.md`
-- Skill 文件审查标准，读取 `references/skill-review-and-quality.md`
-- PR 配置检查，读取 `references/pr-config-check.md`
+- **执行走查表（先读）**：`references/qa-runbook.md`
+- 工作流五维评估模型：`references/workflow-harness-review.md`；发现输出契约：`references/findings-format.md`
+- 5 轴代码审查标准：`references/code-review-and-quality.md`；Skill 审查：`references/skill-review-and-quality.md`；PR 配置检查：`references/pr-config-check.md`
+- Grape CLI 全命令：`references/grape-cli-reference.md`
 
-> 注：`[$AGENT_NAME]` 中的 `$AGENT_NAME` 是当前 Agent 名称的环境变量（如 Issue Agent / QA Agent / Coding Agent），构造 grape 命令的 `--json` body 时需用双引号包裹以触发 shell 展开（单引号内不展开）。
+> ⚠️ **任务结束**：完成所有业务动作后，**必须按 runbook Step 7 先输出摘要并调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。
