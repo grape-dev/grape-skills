@@ -61,11 +61,11 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 # 项目知识基线（Step 0 首选；支持会话 token，仓库作用域匹配即可；命令名因契约版本可能为 repos project info）
 grape repos project info --owner {owner} --repo {repo} --json-out   # project-graph.md + project-capabilities.md 全文 + meta(degraded/commit/branches)
 
-# Agent/仓库沉淀知识（Step 0；dual，会话 token 可用；⚠️ 只读当前 $AGENT_NAME 的知识，不读其他 agent 的）
+# Agent/仓库沉淀知识（Step 0；dual，会话 token 可用）
 grape knowledge stats --repo {repo} --json-out                      # 各类知识数量（system/agent/manual）
-grape knowledge list --repo {repo} --source agent --json-out        # Agent 沉淀知识清单（按 agent_type 过滤 == $AGENT_NAME）
+grape knowledge list --repo {repo} --source agent --json-out        # Agent 沉淀知识清单（前序经验）
 grape knowledge list --repo {repo} --source system --json-out       # 系统注入说明文档清单
-grape knowledge detail --knowledge_id {id} --json-out               # 读单条知识全文（需确认 agent_type 归属）
+grape knowledge detail --knowledge_id {id} --json-out               # 读单条知识全文
 
 # 分支 / 提交 / 文件（知识基线降级、增量判断）
 grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out

@@ -18,15 +18,14 @@
 # ① 项目知识基线：project-graph.md + project-capabilities.md 全文 + meta（degraded/commit/branches）
 grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
 
-# ② 本 Agent 沉淀知识（前序经验）：⚠️ 只读取当前 AGENT_NAME 对应的知识，不读取其它 agent 的知识
+# ② Agent/仓库沉淀知识（前序经验、系统注入说明）
 grape knowledge stats --repo "$REPO_FULL_NAME" --json-out          # 各类知识数量，判断是否有沉淀
 grape knowledge list --repo "$REPO_FULL_NAME" --source agent --json-out   # Agent 沉淀知识清单
 grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out  # 系统注入说明文档
 ```
 
-- ⚠️ **知识按 agent 隔离**：`knowledge list` 返回条目带 `agent_type`，**只用 `agent_type == "$AGENT_NAME"` 的条目**（前序 Agent 经验）；`source=system` 的系统文档可用；**不要读取其他 agent_type 的知识并当作自己的上下文**。
 - `meta.degraded=false` 且 `files` 非空 → 项目基线可用，基于它做分析，**不再**用 `grape git-repo` 逐文件探索。
-- `knowledge list` 命中的**本 Agent 知识** → 按需 `grape knowledge detail --knowledge_id {id} --json-out` 读全文，作为分析/答复依据。
+- `knowledge list` 命中的知识 → 按需 `grape knowledge detail --knowledge_id {id} --json-out` 读全文，作为分析/答复依据。
 - `meta.degraded=true` 或 `files` 空（无基线）→ 降级：`grape git-repo repo` / `grape git-repo tree --depth 2` / `contents README --raw`（相关结论标注 `[degraded]`）。
 - 若上述任一命令报 403（会话 token 作用域不匹配等）→ 跳过该来源，其余正常执行；都不可用时降级 + 评论说明。
 
@@ -79,19 +78,18 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 - **直接进入 Step 6，`next_step=reply_comment`**。
 - ⚠️ **发出评论后必须继续 Step 6**：没有调用 `grape tasks complete` 就是任务未完成，即使评论已发、即使没有 A2A/标签/Spec 等结构化产物——**不要因"纯咨询只是回条评论"就提前结束**。
 
-### Step 5 · A2A 交办（仅 Step 4a 收敛后）
+### Step 5 · A2A 交办（仅 Step 4a 收敛后，必须严格按以下三步）
 
-**先确认当前场景包含哪些 Agent 节点**——场景 ID 已通过环境变量 `$GRAPE_SCENE_ID` 注入（未选定=空串，此时沿用默认交办 `issue`）。用场景 ID 取当前场景详情，节点里的 `skill` 名即各环节 Agent（如 issue-advance/coding-cli/qa-cli/deploy-cli → 分别对应 issue/coding/qa/sre）：
+> ⚠️ **本步为强制流程，不得跳过**：交办前必须先用 `$GRAPE_SCENE_ID` 取当前场景，据此确定目标节点，再发起 A2A；**禁止不查场景直接照抄默认 `issue`**。
 
+**第 1 步：取当前场景节点**
 ```bash
 echo "scene_id=${GRAPE_SCENE_ID:+set} GRAPE_SCENE_ID=<$GRAPE_SCENE_ID>"
-# 用场景 ID 获取当前场景详情（nodes[].skill 标识各环节 Agent）
-grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out
+# 场景 ID 未注入（空串）→ 跳过本步，沿用默认交办 issue（见第 3 步）
+grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out   # nodes[].skill 标识各环节 Agent
 ```
 
-> ⚠️ **只对场景中实际存在的节点发 A2A**：当前场景可能只有部分环节（如只配了 `issue`，没有 coding/qa/sre 节点），则**无需也不应**向不存在的 Agent 交办。若必需环节缺失，在评论中说明"当前场景未包含该开发环节"，`next_step` 标注需人工确认。
-
-**A2A 目标选择（基于场景节点，常见约定）**：
+**第 2 步：按场景节点确定 A2A 目标**
 | 场景节点 skill 含 | agent 值 | 用途 |
 |------------------|---------|------|
 | `issue` / `issue-*` | `issue` | 默认目标：spec 设计/打标签/排里程碑/分配责任人 |
@@ -99,8 +97,12 @@ grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out
 | `qa` / `qa-*` | `qa` | PR 审查（由 coding 触发，VOD 不直接交） |
 | `sre` / `deploy-*` / `cloud-*` | `sre` | 部署/构建/运维 |
 
+- **只对场景中实际存在的节点发 A2A**：当前场景可能只有部分环节（如只配 `issue`、无 coding/qa/sre），则**无需也不应**向不存在的 Agent 交办。
+- 若必需环节缺失 → 在评论中说明"当前场景未包含该开发环节"，`next_step=a2a_need_clarify` 标注需人工确认，**不发起 A2A**。
+
+**第 3 步：发起 A2A**
 ```bash
-# 默认交办 Issue Agent（模板见 requirement-elicit-guide.md §五；issue_number 必填）
+# agent 值取第 2 步结果（未注入场景/仅 issue 节点时用默认 issue）；issue_number 必填
 grape a2a handoff --json '{
   "agent": "issue",
   "payload": {
