@@ -103,16 +103,16 @@ grape git-repo pulls comments create --owner {owner} --repo {repo} --number {pr}
 
 ```bash
 grape tasks complete --json '{
-  "result_text": "结论：Issue #{n} 开发实现完成 / PR #N 已按审查意见完成修改。\n\n动作：\n• implemented：……\n• created：PR #{pr_number}\n• commented：已在 Issue/PR 评论告知\n• a2a：已交办 QA（seq=XXXX）\n\n产出：\n- PR #{pr_number}\n- commit xxxxxx\n\n摘要：一句话概括本次处理结果。",
+  "result_text": "结论：Issue #{n} 开发实现完成，PR #N 已创建并通知 QA。",
   "next_step": "a2a_qa",
-  "actions": [],
-  "conclusion": "",
-  "artifacts": [],
-  "issue_summary": ""
+  "actions": ["提交代码", "创建 PR #N", "在 Issue #N 发评论告知", "A2A 通知 QA 审查 PR #N"],
+  "conclusion": "已完成需求实现与测试，PR #N 待 QA 审查",
+  "artifacts": ["PR #N", "分支 feat/issue-{n}", "commit xxxxxx"],
+  "issue_summary": "实现完成 | 改动摘要 | PR #N 待审查"
 }'
 ```
 
-- **字段规则**：`result_text`（结论/动作/产出摘要，可选）、`actions[]`、`conclusion`、`artifacts[]`、`issue_summary` 为结构化产出，服务端组装为结构化 `result_text`；`next_step` 取 `a2a_issue` / `reply_comment` / `a2a_need_clarify` / `done`。
+- **字段规则**：`result_text`（结论/动作/产出摘要，可选）、`actions[]`、`conclusion`、`artifacts[]`、`issue_summary` 为结构化产出，服务端据此组装结构化 `result_text` 写入 archive（详情页结构化框、events.result）——**must 真实填充，只传 result_text 会丢结构化归档**（空数组/空串也会导致结构化框为空）。`next_step` 取 `a2a_issue` / `reply_comment` / `a2a_need_clarify` / `done`。
 - 传入结构化字段后，**无需再在答复末尾单独输出 JSON 块**；具体示例见 `references/new-dev-flow.md` / `references/pr-optimization-flow.md` 的「任务完成流程」。
 - 即使本轮无后续动作，也必须调用一次。若返回 `already:true`（任务已终态），属正常，忽略即可。
 - 然后**结束任务**，不要继续思考或等待输入。
