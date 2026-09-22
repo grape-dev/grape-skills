@@ -45,6 +45,7 @@ tools:
 | `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空） | A2A `pr_number`（无则不填） |
 | `AGENT_NAME` | Agent 显示名 | 评论/回复署名（默认仍用固定前缀 `[VOD Agent]`） |
 | `DEVOPS_EVENT_TYPE` | 事件类型（如 `issue_opened`） | 判断入口/是否需要 A2A |
+| `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标（见 runbook Step 5） |
 
 > ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
 
