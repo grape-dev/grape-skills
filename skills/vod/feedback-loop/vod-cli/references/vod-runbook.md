@@ -11,10 +11,24 @@
 
 > 收到事件时先按此走查表执行；下表步骤按顺序，命中分支后到对应步骤，**未命中的步骤直接跳过**。
 
-### Step 0 · 项目知识基线（必须最先，任何分支都要做）
-- 读 prompt「项目知识基线」章节末尾标注的 **`project-info/` 全文副本路径**（`read` 工具）。
-- 知识基线已覆盖 README/结构/接口时：**不再**用 `grape git-repo` 逐文件探索，直接进入 Step 1。
-- 仅当 prompt 标注「无项目知识基线」或 `[degraded]` 才降级：`grape git-repo repo`/`grape git-repo tree --depth 2`。
+### Step 0 · 项目知识基线 + Agent 专属知识（必须最先，任何分支都要做）
+用 grape CLI 获取两部分知识（均支持会话 token，仓库作用域匹配即可；命令名若因契约版本不同可按 `grape <组> --help` 确认）：
+
+```bash
+# ① 项目知识基线：project-graph.md + project-capabilities.md 全文 + meta（degraded/commit/branches）
+grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+
+# ② 本 Agent 沉淀知识（前序经验）：⚠️ 只读取当前 AGENT_NAME 对应的知识，不读取其它 agent 的知识
+grape knowledge stats --repo "$REPO_FULL_NAME" --json-out          # 各类知识数量，判断是否有沉淀
+grape knowledge list --repo "$REPO_FULL_NAME" --source agent --json-out   # Agent 沉淀知识清单
+grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out  # 系统注入说明文档
+```
+
+- ⚠️ **知识按 agent 隔离**：`knowledge list` 返回条目带 `agent_type`，**只用 `agent_type == "$AGENT_NAME"` 的条目**（前序 Agent 经验）；`source=system` 的系统文档可用；**不要读取其他 agent_type 的知识并当作自己的上下文**。
+- `meta.degraded=false` 且 `files` 非空 → 项目基线可用，基于它做分析，**不再**用 `grape git-repo` 逐文件探索。
+- `knowledge list` 命中的**本 Agent 知识** → 按需 `grape knowledge detail --knowledge_id {id} --json-out` 读全文，作为分析/答复依据。
+- `meta.degraded=true` 或 `files` 空（无基线）→ 降级：`grape git-repo repo` / `grape git-repo tree --depth 2` / `contents README --raw`（相关结论标注 `[degraded]`）。
+- 若上述任一命令报 403（会话 token 作用域不匹配等）→ 跳过该来源，其余正常执行；都不可用时降级 + 评论说明。
 
 ### Step 1 · 读 Issue 上下文（必做）
 ```bash
