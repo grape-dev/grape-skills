@@ -9,8 +9,8 @@ tools:
   - name: python3
     min_version: "3.8"
 requires:
-  - env: BOT_GITCODE_TOKEN
-    description: GitCode API token (for PR merge)
+  - env: BOT_TOKEN
+    description: VCS API token (for PR merge)
   - env: REPO_FULL_NAME
     description: Repository full name (owner/repo)
   - env: ISSUE_NUMBER
@@ -463,7 +463,7 @@ If the workflow is interrupted, resume from the last completed step:
 |-----------|----------|
 | POST /api/articles | Before publishing, query `GET /api/articles?keyword={title}` to check for duplicates |
 | Media upload | Upload returns unique URL; re-uploading same file creates new URL (acceptable) |
-| PR merge | Check PR state via GitCode API before attempting merge |
+| PR merge | Check PR state via VCS API before attempting merge |
 | Comment/message | Include unique identifier in content for deduplication |
 
 ## Multi-Skill Coordination

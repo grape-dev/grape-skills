@@ -15,12 +15,12 @@ tools:
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
 3. API 返回 403/无权限时：立即停止该操作并回复用户，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 所有 curl / git 调用设 30s 超时（curl --max-time 30）——超时判定失败，不 hang。
-6. **调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
+6. **调用 VCS API 一律以 `references/vcs-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
 
 ## 核心原则
 
@@ -34,11 +34,11 @@ tools:
 
 ### 依赖前序分析
 
-通过 A2A 被调用时，prompt 包含前序 Agent 的处理摘要。必须通过 GitCode API 获取 Issue 完整信息。
+通过 A2A 被调用时，prompt 包含前序 Agent 的处理摘要。必须通过 VCS API 获取 Issue 完整信息。
 
 ### 禁止探索 Grape 内部
 
-所有 Issue/仓库信息通过 GitCode API 获取，不读取 data/、configs/、sessions.db 等 Grape 内部数据。
+所有 Issue/仓库信息通过 VCS API 获取，不读取 data/、configs/、sessions.db 等 Grape 内部数据。
 
 ## 评论规范
 
@@ -47,7 +47,7 @@ tools:
 
 ## Configuration
 
-本 skill 无外部 API 地址配置需求。GitCode API token 从环境变量 $BOT_GITCODE_TOKEN 获取，目标系统凭据由生成的 skill 自身管理。
+本 skill 无外部 API 地址配置需求。VCS API token 从环境变量 $BOT_TOKEN 获取，目标系统凭据由生成的 skill 自身管理。
 
 ## 场景 / When to Use
 
@@ -72,7 +72,7 @@ Don't use for: 测试 skill（tester 职责）/ 发布 skill（publish 职责）
 ```
 · 工作区：worktree 已就绪（分支 feat/issue-{N}），可直接 git add / commit / push
 · 令牌已注入（不用查 env）：
-  $BOT_GITCODE_TOKEN / $REPO_FULL_NAME / $ISSUE_NUMBER / $BOT_USERNAME
+  $BOT_TOKEN / $REPO_FULL_NAME / $ISSUE_NUMBER / $BOT_USERNAME
 · 目标系统凭据（自测用，前缀由 skill name 推导）：
   ${PREFIX}_BASE_URL（必须，所有认证方式都需要）
   ${PREFIX}_USERNAME / ${PREFIX}_PASSWORD（Basic Auth）
@@ -153,8 +153,8 @@ rest-api-skill-creator 通过 grape A2A 链路触发，生成的 skill 参与 A2
 检查目标仓库 skills/ 目录是否已有同名 skill：
 
 ```bash
-curl -s --max-time 30 -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/contents/skills" 2>/dev/null
+curl -s --max-time 30 -H "PRIVATE-TOKEN: $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/contents/skills" 2>/dev/null
 ```
 
 - 远程已存在 → 回复「已存在——可复用/更新」——不重复造
@@ -392,10 +392,10 @@ resp = requests.get(f"{base_url}/{path}", timeout=30)
 
 ```bash
 curl -s --max-time 30 -X POST \
-  -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
+  -H "PRIVATE-TOKEN: $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[Coding Agent] ✅ Skill 已创建并提交 PR\n\n**Skill 名称**：{name}\n**功能摘要**：{一句话描述}\n**API 端点数**：{N} 个\n**认证方式**：{AUTH_TYPE}\n**PR 链接**：{PR_URL}\n**测试状态**：已 A2A 交棒 QA Agent，测试中\n\n**下一步**：\n- 测试通过后自动合并 → 发布"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
 ```
 
 ### Step 5: 清理
@@ -424,7 +424,7 @@ curl -s --max-time 30 -X POST {{SERVER_URL}}/api/a2a \
 
 - 脚本自测：--help 无语法错误 + 真实 API 调用返回有效数据 = 通过
 - validate-skill.sh：frontmatter / 文件结构 / 无 mock / 无硬编码地址 / 段落规范（场景/知识/步骤）全过 = 通过
-- PR 创建：GitCode API 返回 PR URL = 成功
+- PR 创建：VCS API 返回 PR URL = 成功
 - Issue 评论：评论发送成功（API 返回 200）= 成功
 - A2A 交棒：api/a2a 返回 status=ok = 成功
 - 以上全部通过 = skill 创建完成，等 tester 测试
@@ -439,7 +439,7 @@ curl -s --max-time 30 -X POST {{SERVER_URL}}/api/a2a \
 ## 参考 / References
 
 - **Skill 规范**：读取 `references/skill-spec.md`——生成 SKILL.md 前必须先读
-- 调用 GitCode API 时，必须以 `references/gitcode-api-reference.md` 为准
+- 调用 VCS API 时，必须以 `references/vcs-api-reference.md` 为准
 - API 调研详细方法，读取 `references/api-research-guide.md`
 - 脚本生成模板，读取 `references/rest-api-skill-template.md`
 - 用户需求模板，引导用户填写 `templates/requirement-template.md`

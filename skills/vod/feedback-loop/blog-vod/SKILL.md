@@ -12,9 +12,9 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用服务端注入的 `$BOT_GITCODE_TOKEN`，A2A 交办只用 `$GRAPE_SESSION_TOKEN`，两种 token 严禁混用；严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用服务端注入的 `$BOT_TOKEN`，A2A 交办只用 `$GRAPE_SESSION_TOKEN`，两种 token 严禁混用；严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 写操作（创建标签/发布评论/A2A 交办）执行前先向用户确认；流程内已声明的写操作视为已获流程授权。
 
@@ -88,7 +88,7 @@ VOD 的职责：**把博客需求从模糊想法收敛为清晰可执行的需�
 | 断点续跑 | 每轮收敛后把已确认字段以「需求清单 JSON」写入 Issue 评论；会话中断重启后先读该评论恢复轮次，不重复已确认项，不重复交办（A2A 前查 pipeline 是否已有 issue:a2a_event） |
 | 重试幂等 | A2A 失败重试 3 次（间隔数秒）后评论说明并在 next_step 标注人工介入；创建标签前先 GET /labels 查重；发布评论先查是否已有同前缀评论，不产生重复副作用 |
 | 资源清理 | 全程不落临时文件；A2A 成功后 checkpoint 评论保留作为记录；任务结束输出 JSON 块收口，不遗留挂起步骤 |
-| 降级策略 | GitCode API 403 时停止并回复需管理员权限；抓取/浏览器类步骤失败时跳过对应提问轮次用默认值；A2A 端点不可达时重试 3 次后评论说明 |
+| 降级策略 | VCS API 403 时停止并回复需管理员权限；抓取/浏览器类步骤失败时跳过对应提问轮次用默认值；A2A 端点不可达时重试 3 次后评论说明 |
 
 ## 版本管理
 
@@ -122,6 +122,6 @@ VOD 的职责：**把博客需求从模糊想法收敛为清晰可执行的需�
 - 问卷示例与需求清单模板：references/requirement-elicit-guide.md
 - 评论与标签规范：references/comment-labeling-guide.md
 - A2A 交办（认证用 $GRAPE_SESSION_TOKEN）：references/a2a-handoff.md
-- GitCode API（认证用 $BOT_GITCODE_TOKEN）：references/gitcode-api-reference.md
+- VCS API（认证用 $BOT_TOKEN）：references/vcs-api-reference.md
 
 > **任务结束**：完成所有业务动作（标签/评论/A2A 交办）后，输出最终 JSON 块并结束任务，不要继续思考或等待输入。

@@ -15,7 +15,7 @@ Install and configure hermes, opencode, and codearts CLI runtimes for Grape, inc
 
 - Linux (x86_64)
 - Grape installed under `/root/grape`
-- GitCode bot token (`BOT_GITCODE_TOKEN`) available for Agent runtime DB operations
+- GitCode bot token (`BOT_TOKEN`) available for Agent runtime DB operations
 
 ## Quickstart
 

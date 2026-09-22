@@ -13,9 +13,9 @@ tools:
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 token，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 token，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. **禁止前台运行长驻服务类命令**：`python app.py`、`flask run`、`devbridge host` 等会阻塞不退出的命令，严禁在前台直接执行。必须用 nohup 后台启动 + curl 验证 + 报告 URL。
 6. **禁止占用 Grape 核心端口**：3000（Main API）、8080（Webhook）、80（nginx）、8081（Admin）、8082（Admin 前端）严禁使用。部署端口从 5100-5200 区间选择空闲端口。
@@ -411,7 +411,7 @@ done
 | 依赖 | 最低版本 | 说明 |
 |------|----------|------|
 | devbridge CLI | 0.2.0 | 隧道创建/host 管理 |
-| GitCode API | v5 | 仓库 clone 认证 |
+| VCS API | v5 | 仓库 clone 认证 |
 | Python | 3.8+ | 项目运行时（pip install） |
 | Grape 运行时 | - | A2A 调用支持 |
 

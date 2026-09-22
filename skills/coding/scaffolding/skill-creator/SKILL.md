@@ -14,12 +14,12 @@ tools:
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_G...OKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_G...OKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 所有 curl / git 调用设 30s 超时（curl --max-time 30）——超时判定失败，不 hang。
-6. **调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
+6. **调用 VCS API 一律以 `references/vcs-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
 7. **长命令执行会静默**：`pip install`、`hcloud CLI`、大测试等长命令运行期间无输出。执行这类命令时**加 `timeout` 限制（如 `timeout 300 pip install ...`）**并一次只装必要依赖，避免长时间无输出影响执行。
 8. **禁止前台运行长驻/服务类命令**：`python -m http.server`、`npm run dev` 等会阻塞不退出的命令，严禁前台直接执行。改用后台启动+验证+关闭模式。
 
@@ -30,13 +30,13 @@ tools:
 
 ### 依赖前序分析
 通过 A2A 被调用时，prompt 顶部包含「前序 Agent 处理摘要」。skill-issue/issue-advance 触发 → Issue 评论里已有 Spec 文档（以 `[Issue Agent] 📋 Spec Document` 开头，含 spec-ready 标签）。A2A context 含 Spec 摘要（Objective / Scope / Technical Approach / Acceptance Criteria）。
-creator 读 A2A context 摘要后，通过 GitCode API 获取 Issue 完整信息（含 Spec 评论），按 Spec 执行。
+creator 读 A2A context 摘要后，通过 VCS API 获取 Issue 完整信息（含 Spec 评论），按 Spec 执行。
 
 ### 超出能力范围时主动请求支援
 如果创建过程中发现需要其他技能协助，查本 prompt 底部的 Agent 列表通过 A2A API 交办。
 
 ### 禁止探索 Grape 内部
-**所有 Issue/仓库信息通过 GitCode API 获取**，不读取 data/、configs/、sessions.db 等 Grape 内部数据。skill 产物在 worktree 的 skills/ 目录操作。
+**所有 Issue/仓库信息通过 VCS API 获取**，不读取 data/、configs/、sessions.db 等 Grape 内部数据。skill 产物在 worktree 的 skills/ 目录操作。
 
 ### 本地代码基线已就绪（coding 工作模型）
 Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`），可直接执行 `git add` / `git commit` / `git push` 等命令（push 鉴权已注入）。
@@ -80,7 +80,7 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 ```
 · 工作区：worktree 已就绪（分支 feat/issue-{N}），可直接 git add / commit / push
 · 令牌已注入（不用查 env）：
-  $BOT_GITCODE_TOKEN / $REPO_FULL_NAME / $ISSUE_NUMBER / $BOT_USERNAME
+  $BOT_TOKEN / $REPO_FULL_NAME / $ISSUE_NUMBER / $BOT_USERNAME
 · 脚本路径：
   bash {{SKILL_DIR}}/skill-creator/scripts/create_skill_pr.sh "${SKILL_NAME}"
 ```
@@ -92,7 +92,7 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 
 ```bash
 curl -s --max-time 30 -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/contents/skills" 2>/dev/null
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/contents/skills" 2>/dev/null
 ```
 
 - 检查 worktree 本地是否已有 skills/{name}/ 目录（区分新建/修复场景）
@@ -104,7 +104,7 @@ curl -s --max-time 30 -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
 
 ```bash
 curl -s --max-time 30 -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER" 2>/dev/null
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER" 2>/dev/null
 ```
 
 - 优先从 Issue 评论里找 Spec 文档（以 `[Issue Agent] 📋 Spec Document` 开头）
@@ -277,7 +277,7 @@ curl -s --max-time 30 -X POST \
   -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[Coding Agent] ✅ Skill 已创建并提交 PR\n\n**Skill 名称**：{name}\n**功能摘要**：{一句话描述}\n**技术模式**：CLI / SDK / API\n**PR 链接**：{PR_URL}\n**测试状态**：已 A2A 交棒 QA Agent，测试中\n\n**下一步**：\n- 只读查询类：测试通过后自动合并 → 发布\n- 变更类：测试通过后请人工评审合并 → 发布"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
 ```
 
 ### Step 5: 清理
@@ -336,14 +336,14 @@ curl -s --max-time 30 -X POST {{SERVER_URL}}/api/a2a \
 
 - 脚本自测：--help 无语法错误 + 真实 API 调用返回有效数据 = 通过
 - validate-skill.sh：frontmatter / 文件结构 / 无 mock / 无硬编码地址检查全过 = 通过
-- PR 创建：GitCode API 返回 PR URL = 成功
+- PR 创建：VCS API 返回 PR URL = 成功
 - Issue 评论：评论发送成功（API 返回 200）= 成功
 - A2A 交棒：api/a2a 返回 status=ok = 成功
 - 以上全部通过 = skill 创建完成，等 tester 测试
 - 任一步骤失败 → 不创建 PR / 不交棒 tester，Issue 评论说明原因
 
 ## 参考
-- 需要调用 GitCode API 时，**必须以 `references/gitcode-api-reference.md` 为准**——该文档包含 Base URL 与全部端点，严禁自行拼写 API 路径
+- 需要调用 VCS API 时，**必须以 `references/vcs-api-reference.md` 为准**——该文档包含 Base URL 与全部端点，严禁自行拼写 API 路径
 - API 调研详细方法，读取 `references/api-research-guide.md`
 - 生成 skill 的 IAM 权限策略时，读取 `{{SKILL_DIR}}/skill-creator/references/iam-policies-template.md`
 

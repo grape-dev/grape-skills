@@ -22,7 +22,7 @@ codegraph --version
 详细安装部署指南参见内部发布渠道的 codegraph 安装文档。
 
 > ⚠️ codegraph 依赖 Node.js 环境。如目标服务器未安装 Node.js，需先安装 Node.js >= 18。
-> 如安装失败，将降级为基于 README + GitCode API 的项目信息获取（见降级方案）。
+> 如安装失败，将降级为基于 README + VCS API 的项目信息获取（见降级方案）。
 
 ## 存储位置
 
@@ -78,8 +78,8 @@ cat data/workspaces/{owner}/{repo}/project-info/.metadata.json
 ### Step 3: 获取分支列表
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/branches?per_page=50"
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/{owner}/{repo}/branches?per_page=50"
 ```
 
 **筛选分析分支**（最多 3 个）：

@@ -27,10 +27,10 @@
 
 ```bash
 curl -s --max-time 30 -X POST \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "> {用户评论原文}\n\n[blog-vod Agent] {答复/追问正文}"}' \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
 ```
 
 ### 4. 评论幂等
@@ -71,17 +71,17 @@ curl -s --max-time 30 -X POST \
 ```bash
 # 创建标签（form-encoded，不接受 JSON body）
 curl -s --max-time 30 -X POST \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=blog-vod&color=#f9d0c4" \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/labels"
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/labels"
 
 # 给 Issue 添加标签（整体替换语义，携带既有标签）
 curl -s --max-time 30 -X PATCH \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "labels=blog-vod,type:feature" \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
 ```
 
-> 标签操作统一通过 GitCode API，使用 `$BOT_GITCODE_TOKEN` 认证；A2A 等 Grape 接口使用 `$GRAPE_SESSION_TOKEN`，两者不混用。
+> 标签操作统一通过 VCS API，使用 `$BOT_TOKEN` 认证；A2A 等 Grape 接口使用 `$GRAPE_SESSION_TOKEN`，两者不混用。

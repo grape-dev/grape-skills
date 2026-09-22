@@ -30,7 +30,7 @@ PR 合并后，通过 A2A 通知 SRE Agent 执行部署。
 
 ```bash
 curl -X POST $GRAPE_A2A_URL \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "sre",

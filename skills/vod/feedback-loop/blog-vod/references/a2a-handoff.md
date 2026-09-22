@@ -56,5 +56,5 @@ A2A 调用失败时（网络错误/超时/非 2xx）：
 
 - `context` 应包含 blog-vod 的收敛结论摘要（「博客需求清单」关键字段），供 Issue Agent 继承上下文。
 - A2A 成功后 Issue Agent 会接管 stage（从 vod 推进到 issue）。
-- Grape A2A 接口（`/api/a2a`）与 GitCode API（`api.gitcode.com`）是两套独立服务，token 严禁混用：
-  A2A 用 `$GRAPE_SESSION_TOKEN`，GitCode 操作用 `$BOT_GITCODE_TOKEN`。
+- Grape A2A 接口（`/api/a2a`）与 VCS API（`api.gitcode.com`）是两套独立服务，token 严禁混用：
+  A2A 用 `$GRAPE_SESSION_TOKEN`，GitCode 操作用 `$BOT_TOKEN`。

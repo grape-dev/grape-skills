@@ -26,8 +26,8 @@ tools:
 **唯一允许的端点**：
 
 ```bash
-curl -s -X POST "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues" \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X POST "$VCS_API_BASE/repos/{owner}/{repo}/issues" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "<标题>",
@@ -51,7 +51,7 @@ curl -s -X POST "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues" \
    - 读取 `references/codegraph-project-analysis.md`，按其流程用 codegraph 分析项目结构
    - 产出直接写到共享位置 `data/workspaces/{owner}/{repo}/project-info/`：`project-graph.md` + `project-capabilities.md`（供 VOD / issue-advance 复用）
    - 提炼：技术栈、核心模块、功能特性、启动/部署方式
-   - codegraph 不可用时按该参考的降级方案（README + GitCode API），产物标注 `[degraded]`，不阻塞引导。**降级只影响知识条线，不影响创建 GitCode Issue（步骤 3 的 API 命令无任何前置依赖）**
+   - codegraph 不可用时按该参考的降级方案（README + VCS API），产物标注 `[degraded]`，不阻塞引导。**降级只影响知识条线，不影响创建 GitCode Issue（步骤 3 的 API 命令无任何前置依赖）**
 
 3A. **快速部署体验（experience）**
    - 创建 **1 个** Issue，标题「【体验】快速部署并体验本项目的核心功能」
@@ -91,7 +91,7 @@ curl -s -X POST "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues" \
    - 在仓库 README 顶部追一段「🤖 本仓库已托管，可体验以下内容...」或写在该 Issue 中
 
 ## 硬约束（必须遵守）
-- 只用 `$BOT_GITCODE_TOKEN`（或 prompt 注入的 `$USER_GITCODE_TOKEN`）；不读 Grape 内部数据（`data/workspaces` 项目知识文档除外）
+- 只用 `$BOT_TOKEN`（或 prompt 注入的 `$USER_TOKEN`）；不读 Grape 内部数据（`data/workspaces` 项目知识文档除外）
 - 创建 Issue 只走步骤 3 给的那一个 v5 端点；在哪里失败就在哪里以非 0 退出，禁止换端点死磕、禁止静默降级
 - 允许使用 codegraph 工具与 `data/workspaces/{owner}/{repo}/project-info/` 知识文档
 - 不修改代码、不建 PR；仅建 1 个 Issue + 分配 + 通知

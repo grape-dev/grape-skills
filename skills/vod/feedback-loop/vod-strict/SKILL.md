@@ -19,9 +19,9 @@ tools:
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 token，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 token，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 
 ## 定位
@@ -53,7 +53,7 @@ Content-Type: application/json
 #### A1 项目知识基线（必须最先）
 - 项目知识基线已由 Grape 服务端在 prompt 的「项目知识基线」章节**内联注入**（含 project-graph + project-capabilities 摘要）
 - 如需全文：读取 prompt 该章节末尾标注的**全文副本路径**（`project-info/` 下，执行前已被替换为实际落地目录，可用 read tool 读取）
-- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + GitCode API）
+- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + VCS API）
 
 #### A2 项目历史全貌（API 获取）
 - 近期 Issue 列表 `GET /repos/{owner}/{repo}/issues?state=all&per_page=20` → 判断重复/已解决
@@ -217,13 +217,13 @@ Content-Type: application/json
 | 断点续跑（resume） | 支持中间状态恢复：A2A 失败后可重试；Issue 评论已发送不会重复发送（通过评论前缀 [VOD Agent] 去重） |
 | 重试幂等 | A2A 重试最多 3 次；重复 A2A 检查机制确保不创建重复任务（检查 pipeline 是否已有 next:a2a_event） |
 | 资源清理 | 执行过程不创建临时文件，仅读取知识基线和 Issue 内容；评论和 A2A 为幂等操作 |
-| 降级策略 | 项目知识基线不可用时降级为 README + GitCode API 分析；A2A 失败重试 3 次后在评论中说明 |
+| 降级策略 | 项目知识基线不可用时降级为 README + VCS API 分析；A2A 失败重试 3 次后在评论中说明 |
 
 ## 依赖兼容
 
 | 依赖 | 最低版本 | 说明 |
 |------|----------|------|
-| GitCode API | v5 | Issue/PR/评论 API |
+| VCS API | v5 | Issue/PR/评论 API |
 | Grape pipeline | - | 需要 prompt 中包含 pipeline 节点信息 |
 | codegraph（tools） | - | 项目知识基线生成（可选，降级时不需要） |
 | Agent 运行时 | - | 支持 A2A 调用的 Grape Agent 运行时 |
@@ -232,6 +232,6 @@ Content-Type: application/json
 
 - 需求引导 + 审视 + 模板 + A2A 交办：`references/requirement-elicit-guide.md`
 - 项目知识基线生成：`references/codegraph-project-analysis.md`
-- GitCode API：`references/gitcode-api-reference.md`
+- VCS API：`references/vcs-api-reference.md`
 
 > ⚠️ **任务结束**：完成所有业务动作（发评论/结构化/A2A 交办）后，输出最终 JSON 块并**结束任务**，不要继续思考或等待输入。

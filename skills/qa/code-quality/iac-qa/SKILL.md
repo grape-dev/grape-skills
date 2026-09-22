@@ -22,21 +22,21 @@ tags:
 ## 前置条件
 
 - 已安装 git 和 curl
-- 已配置 `$BOT_GITCODE_TOKEN` 环境变量
+- 已配置 `$BOT_TOKEN` 环境变量
 - 目标 PR 已创建且有可获取的 diff
 - Grape 平台 A2A 服务可用（$GRAPE_A2A_URL）
 - 华为云凭证已通过 Grape 控制台注入（`HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`）
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 
 ## 参考文件
 
-- 本地参考：`references/gitcode-api-reference.md`
+- 本地参考：`references/vcs-api-reference.md`
 - 本地参考：`references/code-review-checklist.md`
 - 本地参考：`references/security-checklist.md`
 - 本地参考：`references/huaweicloud-security-checklist.md`（华为云 IaC 专项安全检查、部署验证清单对照）
@@ -45,7 +45,7 @@ tags:
 ## 工作流
 
 ### 1. 获取代码
-通过 GitCode API 获取 PR 的变更文件列表和 diff。
+通过 VCS API 获取 PR 的变更文件列表和 diff。
 
 ### 2. 自动化审查
 
@@ -91,7 +91,7 @@ QA 审查通过（✅ LGTM）后，**自动合并 PR**，然后**通过 A2A 将 
 
 触发条件（按顺序执行）：
 1. QA 审查结论为 ✅ LGTM（无 P0/P1 阻塞项）
-2. **QA 自动合并 PR**（通过 GitCode API `PUT /repos/:owner/:repo/pulls/:number/merge`）
+2. **QA 自动合并 PR**（通过 VCS API `PUT /repos/:owner/:repo/pulls/:number/merge`）
 3. PR 合并确认后，通过 A2A 交办 SRE Agent
 
 不触发的情况：
@@ -142,7 +142,7 @@ QA 审查通过（✅ LGTM）后，**自动合并 PR**，然后**通过 A2A 将 
 | 审查执行时延 | P95 ≤ 8 min | 含 diff 获取 + 代码审查 + 安全扫描 + 资源交叉验证 + 报告输出 |
 | terraform plan | ≤ 5 min | 含 init + plan（OBS backend 连通） |
 | LLM token 消耗 | ≤ 12000 tokens/次 | 含参考文件按需加载 |
-| API 调用次数 | ≤ 15 次/次执行 | GitCode API + 华为云查询 + A2A |
+| API 调用次数 | ≤ 15 次/次执行 | VCS API + 华为云查询 + A2A |
 
 ### 兼容性声明
 
@@ -150,8 +150,8 @@ QA 审查通过（✅ LGTM）后，**自动合并 PR**，然后**通过 A2A 将 
 |------|----------|------|
 | terraform | >= 1.7.5, <= 1.10.5 | OBS backend 兼容窗口 |
 | git | >= 2.20 | 基础 git 操作 |
-| curl | >= 7.60 | GitCode API 调用 |
-| GitCode API | v5 | 所有 API 调用基于 v5 端点 |
+| curl | >= 7.60 | VCS API 调用 |
+| VCS API | v5 | 所有 API 调用基于 v5 端点 |
 | Grape A2A | >= 1.0 | A2A payload 结构遵循 Grape 平台约定 |
 | 计算资源查询 | >= 1.0 | 资源规格交叉验证（声明在 requires 中） |
 | 网络资源查询 | >= 1.0 | 网络资源交叉验证（声明在 requires 中） |

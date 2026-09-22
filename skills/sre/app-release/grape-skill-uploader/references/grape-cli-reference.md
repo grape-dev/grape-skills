@@ -146,6 +146,6 @@ grape commands       # 验证命令树可用
 
 ## 6. 安全与边界
 
-- **token 使用范围**：上传/验证、上下文读取用 `$GRAPE_SESSION_TOKEN`；GitCode Issue 评论用 prompt 注入的 `$BOT_GITCODE_TOKEN`。不得从数据库/配置文件/日志/历史寻找其他 token。
+- **token 使用范围**：上传/验证、上下文读取用 `$GRAPE_SESSION_TOKEN`；GitCode Issue 评论用 prompt 注入的 `$BOT_TOKEN`。不得从数据库/配置文件/日志/历史寻找其他 token。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`user_accounts` 表、`configs/` 目录。
 - **token 不写入文件**：不将 token 写进日志、脚本、ZIP、Issue 评论或工具调用以外的地方。

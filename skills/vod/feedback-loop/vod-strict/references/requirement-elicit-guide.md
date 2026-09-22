@@ -38,7 +38,7 @@
 - **Issue 评论追问格式**（body 以 `[VOD Agent]` 开头）：
   ```bash
   POST /repos/{owner}/{repo}/issues/{number}/comments
-  Authorization: Bearer $BOT_GITCODE_TOKEN
+  Authorization: Bearer $BOT_TOKEN
   Content-Type: application/json
   {"body": "> 用户的问题原文\n\n[VOD Agent] 您指的是哪个对象的批量操作？……"}
   ```
@@ -79,7 +79,7 @@ auto-submitted by VOD Agent（Feishu）
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "issue",

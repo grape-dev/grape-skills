@@ -12,11 +12,11 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 `<YOUR_TOKEN>` 占位符（实际凭证由宿主在终端交互中注入，正文/文档中一律使用占位符写法），严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 `<YOUR_TOKEN>` 占位符（实际凭证由宿主在终端交互中注入，正文/文档中一律使用占位符写法），严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
-5. **调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准**：该文档包含 Base URL 与全部端点。**严禁根据经验/记忆/猜测自行拼写 API 路径**（尤其不得使用 GitLab 风格 `/api/v3`、`/api/v4`、`projects/.../merge_requests` 或错误域名）。文档未列出的操作用 `GET /repos/:owner/:repo` 等既有端点组合实现，无法实现时在评论中说明。
+5. **调用 VCS API 一律以 `references/vcs-api-reference.md` 为准**：该文档包含 Base URL 与全部端点。**严禁根据经验/记忆/猜测自行拼写 API 路径**（尤其不得使用 GitLab 风格 `/api/v3`、`/api/v4`、`projects/.../merge_requests` 或错误域名）。文档未列出的操作用 `GET /repos/:owner/:repo` 等既有端点组合实现，无法实现时在评论中说明。
 6. **长命令执行会静默**：`git clone`、大测试等长命令运行期间宿主 Agent 可能无输出。执行这类命令时**加 `timeout` 限制（如 `timeout 300 ...`）**并一次只装必要依赖，避免长时间无输出影响执行；若命令本身可能超长，先输出说明再执行。**依赖安装必须在项目虚拟环境（venv）内进行**：先在项目目录创建并激活 `venv`（`python3 -m venv .venv` + 激活），再执行 `pip install`，**严禁全局/系统级安装（含 `--user` 标志）**，优先使用 `requirements.txt` 锁定依赖与版本来源。
 7. **禁止前台运行长驻/服务类命令**：`python -m http.server`、`npm run dev`、`vite` 等会**阻塞不退出**的命令，严禁在前台直接执行（宿主 Agent 会等待命令退出导致超时失败）。**改用一次性验证模式**：
    ```bash
@@ -48,7 +48,7 @@ tools:
 如果开发过程中发现需要其他技能协助，查本 prompt 底部的 Agent 列表通过 A2A API 交办。
 
 ### 禁止探索 Grape 内部
-**所有信息通过 GitCode API 获取**，不读取本地文件。
+**所有信息通过 VCS API 获取**，不读取本地文件。
 
 ### 本地代码基线已就绪（coding 工作模型）
 Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `feat/issue-{issue_number}`），可直接执行
@@ -80,7 +80,7 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 | ⚠️ 创建 PR 后必须通过 A2A 通知 QA Agent 进行代码审查 | ✅ **必须做，不可跳过** |
 | 代码优化场景修改完成后必须在 PR 评论告知 | ✅ **必须做** |
 | 每个提交一个原子变更 | ✅ **必须做** |
-| 只通过 GitCode API 获取信息 | ✅ **必须做** |
+| 只通过 VCS API 获取信息 | ✅ **必须做** |
 | 仅实现当前 Issue 描述的内容 | ✅ **保持范围** |
 | 直接合并 PR | ❌ **禁止**（仅创建，等待人工审批） |
 | 修改非 Issue 相关的代码 | ❌ **禁止** |
@@ -99,7 +99,7 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 
 ## 参考
 
-需要调用 GitCode API 时，读取 `references/gitcode-api-reference.md`。
+需要调用 VCS API 时，读取 `references/vcs-api-reference.md`。
 
 > ⚠️ **任务结束**：完成所有业务动作（提交 PR/修改代码/回应审查）后，**必须在最终答复末尾输出结构化 JSON 块**（含 `actions`/`conclusion`/`artifacts`/`next_step`/`issue_summary`，格式见 `references/new-dev-flow.md` / `references/pr-optimization-flow.md` 末尾，字段约束见下方 outputSchema），然后**结束任务**，不要继续思考或等待输入。**不得用长流程叙述替代 JSON 块**。
 
@@ -119,7 +119,7 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 
 **校验规则**：
 - `scene` 未命中任何已声明特征词 → 判为非法输入，按「场景识别」表「其他 → 不做处理，结束」**显式拒绝**，不执行任何写操作；
-- 必填字段缺失且无法通过 GitCode API 补齐 → 停止并请求用户补充，不猜测值；
+- 必填字段缺失且无法通过 VCS API 补齐 → 停止并请求用户补充，不猜测值；
 - 必填字段缺失但可从 API 补齐（如 `repo`/`issue_number`）→ 先补齐再开始，保证离线/缺参时静态可拒绝。
 
 ### outputSchema — 输出约束
@@ -141,7 +141,7 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 | 指标 | 预算/基线 | 说明 |
 |------|-----------|------|
 | 加载时延 | < 1s | 本技能共 9 个纯文本 .md（约 84KB），无脚本、无外部资源加载 |
-| 单次执行时延（P95） | ≤ 5 分钟 | 网络调用主导：单次 GitCode API 调用预算 ≤ 30s；长命令强制 `timeout 300` 上限；本地阶段（识别/自审查/输出）无超过 1 分钟的环节 |
+| 单次执行时延（P95） | ≤ 5 分钟 | 网络调用主导：单次 VCS API 调用预算 ≤ 30s；长命令强制 `timeout 300` 上限；本地阶段（识别/自审查/输出）无超过 1 分钟的环节 |
 | LLM 调用次数 | 单次执行 ≤ 25 次 | 场景识别 ≤ 1 + 流程执行 ≤ 18 + 自审查 ≤ 2 + 输出收尾 ≤ 4；超限即停下检查是否陷入循环 |
 | token 消耗 | ≤ 60,000 token/次（基线 ±10%，即 54,000–66,000） | SKILL.md ~6KB + 按需读取的 references 文档（单次场景 ≤ 2 份，≤ 20KB）；通过按需加载控制 |
 
@@ -176,9 +176,9 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 | 依赖 | 最低版本 | 说明 |
 |------|---------|------|
 | git | ≥ 2.17 | 本地 worktree 操作（checkout/add/commit/push），兼容任意主流发行版 |
-| curl | ≥ 7.64 | GitCode API 调用（HTTPS），兼容任意主流发行版 |
+| curl | ≥ 7.64 | VCS API 调用（HTTPS），兼容任意主流发行版 |
 | python3 | ≥ 3.8 | 仅在项目 venv 内用于依赖安装与测试执行（可选，无测试任务时不强制） |
-| node | ≥ 14（可选） | 仅当使用 GitCode API 辅助脚本时所需，非本技能运行必需 |
-| 网络 | HTTPS | 依赖官方 GitCode API 服务可达；不可达时按可靠性声明的降级策略处理 |
+| node | ≥ 14（可选） | 仅当使用 VCS API 辅助脚本时所需，非本技能运行必需 |
+| 网络 | HTTPS | 依赖官方 VCS API 服务可达；不可达时按可靠性声明的降级策略处理 |
 
 **兼容性声明**：本技能面向通用命令行宿主编写，不依赖任何特定 Agent 专有行为。文中「宿主 Agent」指当前执行环境；长命令静默、前台命令阻塞等待均为通用终端行为，已给出通用规避方式（`timeout` + 后台一次性验证模式 + 收尾清理）。git/curl 在声明版本范围内行为一致，无平台差异假设。

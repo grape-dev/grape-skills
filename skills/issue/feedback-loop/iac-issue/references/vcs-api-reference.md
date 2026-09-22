@@ -1,9 +1,9 @@
-# GitCode API Reference (Shared)
+# VCS API Reference (Shared)
 
 ## Base URL
 
 ```
-https://api.gitcode.com/api/v5
+$VCS_API_BASE
 ```
 
 读写操作均使用此 Base URL（实测 POST/PATCH/DELETE 打到 `api.gitcode.com` 正常工作）。
@@ -11,12 +11,12 @@ https://api.gitcode.com/api/v5
 ## Authentication
 
 ```
-PRIVATE-TOKEN: $BOT_GITCODE_TOKEN
+PRIVATE-TOKEN: $BOT_TOKEN
 # 或
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 ```
 
-⚠️ **`Authorization: token $BOT_GITCODE_TOKEN`（注意是 `token` 不是 `Bearer`）会导致 401！**
+⚠️ **`Authorization: token $BOT_TOKEN`（注意是 `token` 不是 `Bearer`）会导致 401！**
 GitCode 的 token 不是 OAuth token，`token` 关键字不被接受。只能用 `PRIVATE-TOKEN` 或 `Bearer`。
 
 - token 长度约 24 字符是正常的，不要因为短就怀疑格式。
@@ -46,8 +46,8 @@ GitCode 的 token 不是 OAuth token，`token` 关键字不被接受。只能用
 ```python
 import json, urllib.request, urllib.parse, os
 
-TOKEN = os.environ["BOT_GITCODE_TOKEN"]
-BASE = "https://api.gitcode.com/api/v5"
+TOKEN = os.environ["BOT_TOKEN"]
+BASE = "$VCS_API_BASE"
 
 def gitcode_get(path):
     url = f"{BASE}{path}"
@@ -118,3 +118,24 @@ gitcode_write("PATCH", f"/repos/{owner}/{repo}/issues/{number}",
 - All endpoints use v5 API unless specified
 - Pagination: ?page=1&per_page=100
 - Rate limiting: 5000 requests/hour
+
+## GitHub 与 GitCode 差异对照（重要！）
+
+调用 VCS API 前先确认仓库 provider（由 prompt 的 VCS API Access 段指定），按下表选择正确的参数格式：
+
+| 功能 | GitCode | GitHub |
+|------|---------|--------|
+| Issue 关闭 | `state="close"` | `state="closed"` |
+| labels 格式 | 逗号分隔字符串 `"bug,feature"` | 数组 `["bug","feature"]` |
+| assignees | `assignee` 单值字符串 | `assignees` 数组 `["user1"]` |
+| Create Issue body | 需带 `repo` 字段 | 不需要（repo 在 URL 里） |
+| PR 普通评论 | `POST /pulls/:n/comments` | `POST /issues/:n/comments`（GitHub 把 PR 视为 Issue） |
+| Create file | `POST /contents/:path` | `PUT /contents/:path` |
+| Update file | `PUT /contents/:path`（需 `sha`） | `PUT /contents/:path`（需 `sha`） |
+| Create branch | `POST /branches`（body: `branch_name`, `ref`） | `POST /git/refs`（body: `ref`, `sha`） |
+| Delete file | 不支持 | `DELETE /contents/:path` |
+| Accept header | 不需要 | `application/vnd.github+json`（必须带！） |
+| Create label | form-encoded | JSON body |
+| Add labels to issue | 通过 `PATCH /issues/:n` 的 `labels` 字段 | `POST /issues/:n/labels`（专用端点） |
+| Rate limit | 400 req/min | 5000 req/hour（认证用户） |
+| 关联 Issue | `inner_issue_nums` / `close_related_issue` | PR body 中 `Closes #N` / `Fixes #N` |

@@ -15,15 +15,15 @@
 优先从 `codeowner` 分支获取：
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/contents/CODEOWNERS?ref=codeowner"
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/{owner}/{repo}/contents/CODEOWNERS?ref=codeowner"
 ```
 
 如果返回 404，尝试默认分支：
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/contents/CODEOWNERS"
+curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/{owner}/{repo}/contents/CODEOWNERS"
 ```
 
 返回 JSON，`content` 字段是 Base64 编码，需解码后读取：
@@ -66,10 +66,10 @@ text = base64.b64decode(data['content']).decode('utf-8')
 立即调用 API 分配（必须先执行，再评论）：
 
 ```bash
-curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"assignee": "younger_eric"}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/{number}
+  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
 ```
 
 ### 7.1 通知责任人 / 确保任务存在（必做）
@@ -78,7 +78,7 @@ curl -s -X PATCH -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/tasks/notify \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "assignee": "younger_eric",

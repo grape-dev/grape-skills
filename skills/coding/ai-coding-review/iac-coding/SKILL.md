@@ -22,25 +22,25 @@ tags:
 ## 前置条件
 
 - 已安装 git 和 curl
-- 已配置 `$BOT_GITCODE_TOKEN` 环境变量
+- 已配置 `$BOT_TOKEN` 环境变量
 - Issue 的 git worktree 分支已就绪（feat/issue-{issue_number}）
 - Grape 平台 A2A 服务可用
 - 华为云凭证已通过 Grape 控制台注入（`HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`）
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
-5. 调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准，严禁根据经验/记忆/猜测自行拼写 API 路径。
+5. 调用 VCS API 一律以 `references/vcs-api-reference.md` 为准，严禁根据经验/记忆/猜测自行拼写 API 路径。
 6. 长命令执行会静默，加 timeout 限制并一次只装必要依赖。
 7. 禁止前台运行长驻/服务类命令，改用后台启动+验证+关闭模式。
 8. 华为云 AK/SK 不得硬编码到任何 .tf 文件，一律走环境变量（Grape 控制台注入 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK` → 映射为 `HW_ACCESS_KEY`/`HW_SECRET_KEY`）。
 
 ## 参考文件
 
-- 本地参考：`references/gitcode-api-reference.md`
+- 本地参考：`references/vcs-api-reference.md`
 - 本地参考：`references/code-review-checklist.md`
 - 本地参考：`references/huaweicloud-tf-conventions.md`（华为云 TF 编码规范、凭证设置约定、cn-north-4 避坑指南）
 - 外部技能参考：TF 生成器的 reference/ 目录（guardrails.md、terraform-generation-guide.md、validation-workflow.md、56个服务best-practice模板），需从 multica-squad 仓获取
@@ -148,7 +148,7 @@ tags:
 | 开发执行时延 | P95 ≤ 10 min | 含 TF 生成 + fmt/init/validate/plan + git push + MR 创建（不含云侧资源创建时延） |
 | terraform init | ≤ 3 min | 镜像源生效时 |
 | LLM token 消耗 | ≤ 12000 tokens/次 | 含参考文件按需加载 |
-| API 调用次数 | ≤ 15 次/次执行 | GitCode API + A2A |
+| API 调用次数 | ≤ 15 次/次执行 | VCS API + A2A |
 
 ### 兼容性声明
 
@@ -156,8 +156,8 @@ tags:
 |------|----------|------|
 | terraform | >= 1.7.5, <= 1.10.5 | OBS backend 兼容窗口 |
 | git | >= 2.20 | 基础 git 操作 |
-| curl | >= 7.60 | GitCode API 调用 |
-| GitCode API | v5 | 所有 API 调用基于 v5 端点 |
+| curl | >= 7.60 | VCS API 调用 |
+| VCS API | v5 | 所有 API 调用基于 v5 端点 |
 | Grape A2A | >= 1.0 | A2A payload 结构遵循 Grape 平台约定 |
 | TF 生成器 | >= 1.0 | TF 配置生成（声明在 requires 中） |
 | 版本演进策略 | — | 本 Skill 版本号在 frontmatter 中声明；新旧版本差异通过版本号识别；A2A 调用方按 issue_number 传参，不依赖 Skill 版本号 |
@@ -186,7 +186,7 @@ tags:
 | 代码优化场景修改完成后必须在 PR 评论告知 | ✅ **必须做** |
 | 每个提交一个原子变更 | ✅ **必须做** |
 | 所有 TF 代码和脚本放在仓库 `iac/` 子目录下 | ✅ **必须做** |
-| 只通过 GitCode API 获取信息 | ✅ **必须做** |
+| 只通过 VCS API 获取信息 | ✅ **必须做** |
 | 仅实现当前 Issue 描述的内容 | ✅ **保持范围** |
 | 直接合并 PR | ❌ **禁止（仅创建，等待人工审批）** |
 | 执行 terraform apply / terraform destroy | ❌ **禁止（部署是 SRE Agent 职责，Coding 只负责到 PR 创建）** |

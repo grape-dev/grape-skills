@@ -2,14 +2,14 @@
 # ============================================================================
 # create_skill_pr.sh — Coding Agent 创建 GitCode PR 的脚本
 #
-# 职责：git commit + push → 调 GitCode API 创建 PR → 设置审查人 → 输出 PR URL
+# 职责：git commit + push → 调 VCS API 创建 PR → 设置审查人 → 输出 PR URL
 # 复用 worktree 已有分支 feat/issue-{N}，不另建分支。
 #
 # 用法：
 #   create_skill_pr.sh <skill_name>
 #
 # 环境变量（已由系统注入，不用查 env）：
-#   BOT_GITCODE_TOKEN  仓库 bot token（必填，所有 agent 已注入）
+#   BOT_TOKEN  仓库 bot token（必填，所有 agent 已注入）
 #   REPO_FULL_NAME     仓库全名 owner/repo（必填）
 #   ISSUE_NUMBER       Issue 编号（必填）
 #   BOT_USERNAME       审查人用户名（可选，未注入时兜底 owner）
@@ -24,12 +24,12 @@ if [[ -z "$SKILL_NAME" ]]; then
   exit 1
 fi
 
-TOKEN="${BOT_GITCODE_TOKEN:-}"
+TOKEN="${BOT_TOKEN:-}"
 REPO_FULL="${REPO_FULL_NAME:-}"
 ISSUE_NUM="${ISSUE_NUMBER:-}"
 
 if [[ -z "$TOKEN" ]]; then
-  echo "[create_skill_pr] ERROR: BOT_GITCODE_TOKEN 未设置"
+  echo "[create_skill_pr] ERROR: BOT_TOKEN 未设置"
   exit 1
 fi
 if [[ -z "$REPO_FULL" ]]; then
@@ -44,7 +44,7 @@ fi
 # 解析 owner/repo
 OWNER="${REPO_FULL%%/*}"
 REPO="${REPO_FULL#*/}"
-API_BASE="https://api.gitcode.com/api/v5"
+API_BASE="$VCS_API_BASE"
 BRANCH="feat/issue-${ISSUE_NUM}"
 
 log() { echo "[create_skill_pr] $*"; }

@@ -31,7 +31,7 @@ tools:
 
 ### ⚠️ 任务通知硬规则（不可跳过）
 **在本 Issue 处理流程结束、责任人最终确定后（含机器人接管），必须调用 `POST /api/tasks/notify` 上报任务**（接口幂等）。
-- **assignee=机器人（grape_bot / gitcode_bot 等 bot 用户名）** → notify 会关闭该 Issue 旧的待处理任务（任务中心显示"已完成 / bot_takeover"），表示机器人已接管；
+- **assignee=机器人（grape_bot / grape_bot 等 bot 用户名）** → notify 会关闭该 Issue 旧的待处理任务（任务中心显示"已完成 / bot_takeover"），表示机器人已接管；
 - **assignee=人** → notify 创建/重派任务给该责任人（旧任务关闭为 reassigned，新建 active 任务）；
 - **唯一例外**：完全未确定责任人（如关闭 / 等待配置）。
 
@@ -43,7 +43,7 @@ curl -X POST {{SERVER_URL}}/api/tasks/notify \
   -H "Authorization: Bearer $BOT_G...OKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "assignee": "<责任人GitCode用户名 或 grape_bot>",
+    "assignee": "<责任人VCS用户名 或 grape_bot>",
     "repo_key": "'"$REPO_FULL_NAME"'",
     "issue_number": "'"$ISSUE_NUMBER"'",
     "task_description": "Issue #'"$ISSUE_NUMBER"' 已分配给你，请处理：<简要任务描述>"
@@ -79,12 +79,12 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 
 ### 禁止探索 Grape 内部
 项目知识文档（data/workspaces/）和 codegraph 索引（.codegraph/）除外。
-其他信息通过 GitCode API 获取，不读取项目源代码文件。
+其他信息通过 VCS API 获取，不读取项目源代码文件。
 
 **硬约束（违反即违规）：**
-1. **只用系统注入的 token** — 调用 GitCode API 只能用 prompt 中给出的 `$BOT_GITCODE_TOKEN`。**严禁**从数据库、configs 目录、日志、历史记录或任何文件中寻找、读取、猜测其他 token。
+1. **只用系统注入的 token** — 调用 VCS API 只能用 prompt 中给出的 `$BOT_TOKEN`。**严禁**从数据库、configs 目录、日志、历史记录或任何文件中寻找、读取、猜测其他 token。
 2. **严禁访问 Grape 内部数据** — 不得读取 sessions.db、user_accounts 表等 Grape 运行数据（data/workspaces/ 下的项目知识文档除外）。
-3. **API 403/无权限** — 若 GitCode API 返回 403 或权限不足，**立即停止该操作并回复用户**。
+3. **API 403/无权限** — 若 VCS API 返回 403 或权限不足，**立即停止该操作并回复用户**。
 4. **token 不得落盘** — 不得将 token 写入任何文件、日志、评论或脚本。
 
 ---
@@ -109,13 +109,13 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 > 所有事件类型共用以下流程，**不区分"新 Issue"与"评论"**——评论处理同样需要知识基线与深度可开发性分析。
 
 ### 1. 确定 Issue 与上下文（必须最先）
-- 从事件 payload 提取 issue 编号；缺失则用 GitCode API 查询定位
+- 从事件 payload 提取 issue 编号；缺失则用 VCS API 查询定位
 - 读取该 Issue 全部评论/标签/关联 PR，了解完整上下文（含生命周期 `issue_state` 阶段）
 
 ### 2. 项目知识基线（⚠️ 必须执行，任何事件都需）
 - 项目知识基线已由 Grape 服务端在 prompt 的「项目知识基线」章节**内联注入**（含 project-graph + project-capabilities 摘要）
 - 如需全文：读取 prompt 该章节末尾标注的**全文副本路径**（`project-info/` 下，执行前已被替换为实际落地目录，可用 read tool 读取）
-- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + GitCode API）
+- ⚠️ **不再自行生成**：知识基线由服务端统一维护（多机共享）；若 prompt 标注「无项目知识基线」或「[degraded]」，允许降级分析（README + VCS API）
 - ⚠️ 此步骤是后续分析与答复的基础，不可跳过——评论答复也要基于项目理解
 
 ### 3. 深度可开发性分析（⚠️ 每次处理都执行）
@@ -198,10 +198,10 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 > ⚠️ **禁止创建测试 Issue**：直接创建正式子任务 Issue，不要先建测试 Issue 验证 API 再删除。
 > 测试 Issue 会触发 webhook 进入流水线，浪费 Agent 资源并产生垃圾数据。
 
-对每个子任务，调用 GitCode API 创建 Issue：
+对每个子任务，调用 VCS API 创建 Issue：
 
 ```bash
-curl -X POST "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues?access_token=$BOT_G...OKEN" \
+curl -X POST "$VCS_API_BASE/repos/{owner}/{repo}/issues?access_token=$BOT_G...OKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "title=子任务：数据库迁移 SQLite → MySQL" \
   -d "body=## 父任务\n[Issue #20](https://gitcode.com/{owner}/{repo}/issues/20)\n\n## 目标\n{从 Spec 中提取的子任务目标}\n\n## 验收标准\n{子任务验收标准}\n\n## 依赖\n{如有前置子任务，注明}" \
@@ -217,7 +217,7 @@ curl -X POST "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues?access_
 在父 Issue body 中追加子任务列表：
 
 ```bash
-curl -X PATCH "https://api.gitcode.com/api/v5/repos/{owner}/{repo}/issues/20?access_token=$BOT_G...OKEN" \
+curl -X PATCH "$VCS_API_BASE/repos/{owner}/{repo}/issues/20?access_token=$BOT_G...OKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "{原 body}\n\n---\n## 子任务\n- [ ] [#21 数据库迁移](issues/21)\n- [ ] [#22 模板分离](issues/22)\n- [ ] [#23 测试覆盖](issues/23)"}'
 ```
@@ -334,7 +334,7 @@ curl -X POST {{SERVER_URL}}/api/tasks/close \
 | 评估可拆分性、创建子 Issue | ✅ 多任务模式下执行 |
 | 子任务跳过分析直接 A2A coding | ✅ 子任务快速通道执行 |
 | 更新父 Issue 追加子任务列表 | ✅ 创建子 Issue 后执行 |
-| 只通过 GitCode API 获取信息 | ✅ **鼓励做** |
+| 只通过 VCS API 获取信息 | ✅ **鼓励做** |
 | 直接写代码、修改文件 | ❌ **禁止** |
 | 提交 PR、合并 PR | ❌ **禁止** |
 | 多任务模式下父任务直接 A2A coding | ❌ **禁止（子 Issue 自动触发流水线）** |
@@ -354,16 +354,16 @@ name=feature&color=a2eeef
 curl -s -X PATCH -H "Authorization: Bearer $BOT_G...OKEN" \
   -H "Content-Type: application/json" \
   -d '{"labels": "feature,triaged", "assignee": "younger_eric"}' \
-  https://api.gitcode.com/api/v5/repos/:owner/:repo/issues/:number
+  $VCS_API_BASE/repos/:owner/:repo/issues/:number
 
 # 关闭 Issue
 curl -s -X PATCH ... -d '{"state": "close"}' \
-  https://api.gitcode.com/api/v5/repos/:owner/:repo/issues/:number
+  $VCS_API_BASE/repos/:owner/:repo/issues/:number
 ```
 
 ## 参考
 
-需要调用更全面的 GitCode API 时，读取 `references/gitcode-api-reference.md`。
+需要调用更全面的 VCS API 时，读取 `references/vcs-api-reference.md`。
 需要使用 codegraph 工具时，读取 `references/codegraph-commands.md`。
 
 > 注：评论 body 前缀固定为 `[issue agent]`，不再使用 `$AGENT_NAME` 环境变量。

@@ -15,7 +15,7 @@ tools:
 
 1. 调用 Grape/GitCode 平台一律只用 `grape` CLI 与系统注入的 `$GRAPE_SESSION_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token，也**不得改用 curl 直连 `api.gitcode.com`**。命令参考见 `references/grape-cli-reference.md`。注意 token 有调用范围：会话级 `tk_` 覆盖本技能全部日常操作（workflows / Agent Context / git-repo）；「账户/平台管理」类端点（skills/auth/repos-managed 等）对 `tk_` 返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按指引说明即可，不要更换 token 或绕行。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. 401（token 失效）：任务级 token 短命，失效属正常；说明凭据已失效即可，不尝试替换。
 5. token 不得写入任何文件/日志/评论。
 
@@ -49,7 +49,7 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 
 ### ⚠️ 任务通知硬规则（不可跳过）
 **在本 Issue 处理流程结束、责任人最终确定后（含机器人接管），必须用 `grape tasks notify` 上报任务**（接口幂等）。
-- **assignee=机器人（grape_bot / gitcode_bot 等 bot 用户名）** → notify 会关闭该 Issue 旧的待处理任务（任务中心显示"已完成 / bot_takeover"），表示机器人已接管；
+- **assignee=机器人（grape_bot / grape_bot 等 bot 用户名）** → notify 会关闭该 Issue 旧的待处理任务（任务中心显示"已完成 / bot_takeover"），表示机器人已接管；
 - **assignee=人** → notify 创建/重派任务给该责任人（旧任务关闭为 reassigned，新建 active 任务）；
 - **唯一例外**：完全未确定责任人（如关闭 / 等待配置）。
 
@@ -58,7 +58,7 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 
 ```bash
 grape tasks notify --json '{
-  "assignee": "<责任人GitCode用户名 或 grape_bot>",
+  "assignee": "<责任人VCS用户名 或 grape_bot>",
   "repo_key": "{owner}/{repo}",
   "issue_number": {n},
   "task_description": "Issue #{n} 已分配给你，请处理：<简要任务描述>"

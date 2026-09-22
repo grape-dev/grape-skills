@@ -187,10 +187,10 @@ grape refresh               # 重拉最新契约
 
 ## 6. 安全与边界
 
-- **token 使用范围**：`$BOT_GITCODE_TOKEN`（GitCode API）和 `$GRAPE_SESSION_TOKEN`（grape API）分开使用，严禁混用。
+- **token 使用范围**：`$BOT_TOKEN`（VCS API）和 `$GRAPE_SESSION_TOKEN`（grape API）分开使用，严禁混用。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`configs/`、`user_accounts` 表、`managed_repos` 表——不得读取。
 - **403/401 处理**：
-  - 403（无权限）→ 立即停止该操作，回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置」。
+  - 403（无权限）→ 立即停止该操作，回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置」。
   - 401（token 失效）→ token 已过期，不可自行刷新，回复用户重新注入。
   - `user_only` 端点对 `tk_` 返回 403 → 改用 `GRAPE_API_TOKEN`（`grape_`）或走只读 `dual` 路径。
 - **token 不落盘**：不得将 token 写入文件、日志、评论或脚本。

@@ -67,8 +67,8 @@ grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 
 ## 写入身份与 self-comment 过滤说明
 
-- 原始版以 `$USER_GITCODE_TOKEN`（用户本人身份）回帖/建 Issue，避免被 self-comment 过滤。**CLI 版默认使用会话 token `$GRAPE_SESSION_TOKEN`**，写入身份为当前会话。
-- 若 prompt 中仍注入 `$USER_GITCODE_TOKEN` 且需以用户身份写入，可用一次性参数显式指定：`grape --token "$USER_GITCODE_TOKEN" git-repo issues comments create ...`（不改写任何配置文件）。
+- 原始版以 `$USER_TOKEN`（用户本人身份）回帖/建 Issue，避免被 self-comment 过滤。**CLI 版默认使用会话 token `$GRAPE_SESSION_TOKEN`**，写入身份为当前会话。
+- 若 prompt 中仍注入 `$USER_TOKEN` 且需以用户身份写入，可用一次性参数显式指定：`grape --token "$USER_TOKEN" git-repo issues comments create ...`（不改写任何配置文件）。
 - 若回帖后 webhook 事件因 self-comment 过滤未被 issue agent 重新分诊，在回复中如实提示用户，不假称已生效。
 
 ## git（本地执行，token 零暴露）
@@ -107,7 +107,7 @@ grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 ## 安全与边界（必须遵守）
 
 1. **只用系统注入的 `$GRAPE_SESSION_TOKEN`**：不得从数据库、配置文件、日志、历史、环境变量
-   中寻找/猜测其他 token；不得读取 `BOT_GITCODE_TOKEN`/`USER_GITCODE_TOKEN`（已不注入，见上文「写入身份」例外）。
+   中寻找/猜测其他 token；不得读取 `BOT_TOKEN`/`USER_TOKEN`（已不注入，见上文「写入身份」例外）。
 2. **禁止访问 Grape 内部数据**：不得读取 `data/sessions.db`、`user_accounts`、`managed_repos`、
    `configs/`（含 `global-bot-token.json` 等）等 Grape 内部基础设施（`data/workspaces/` 项目知识文档除外）。
 3. **403/无权限**：立即停止并回复用户「该操作需要相应权限，请在 GitCode 中手动配置后重试」，

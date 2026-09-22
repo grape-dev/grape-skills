@@ -11,7 +11,7 @@ tools:
 
 1. **CLI 优先**：凡 grape CLI 能做的走 CLI，禁止 curl 直连 API。CLI 未安装时报障，不降级直连。
 2. **任务上下文先行**：执行前先读 `grape tasks current --json-out` + `grape issues detail` + `grape events detail --seq`，明确已做/待做。
-3. **只用系统注入的 token**：调用 API 只用 `$BOT_GITCODE_TOKEN`；严禁从数据库/configs/日志中寻找其他 token。
+3. **只用系统注入的 token**：调用 API 只用 `$BOT_TOKEN`；严禁从数据库/configs/日志中寻找其他 token。
 4. **禁止访问 Grape 内部数据**：不得读取 sessions.db、user_accounts 表等（prompt 注入的项目知识文档除外）。
 5. **token 不落盘**：不得将 token 写入文件/日志/评论/脚本。
 

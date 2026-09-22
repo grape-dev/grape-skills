@@ -37,7 +37,7 @@
 ## 证据状态写法
 
 - **已观察**：`✅ 已观察 — references/workflow-harness-review.md:12（AGENTS.md 存在）`
-- **未观察**：`⚠️ 未观察 — 仓库无 tests/ 目录（GitCode API 遍历 404）`
+- **未观察**：`⚠️ 未观察 — 仓库无 tests/ 目录（VCS API 遍历 404）`
 
 ## 输出纪律
 

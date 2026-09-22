@@ -7,19 +7,19 @@
 - 每个结论必须绑定证据，标注 **已观察（observed）** 或 **未观察（unobserved）**。
 - **未观察 ≠ 没有**。只标注"未获得证据"，不用推断补齐、不虚构、不评分。
 - **没有证据就不评分**。维度评分只在证据充分时给出；证据不足的维度输出 `unobserved` + 原因。
-- 只通过 GitCode API 获取仓库文件；会话历史 `data/workspaces/history/{account}/{repository}/session_history.json` 用 read 读取。
+- 只通过 VCS API 获取仓库文件；会话历史 `data/workspaces/history/{account}/{repository}/session_history.json` 用 read 读取。
 
 ## 证据来源
 
 | 来源 | 获取方式 | 支撑维度 |
 |------|---------|---------|
-| `AGENTS.md` / `CLAUDE.md` / `rules` | GitCode API `GET /repos/{owner}/{repo}/contents/AGENTS.md` | 任务理解、受控执行 |
-| `spec` / `DESIGN.md` / 需求文档 | GitCode API | 任务理解 |
-| `skills/` 目录 | GitCode API 遍历目录 | 受控执行、经验沉淀 |
-| `tests/`、测试配置 | GitCode API | 变更验证 |
-| CI 配置（`.github/workflows`、`.gitlab-ci.yml`、`Jenkinsfile`） | GitCode API | 变更验证、可靠交付 |
-| Hook / 分支保护 / 审查要求 | GitCode API（PR 审查记录、合并记录） | 可靠交付 |
-| 构建脚本、`package.json` / `requirements.txt` | GitCode API | 受控执行、变更验证 |
+| `AGENTS.md` / `CLAUDE.md` / `rules` | VCS API `GET /repos/{owner}/{repo}/contents/AGENTS.md` | 任务理解、受控执行 |
+| `spec` / `DESIGN.md` / 需求文档 | VCS API | 任务理解 |
+| `skills/` 目录 | VCS API 遍历目录 | 受控执行、经验沉淀 |
+| `tests/`、测试配置 | VCS API | 变更验证 |
+| CI 配置（`.github/workflows`、`.gitlab-ci.yml`、`Jenkinsfile`） | VCS API | 变更验证、可靠交付 |
+| Hook / 分支保护 / 审查要求 | VCS API（PR 审查记录、合并记录） | 可靠交付 |
+| 构建脚本、`package.json` / `requirements.txt` | VCS API | 受控执行、变更验证 |
 | 会话历史 `session_history.json` | read 工具 | 任务理解、受控执行、经验沉淀 |
 
 ## 五个维度

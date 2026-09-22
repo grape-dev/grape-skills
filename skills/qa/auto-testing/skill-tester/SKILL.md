@@ -14,12 +14,12 @@ tools:
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_G...OKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_G...OKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
 3. API 返回 403/无权限时：立即停止该操作并回复用户，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 所有 curl / git 调用设 30s 超时（curl --max-time 30）——超时判定失败，不 hang。
-6. **调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
+6. **调用 VCS API 一律以 `references/vcs-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
 7. **长命令执行会静默**：`pip install`、`hcloud CLI`、大测试等长命令运行期间无输出。执行这类命令时**加 `timeout` 限制（如 `timeout 300 pip install ...`）**并一次只装必要依赖，避免长时间无输出影响执行。
 8. **禁止前台运行长驻/服务类命令**：`python -m http.server`、`npm run dev` 等会阻塞不退出的命令，严禁前台直接执行。改用后台启动+验证+关闭模式。
 
@@ -29,13 +29,13 @@ tools:
 负责功能验证、规范检查、安全扫描、测试报告。不负责 skill 创建、修改 skill 内容（只读验证）。
 
 ### 依赖前序分析
-通过 A2A 被调用时，prompt 包含 Coding Agent 的处理摘要（skill 名称/操作类型/PR 编号）。必须通过 GitCode API 获取 PR 和 Issue 完整信息。
+通过 A2A 被调用时，prompt 包含 Coding Agent 的处理摘要（skill 名称/操作类型/PR 编号）。必须通过 VCS API 获取 PR 和 Issue 完整信息。
 
 ### 超出能力范围时主动请求支援
 测试发现需要修复 → A2A 回 coding，不自己修。
 
 ### 禁止探索 Grape 内部
-**所有 Issue/PR 信息通过 GitCode API 获取**，不读取 data/、configs/、sessions.db 等 Grape 内部数据。
+**所有 Issue/PR 信息通过 VCS API 获取**，不读取 data/、configs/、sessions.db 等 Grape 内部数据。
 
 ## 评论规范
 
@@ -70,7 +70,7 @@ tools:
 
 ```bash
 curl -s --max-time 30 -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments?per_page=100" 2>/dev/null
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments?per_page=100" 2>/dev/null
 ```
 
 - 找到 → PR 之前已测试通过，直接 A2A SRE Agent（不重新测试）
@@ -119,7 +119,7 @@ curl -s --max-time 30 -X POST \
   -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[QA Agent] ✅ 测试通过\n\n## Skill 测试报告：{name} v{version}\n\n## 功能验证\n| 检查项 | 状态 | 证据 | 说明 |\n|--------|------|------|------|\n| API 调用 | ✅ | 返回 N 条数据 | 真实调用成功 |\n\n## 规范检查\n| 检查项 | 状态 |\n|--------|------|\n| frontmatter | ✅ |\n\n## 结论\n✅ 测试通过，可合并发布"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
 ```
 
 PR 评论：
@@ -129,7 +129,7 @@ curl -s --max-time 30 -X POST \
   -H "PRIVATE-TOKEN: $BOT_G...OKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[QA Agent] ✅ 测试通过"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/pulls/$PR_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/pulls/$PR_NUMBER/comments"
 ```
 
 ## Step 5: 合并 + A2A 交棒（测试通过后）
@@ -200,7 +200,7 @@ curl -s --max-time 30 -X POST {{SERVER_URL}}/api/a2a \
 
 ## 参考
 - 测试报告格式，读取 `references/test-report-format.md`
-- 调用 GitCode API 时，**必须以 `references/gitcode-api-reference.md` 为准**——严禁自行拼写 API 路径
+- 调用 VCS API 时，**必须以 `references/vcs-api-reference.md` 为准**——严禁自行拼写 API 路径
 
 ## 输出规范
 - 评论 body 必须以固定标记开头（保证可检索性）

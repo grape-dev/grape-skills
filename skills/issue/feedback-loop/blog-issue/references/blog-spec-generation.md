@@ -11,8 +11,8 @@
 | 输入 | 来源 | 用途 |
 |------|------|------|
 | 博客需求清单 | VOD A2A context 中的 `requirement_summary` | 主题/风格/结构/配图/视频/长度/语调/标签 |
-| Issue 正文 | GitCode API | 原始需求描述、参考链接 |
-| Issue 评论 | GitCode API | 用户补充信息 |
+| Issue 正文 | VCS API | 原始需求描述、参考链接 |
+| Issue 评论 | VCS API | 用户补充信息 |
 | 博客系统地址 | 项目知识 `project-info/member/blog-config.yaml` 或 Issue 正文 | 发布目标 |
 | AI 模型配置 | 项目知识 `project-info/member/ai-models.yaml` | 配图/视频生成的 API Key/URL/Model |
 | blog_api.py | GitCode contents API | 确认博客系统可用接口 |
@@ -96,7 +96,7 @@
 ```python
 import json, urllib.request, os
 
-TOKEN = os.environ["BOT_GITCODE_TOKEN"]
+TOKEN = os.environ["BOT_TOKEN"]
 REPO = os.environ["REPO_FULL_NAME"]
 ISSUE = os.environ["ISSUE_NUMBER"]
 
@@ -104,7 +104,7 @@ body = "[blog-issue Agent] 📋 博客 Spec Document\n\n" + spec_content
 
 data = json.dumps({"body": body}).encode("utf-8")
 req = urllib.request.Request(
-    f"https://api.gitcode.com/api/v5/repos/{REPO}/issues/{ISSUE}/comments",
+    f"$VCS_API_BASE/repos/{REPO}/issues/{ISSUE}/comments",
     data=data, method="POST"
 )
 req.add_header("PRIVATE-TOKEN", TOKEN)
@@ -121,26 +121,26 @@ with urllib.request.urlopen(req) as r:
 ### 打标签
 
 ```bash
-curl -s -X PATCH -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
+curl -s -X PATCH -H "PRIVATE-TOKEN: $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"labels": "{原有标签},spec-ready,blog-issue"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER"
 ```
 
 ### 分配给机器人
 
 ```bash
-curl -s -X PATCH -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
+curl -s -X PATCH -H "PRIVATE-TOKEN: $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"assignee": "'"$BOT_USERNAME"'"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER"
 ```
 
 ## A2A 通知 Coding Agent（博客专属）
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "coding",

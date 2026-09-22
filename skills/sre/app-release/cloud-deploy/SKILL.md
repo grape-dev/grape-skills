@@ -11,7 +11,7 @@ tools:
 
 ## 安全硬约束
 
-1. 调用 GitCode API 只用 `$BOT_GITCODE_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token；token 不得写入文件/日志/评论。
+1. 调用 VCS API 只用 `$BOT_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token；token 不得写入文件/日志/评论。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
 3. API 返回 403/无权限时：立即停止并回复用户「需要管理员/维护者权限」，严禁尝试其他 token 或绕行。
 4. AK/SK 从 Grape 控制台配置获取；未配置时停止并提示用户，严禁硬编码或从他处寻找凭证。
@@ -37,7 +37,7 @@ Don't use for: 非 merge/非 A2A 的 PR 事件；非 main/master 分支的 push�
 |------|------|------|
 | `HUAWEICLOUD_SDK_AK` | Grape 控制台 | 华为云 AK |
 | `HUAWEICLOUD_SDK_SK` | Grape 控制台 | 华为云 SK |
-| `BOT_GITCODE_TOKEN` | 系统 prompt | GitCode API Token |
+| `BOT_TOKEN` | 系统 prompt | VCS API Token |
 
 ### grape CLI 命令
 

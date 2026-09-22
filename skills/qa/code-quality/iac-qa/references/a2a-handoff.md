@@ -7,7 +7,7 @@ QA 审查通过后，**自动合并 PR**，合并成功后 **必须** A2A 交办
 ### 触发步骤（按顺序执行）
 
 1. QA 审查结论为 ✅ LGTM（无 P0/P1 阻塞项）
-2. QA 通过 GitCode API 自动合并 PR：`PUT /repos/:owner/:repo/pulls/:number/merge`
+2. QA 通过 VCS API 自动合并 PR：`PUT /repos/:owner/:repo/pulls/:number/merge`
 3. PR 合并确认后，通过 A2A 交办 SRE Agent
 
 ### 不触发的情况
@@ -21,7 +21,7 @@ QA 审查通过后，**自动合并 PR**，合并成功后 **必须** A2A 交办
 
 ```bash
 curl -X POST $GRAPE_A2A_URL \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "sre",

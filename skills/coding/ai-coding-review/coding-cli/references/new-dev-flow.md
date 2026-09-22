@@ -137,7 +137,7 @@ grape git-repo pulls update --owner {owner} --repo {repo} --number {pr_number} \
 
 > **PR 链接路径规则（重要）：**
 > - GitCode **Web 页面** PR 链接使用 `/pull/`（**单数**）：`https://gitcode.com/{owner}/{repo}/pull/{pr_number}`
-> - GitCode **API** 路径使用 `/pulls/`（复数）：`https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls`
+> - GitCode **API** 路径使用 `/pulls/`（复数）：`$VCS_API_BASE/repos/{owner}/{repo}/pulls`
 > - **Issue 评论中必须使用 Web 页面链接（`/pull/` 单数），不得使用 API 路径（`/pulls/` 复数）**
 > - **必须使用 markdown 链接格式** `[PR #{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})`，不得使用纯文本 `PR #{pr_number}`
 

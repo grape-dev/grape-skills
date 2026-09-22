@@ -24,7 +24,7 @@ codegraph --version
 
 依赖：Node.js >= 18
 
-> ⚠️ 本机未安装 codegraph 或 `codegraph init` 失败时，降级为基于 README + GitCode API 获取项目信息（见 `codegraph-project-analysis.md` 降级方案），标注 `[degraded - codegraph unavailable]`。
+> ⚠️ 本机未安装 codegraph 或 `codegraph init` 失败时，降级为基于 README + VCS API 获取项目信息（见 `codegraph-project-analysis.md` 降级方案），标注 `[degraded - codegraph unavailable]`。
 
 ## 命令列表
 

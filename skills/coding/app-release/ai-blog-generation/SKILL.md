@@ -12,8 +12,8 @@ tools:
   - name: git
     min_version: "2.20"
 requires:
-  - env: BOT_GITCODE_TOKEN
-    description: GitCode API 访问令牌
+  - env: BOT_TOKEN
+    description: VCS API 访问令牌
   - env: REPO_FULL_NAME
     description: 仓库全名（owner/repo 格式）
   - env: ISSUE_NUMBER
@@ -34,9 +34,9 @@ inputSchema:
       type: integer
       minimum: 1
       description: GitCode Issue 编号
-    BOT_GITCODE_TOKEN:
+    BOT_TOKEN:
       type: string
-      description: GitCode API 访问令牌（从环境变量获取）
+      description: VCS API 访问令牌（从环境变量获取）
     BOT_USERNAME:
       type: string
       description: Bot GitCode 用户名
@@ -94,7 +94,7 @@ outputSchema:
 3. token 不得写入日志或回复。
 4. API 返回 403 / 429 时：停止重试并报告用户。速率限制 2 req/s。
 5. **长命令执行会静默**：视频生成约 30s，图片生成约 7s/张，提前告知用户等待。
-6. 调用 GitCode API 一律以 `$SKILL_DIR/references/gitcode-api-reference.md` 为准，严禁根据经验/记忆/猜测自行拼写 API 路径。
+6. 调用 VCS API 一律以 `$SKILL_DIR/references/vcs-api-reference.md` 为准，严禁根据经验/记忆/猜测自行拼写 API 路径。
 7. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限」，严禁尝试其他 token 或绕行手段。
 
 # AI 博客生成 + PR 提交流程
@@ -155,7 +155,7 @@ pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple edge-tts Pillow
 
 | 变量 | 来源 | 说明 |
 |------|------|------|
-| `$BOT_GITCODE_TOKEN` | 系统 prompt 注入 | GitCode API token（PRIVATE-TOKEN） |
+| `$BOT_TOKEN` | 系统 prompt 注入 | VCS API token（PRIVATE-TOKEN） |
 | `$REPO_FULL_NAME` | 系统 prompt 注入 | 当前仓库全名（owner/repo） |
 | `$ISSUE_NUMBER` | 系统 prompt 注入 | Issue 编号 |
 | `$BOT_USERNAME` | 系统 prompt 注入 | Bot 用户名 |
@@ -285,12 +285,12 @@ git commit -m "docs(blog): add article '$BLOG_TITLE'
 - 元数据 meta.json"
 ```
 
-**推送并创建 PR（使用 Python 调用 GitCode API）：**
+**推送并创建 PR（使用 Python 调用 VCS API）：**
 
 ```python
 import json, urllib.request, os
 
-TOKEN = os.environ.get("BOT_GITCODE_TOKEN", "")
+TOKEN = os.environ.get("BOT_TOKEN", "")
 REPO = os.environ.get("REPO_FULL_NAME", "")
 BRANCH = os.environ["BRANCH_NAME"]
 BASE_BRANCH = "dev"
@@ -314,7 +314,7 @@ pr_body = json.dumps({
 }).encode("utf-8")
 
 req = urllib.request.Request(
-    f"https://api.gitcode.com/api/v5/repos/{REPO}/pulls",
+    f"$VCS_API_BASE/repos/{REPO}/pulls",
     data=pr_body,
     method="POST"
 )
@@ -330,10 +330,10 @@ with urllib.request.urlopen(req) as r:
 
 ```bash
 curl -s --max-time 30 -X POST \
-  -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
+  -H "PRIVATE-TOKEN: $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[coding Agent] ✅ 博客已提交\n\n博客文章已生成并通过 PR #PR_NUMBER 提交到仓库。\n\n- 目录：blog/TOPIC_SLUG/\n- 分支：BRANCH_NAME\n- PR：'$REPO_FULL_NAME'/pull/PR_NUMBER\n\n下一步由 SRE Agent 进行博客发布。"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
 ```
 
 ### 8. ✅ 交办 SRE 发布（必须执行）
@@ -435,7 +435,7 @@ curl -X POST {{SERVER_URL}}/api/a2a \
 
 1. **检查临时目录**：`ls /tmp/blog-gen-*/` 确认中间产物是否存在（index.html、images/、intro.mp4 等）
 2. **检查 git 分支**：`git branch | grep feat/blog-` 确认是否已创建分支和提交
-3. **检查 PR 状态**：通过 GitCode API 查询是否已有同标题 PR
+3. **检查 PR 状态**：通过 VCS API 查询是否已有同标题 PR
 4. **检查 Issue 评论**：是否已有 `[coding Agent]` 前缀的评论
 5. **从最后完成的步骤继续**：跳过已完成的步骤，从下一步继续执行
 
@@ -474,7 +474,7 @@ curl -X POST {{SERVER_URL}}/api/a2a \
 
 - `$SKILL_DIR/references/product-research.md` — 产品实物调研与视觉特征提取（步骤 3 详细实现）
 - `$SKILL_DIR/references/image-video-generation.md` — 图片与视频生成（步骤 4、5 详细实现）
-- `$SKILL_DIR/references/gitcode-api-reference.md` — GitCode API 调用规范
+- `$SKILL_DIR/references/vcs-api-reference.md` — VCS API 调用规范
 - qwen-image 图片生成：`POST /v1/images/generations`（URL/Key/Model 从项目知识获取）
 - Wan2.2 T2V 视频生成：`POST /v1/video/generations`（URL/Key/Model 从项目知识获取，只能用 T2V 模型，禁止 I2V）
 - Edge TTS：`edge-tts --voice zh-CN-XiaoxiaoNeural --text "文案" --write-media output.mp3`

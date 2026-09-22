@@ -22,20 +22,20 @@ tags:
 ## 前置条件
 
 - 已安装 curl 和 git
-- 已配置 `$BOT_GITCODE_TOKEN` 环境变量
+- 已配置 `$BOT_TOKEN` 环境变量
 - Grape 平台 A2A 服务可用（$GRAPE_A2A_URL）
 - 华为云凭证已通过 Grape 控制台注入（`HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`）
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 
 ## 参考文件
 
-- 本地参考：`references/gitcode-api-reference.md`
+- 本地参考：`references/vcs-api-reference.md`
 - 本地参考：`references/labeling-guide.md`
 - 本地参考：`references/assignee-guide.md`
 - 本地参考：`references/comment-guide.md`
@@ -117,13 +117,13 @@ tags:
 | Skill 加载时延 | < 3s | 纯文档型 skill，无加载期脚本 |
 | Issue 处理时延 | P95 ≤ 5 min | 含分类 + Spec 生成 + 标签/指派 + A2A |
 | LLM token 消耗 | ≤ 10000 tokens/次 | 含参考文件按需加载 |
-| API 调用次数 | ≤ 12 次/次执行 | GitCode API + 华为云查询 + A2A |
+| API 调用次数 | ≤ 12 次/次执行 | VCS API + 华为云查询 + A2A |
 
 ### 兼容性声明
 
 | 依赖 | 版本要求 | 说明 |
 |------|----------|------|
-| GitCode API | v5 | 所有 API 调用基于 v5 端点 |
+| VCS API | v5 | 所有 API 调用基于 v5 端点 |
 | Grape A2A | >= 1.0 | A2A payload 结构遵循 Grape 平台约定 |
 | 计算资源查询 | >= 1.0 | 资源规格查询（声明在 requires 中） |
 | 网络资源查询 | >= 1.0 | 网络资源查询（声明在 requires 中） |

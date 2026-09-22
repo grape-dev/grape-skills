@@ -29,17 +29,17 @@ grape CLI 支持三种认证方式（优先级从高到低）：
 
 ```bash
 # 单次使用
-grape --token "$BOT_GITCODE_TOKEN" --base-url https://api.gitcode.com tasks mine
+grape --token "$BOT_TOKEN" --base-url https://api.gitcode.com tasks mine
 
 # 或设置环境变量
-export GRAPE_API_TOKEN="$BOT_GITCODE_TOKEN"
+export GRAPE_API_TOKEN="$BOT_TOKEN"
 grape tasks mine
 ```
 
 ### Base URL
 
 ```bash
-grape --base-url https://api.gitcode.com --token "$BOT_GITCODE_TOKEN" git-repo issues list --owner XOcto --repo grape-cli
+grape --base-url https://api.gitcode.com --token "$BOT_TOKEN" git-repo issues list --owner XOcto --repo grape-cli
 ```
 
 ## 3. 常用命令
@@ -133,7 +133,7 @@ grape api POST /api/repos/XOcto/grape-cli/issues/5/comments -d '{"body":"评论�
 |------|------|
 | 超时 | 默认 30s，可 `--timeout 120` 调整（git 透传不受限） |
 | 分页 | `?page=1&per_page=20`，最大 per_page=100 |
-| Rate Limit | GitCode API: 400 req/min, 4000 req/hour |
+| Rate Limit | VCS API: 400 req/min, 4000 req/hour |
 | 契约依赖 | 契约命令从 `openapi.json` 动态生成，`grape refresh` 更新 |
 | 凭据注入 | `grape git` 进程内注入，不写入 git config 或文件 |
 
@@ -149,7 +149,7 @@ grape api POST /api/repos/XOcto/grape-cli/issues/5/comments -d '{"body":"评论�
 
 ## 6. 安全与边界
 
-1. **只用系统注入的 token**：`$BOT_GITCODE_TOKEN`，不得从数据库/配置文件/日志/历史中寻找其他 token。
+1. **只用系统注入的 token**：`$BOT_TOKEN`，不得从数据库/配置文件/日志/历史中寻找其他 token。
 2. **禁止访问 Grape 内部数据**：不得读取 data/、configs/、sessions.db、user_accounts 等。
 3. **403 处理**：API 返回 403 时停止操作，回复用户「需要管理员/维护者权限」。
 4. **token 不落盘**：`grape git` 进程内注入凭据，不写入 git config；其他命令通过 header 传递。

@@ -18,7 +18,7 @@ version: 1.0.0
 Grape 平台通过 `env_extra` 注入以下环境变量：
 - `HUAWEICLOUD_SDK_AK` — 仓库 owner 的华为云 Access Key
 - `HUAWEICLOUD_SDK_SK` — 仓库 owner 的华为云 Secret Key
-- `BOT_GITCODE_TOKEN` — GitCode API Token
+- `BOT_TOKEN` — VCS API Token
 - `REPO_FULL_NAME` — 仓库全称（owner/repo）
 - `ISSUE_NUMBER` — 关联 Issue 号
 - `PR_NUMBER` — 关联 PR 号
@@ -26,7 +26,7 @@ Grape 平台通过 `env_extra` 注入以下环境变量：
 ## 安全硬约束（必须遵守）
 
 1. **必须使用环境变量注入的 AK/SK**，严禁使用 worker 机器上 hcloud 预配的凭据。worker 机器可能配了其他用户的 AK/SK，用错凭据会把资源建到别人账号下。
-2. 调用 GitCode API 只用 prompt 注入的 `$BOT_GITCODE_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
+2. 调用 VCS API 只用 prompt 注入的 `$BOT_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token。
 3. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
 4. API 返回 403/无权限时：立即停止该操作并回复用户，严禁尝试其他 token 或绕行手段。
 5. token/AK/SK 不得写入任何文件/日志/评论。
@@ -229,7 +229,7 @@ read references/huawei-ecs/references/create-instance.md
 |------|------|------|
 | `HUAWEICLOUD_SDK_AK` | Grape env_extra 注入 | 仓库 owner 的华为云 Access Key |
 | `HUAWEICLOUD_SDK_SK` | Grape env_extra 注入 | 仓库 owner 的华为云 Secret Key |
-| `BOT_GITCODE_TOKEN` | Grape env_extra 注入 | GitCode API Token |
+| `BOT_TOKEN` | Grape env_extra 注入 | VCS API Token |
 | `REPO_FULL_NAME` | Grape env_extra 注入 | 仓库全称（owner/repo） |
 | `ISSUE_NUMBER` | Grape env_extra 注入 | 关联 Issue 号 |
 | `PR_NUMBER` | Grape env_extra 注入 | 关联 PR 号 |

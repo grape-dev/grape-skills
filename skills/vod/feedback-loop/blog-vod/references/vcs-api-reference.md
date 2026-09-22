@@ -1,11 +1,11 @@
-# GitCode API 参考（blog-vod Agent 用）
+# VCS API 参考（blog-vod Agent 用）
 
-> 配套 `skills/vod/feedback-loop/blog-vod/SKILL.md`。所有 GitCode 操作使用 `$BOT_GITCODE_TOKEN` 认证；A2A 等 Grape 接口使用 `$GRAPE_SESSION_TOKEN`，两者严禁混用。
+> 配套 `skills/vod/feedback-loop/blog-vod/SKILL.md`。所有 GitCode 操作使用 `$BOT_TOKEN` 认证；A2A 等 Grape 接口使用 `$GRAPE_SESSION_TOKEN`，两者严禁混用。
 
 ## Base URL
 
 ```
-https://api.gitcode.com/api/v5
+$VCS_API_BASE
 ```
 
 读写操作均使用此 Base URL。
@@ -13,9 +13,9 @@ https://api.gitcode.com/api/v5
 ## Authentication
 
 ```
-PRIVATE-TOKEN: $BOT_GITCODE_TOKEN
+PRIVATE-TOKEN: $BOT_TOKEN
 # 或
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 ```
 
 注意事项（实测）：
@@ -40,8 +40,8 @@ Authorization: Bearer $BOT_GITCODE_TOKEN
 
 ```bash
 curl -s --max-time 30 \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
 ```
 
 ### 2. 发布评论（多行 body 用文件）
@@ -52,48 +52,48 @@ cat > /tmp/blog_vod_comment.json << 'EOF'
 EOF
 
 curl -s --max-time 30 -X POST \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   --data @/tmp/blog_vod_comment.json \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
 ```
 
 ### 3. 列出评论（发布前幂等检查）
 
 ```bash
 curl -s --max-time 30 \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
 ```
 
 ### 4. 创建标签（form-encoded）
 
 ```bash
 curl -s --max-time 30 -X POST \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=blog-vod&color=f9d0c4" \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/labels"
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/labels"
 ```
 
 ### 5. 给 Issue 加标签（form-encoded，整体替换语义）
 
 ```bash
 curl -s --max-time 30 -X PATCH \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "labels=blog-vod,type:feature" \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
 ```
 
 ### 6. 关闭 Issue
 
 ```bash
 curl -s --max-time 30 -X PATCH \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"state": "close"}' \
-  "https://api.gitcode.com/api/v5/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
 ```
 
 ## Endpoints 速查

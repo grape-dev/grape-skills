@@ -15,12 +15,12 @@ tools:
 
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 $BOT_GITCODE_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
 3. API 返回 403/无权限时：立即停止该操作并回复用户，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 所有 curl / git 调用设 30s 超时（curl --max-time 30）——超时判定失败，不 hang。
-6. **调用 GitCode API 一律以 `references/gitcode-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
+6. **调用 VCS API 一律以 `references/vcs-api-reference.md` 为准**：严禁根据经验/记忆/猜测自行拼写 API 路径。
 
 ## 核心原则
 
@@ -30,7 +30,7 @@ tools:
 
 ### 依赖前序分析
 
-通过 A2A 被调用时，prompt 包含 rest-api-skill-creator 的处理摘要（skill 名称/PR 编号）。必须通过 GitCode API 获取 PR 和 Issue 完整信息。
+通过 A2A 被调用时，prompt 包含 rest-api-skill-creator 的处理摘要（skill 名称/PR 编号）。必须通过 VCS API 获取 PR 和 Issue 完整信息。
 
 ### 动态识别子命令
 
@@ -49,7 +49,7 @@ tools:
 
 ## Configuration
 
-本 skill 无外部 API 地址配置需求。GitCode API token 从环境变量 $BOT_GITCODE_TOKEN 获取，被测 skill 的凭据从其自身的 test-vars.json 和环境变量读取。
+本 skill 无外部 API 地址配置需求。VCS API token 从环境变量 $BOT_TOKEN 获取，被测 skill 的凭据从其自身的 test-vars.json 和环境变量读取。
 
 ## 场景 / When to Use
 
@@ -149,20 +149,20 @@ Issue 评论：
 
 ```bash
 curl -s --max-time 30 -X POST \
-  -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
+  -H "PRIVATE-TOKEN: $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[QA Agent] ✅ 测试通过\n\n## Skill 测试报告：{name} v{version}\n\n## 功能验证\n| 检查项 | 状态 | 证据 | 说明 |\n|--------|------|------|------|\n| API 调用 | ✅ | 返回 N 条数据 | 真实调用成功 |\n\n## 结论\n✅ 测试通过，可合并发布"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/comments"
 ```
 
 PR 评论：
 
 ```bash
 curl -s --max-time 30 -X POST \
-  -H "PRIVATE-TOKEN: $BOT_GITCODE_TOKEN" \
+  -H "PRIVATE-TOKEN: $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "[QA Agent] ✅ 测试通过"}' \
-  "https://api.gitcode.com/api/v5/repos/$REPO_FULL_NAME/pulls/$PR_NUMBER/comments"
+  "$VCS_API_BASE/repos/$REPO_FULL_NAME/pulls/$PR_NUMBER/comments"
 ```
 
 ### Step 5: 合并 + A2A 交棒（测试通过后）
@@ -258,7 +258,7 @@ curl -s --max-time 30 -X POST {{SERVER_URL}}/api/a2a \
 ## 参考 / References
 
 - 测试报告格式，读取 `references/test-report-format.md`
-- 调用 GitCode API 时，必须以 `references/gitcode-api-reference.md` 为准
+- 调用 VCS API 时，必须以 `references/vcs-api-reference.md` 为准
 
 ## 任务结束
 

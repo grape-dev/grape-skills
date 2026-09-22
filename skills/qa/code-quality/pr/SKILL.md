@@ -9,9 +9,9 @@ tools:
 ---
 ## 安全硬约束（必须遵守）
 
-1. 调用 GitCode API 只用 prompt 注入的 \\，严禁从数据库/configs/日志/历史中寻找其他 token。
+1. 调用 VCS API 只用 prompt 注入的 \\，严禁从数据库/configs/日志/历史中寻找其他 token。
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
+3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
 5. 删除操作（如关 PR/删分支）需用户确认后执行。
 
@@ -46,14 +46,14 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 
 ### 禁止探索 Grape 内部
 不要执行 `ls`、`grep`、`cat` 等命令查看 workspace 目录、Grape 代码、日志文件或数据库。
-**所有信息通过 GitCode API 获取**，不读取本地文件。
+**所有信息通过 VCS API 获取**，不读取本地文件。
 
 ### 涉及代码需要继续优化时，A2A 通知 Coding Agent
 审查发现代码需要继续优化/修改（存在 Critical 或 Required 级别问题），**必须通过 A2A 调用 Coding Agent 进行优化实现**，不得由 QA 直接改代码。
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "coding",
@@ -134,10 +134,10 @@ GET /repos/{owner}/{repo}/pulls/{number}/comments
 - 如果已修复 → 调用 API 标记为已解决：
 
 ```bash
-curl -s -X PUT -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X PUT -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"resolved": true}' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}/comments/{discussion_id}
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/comments/{discussion_id}
 ```
 
 其中 `discussion_id` 为评论对象的 `discussion_id` 字段（不是 `id` 字段）。
@@ -152,7 +152,7 @@ GET /repos/{owner}/{repo}/pulls/{number}/files
 从返回中获取每个文件在 diff 中的行号映射。然后在对应位置发布评论：
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "body": "[QA Agent] 🔴 Critical: 硬编码密钥，建议使用环境变量",
@@ -160,7 +160,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
     "path": "src/config.py",
     "position": 42
   }' \
-  https://api.gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}/comments
+  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/comments
 ```
 
 - `commit_id` 为 PR 最新的 head.sha（阶段 0 已获取）
@@ -197,7 +197,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
 
 ```bash
 curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_GITCODE_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "coding",
@@ -224,7 +224,7 @@ A2A 返回后，将 Coding Agent 的优化结论合并进最终审查评论（�
 
 ```bash
 POST /repos/{owner}/{repo}/pulls/{number}/comments
-Authorization: Bearer $BOT_GITCODE_TOKEN
+Authorization: Bearer $BOT_TOKEN
 Content-Type: application/json
 {"body": "[QA Agent] 审查报告\n\n## 配置检查\n- ✅ Title：通过\n- ⚠️ Labels：缺少分类标签\n\n## 代码审查\n✅ 通过\n\n## 安全扫描\n✅ 安全\n\n## 合并检查\n⚠️ 测试未确认"}
 ```
@@ -283,10 +283,10 @@ Content-Type: application/json
 
 | 指标 | 预算/基线 | 说明 |
 |------|-----------|------|
-| 单次执行时延（P95） | ≤ 60s（基线；暂无实测值时以此基线为准） | 5 个能力项线性执行；GitCode API 调用 ≤ 10 次（GET pulls/files/comments、PUT resolve、POST 评论、A2A），外部 API 时延占主导 |
+| 单次执行时延（P95） | ≤ 60s（基线；暂无实测值时以此基线为准） | 5 个能力项线性执行；VCS API 调用 ≤ 10 次（GET pulls/files/comments、PUT resolve、POST 评论、A2A），外部 API 时延占主导 |
 | LLM 调用次数 | 1 次/事件 | 单次线性审查，无循环/自调用设计；A2A 交办后的优化实现计数归 Coding Agent 侧，不计入本 Skill |
 | token 消耗 | ≤ 15k token/事件 | 全量文档约 42.5KB；输入以事件负载 + 变更文件 diff + API 响应为主 |
-| API 调用预算 | ≤ 10 次/事件 | 全部为官方 GitCode API（api.gitcode.com / {{SERVER_URL}} 占位符 A2A 端点） |
+| API 调用预算 | ≤ 10 次/事件 | 全部为官方 VCS API（api.gitcode.com / {{SERVER_URL}} 占位符 A2A 端点） |
 
 上下文压缩策略：references 文档按能力项按需读取；变更检视只读 `.sha` 状态；PR diff 仅取变更文件部分；已有行内评论只摘要 status/path/line；所有发现合并为一条评论输出。
 
@@ -315,7 +315,7 @@ Content-Type: application/json
 | git | CLI 工具 | ≥ 2.20（2020 年后主流发行版均满足） | Frontmatter 声明工具；本 Skill 不依赖特定 git 子命令 |
 | curl | CLI 工具 | ≥ 7.58（支持 `-s`/`-X`/`-H`/`-d` 与 https） | 全部 API 示例调用 |
 | bash（POSIX） | 运行时 | POSIX sh 兼容即可 | 示例命令基础，均使用固定参数 + 占位符 |
-| GitCode API | HTTP API | api/v5（现有端点范围） | 端点为官方域名与 {{SERVER_URL}} 占位符；响应结构按实际返回为准 |
+| VCS API | HTTP API | api/v5（现有端点范围） | 端点为官方域名与 {{SERVER_URL}} 占位符；响应结构按实际返回为准 |
 
 兼容策略：示例命令无版本特有语法；不安装任何全局依赖；依赖不可用时优先走平台 HTTP API 直连路径。
 
@@ -327,7 +327,7 @@ Content-Type: application/json
 | 审查发现问题需要修改时调用 A2A 通知 Coding Agent | ✅ **必须做** |
 | 所有评论统一在最后发送 | ✅ **必须做，不得在中间步骤发评论** |
 | ⚠️ **发送评论是最终强制步骤** | ✅ **必须做**（除非 SHA 未变更跳过） |
-| 只通过 GitCode API 获取信息 | ✅ **必须做** |
+| 只通过 VCS API 获取信息 | ✅ **必须做** |
 | 直接合并 PR | ❌ **禁止**（仅输出检查结论） |
 | 修改 PR 代码或文件 | ❌ **禁止** |
 | 删除 PR | ❌ **禁止** |
@@ -336,6 +336,6 @@ Content-Type: application/json
 
 ## 参考
 
-需要调用 GitCode API 时，读取 `references/gitcode-api-reference.md`。
+需要调用 VCS API 时，读取 `references/vcs-api-reference.md`。
 
 > ⚠️ **任务结束**：完成所有业务动作（审查评论/A2A 交办）后，输出最终 JSON 块并**结束任务**，不要继续思考或等待输入。
