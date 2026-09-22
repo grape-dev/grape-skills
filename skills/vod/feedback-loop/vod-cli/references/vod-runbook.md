@@ -2,7 +2,7 @@
 
 > 目的：把 VOD 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
-> **评论前缀硬规（场景 A/B 通用）**：所有 VOD 评论 body 一律以 `[VOD Agent]` 开头（用 `grape git-repo issues comments create ... --json '{"body":"[VOD Agent] ..."}'`）。
+> **评论前缀硬规**：所有 VOD 评论 body 一律以 `[VOD Agent]` 开头（用 `grape git-repo issues comments create ... --json '{"body":"[VOD Agent] ..."}'`）。
 > 命令取舍速查：读 Issue 聚合用 `issues detail`；取原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth 2`（**`tree` 无 `--path`**）。
 
 ---
@@ -65,9 +65,28 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 - **直接进入 Step 6，`next_step=reply_comment`**。
 - ⚠️ **发出评论后必须继续 Step 6**：没有调用 `grape tasks complete` 就是任务未完成，即使评论已发、即使没有 A2A/标签/Spec 等结构化产物——**不要因"纯咨询只是回条评论"就提前结束**。
 
-### Step 5 · A2A 交办 Issue Agent（仅 Step 4a 收敛后）
+### Step 5 · A2A 交办（仅 Step 4a 收敛后）
+
+**先确认当前场景包含哪些 Agent 节点**——场景 ID 已通过环境变量 `$GRAPE_SCENE_ID` 注入（未选定=空串，此时沿用默认交办 `issue`）。用场景 ID 取当前场景详情，节点里的 `skill` 名即各环节 Agent（如 issue-advance/coding-cli/qa-cli/deploy-cli → 分别对应 issue/coding/qa/sre）：
+
 ```bash
-# 模板见 requirement-elicit-guide.md §五；issue_number 必填
+echo "scene_id=${GRAPE_SCENE_ID:+set} GRAPE_SCENE_ID=<$GRAPE_SCENE_ID>"
+# 用场景 ID 获取当前场景详情（nodes[].skill 标识各环节 Agent）
+grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out
+```
+
+> ⚠️ **只对场景中实际存在的节点发 A2A**：当前场景可能只有部分环节（如只配了 `issue`，没有 coding/qa/sre 节点），则**无需也不应**向不存在的 Agent 交办。若必需环节缺失，在评论中说明"当前场景未包含该开发环节"，`next_step` 标注需人工确认。
+
+**A2A 目标选择（基于场景节点，常见约定）**：
+| 场景节点 skill 含 | agent 值 | 用途 |
+|------------------|---------|------|
+| `issue` / `issue-*` | `issue` | 默认目标：spec 设计/打标签/排里程碑/分配责任人 |
+| `coding` / `coding-*` | `coding` | 代码实现（VOD 一般交 issue 后再流转） |
+| `qa` / `qa-*` | `qa` | PR 审查（由 coding 触发，VOD 不直接交） |
+| `sre` / `deploy-*` / `cloud-*` | `sre` | 部署/构建/运维 |
+
+```bash
+# 默认交办 Issue Agent（模板见 requirement-elicit-guide.md §五；issue_number 必填）
 grape a2a handoff --json '{
   "agent": "issue",
   "payload": {
@@ -106,21 +125,6 @@ grape tasks complete --json '{
 
 ---
 
-## 场景 A：飞书 VOD Bot 收集的需求建议（无目标 Issue）
-
-> 与场景 B 共用 Step 0/3/4a/6；差异在沟通渠道用飞书群，产出为**新建 Issue**。
-
-```bash
-# 引导收敛清晰后，创建 Issue（body 标注来源 Feishu；用 git-repo 组命令，body 字段明确）
-grape git-repo issues create --owner "$ACCOUNT" --repo "$REPO_NAME" \
-  --json '{"title":"<清晰标题>","body":"<§四 模板 body，尾部标注：来源=飞书 / auto-submitted by VOD Agent（Feishu）>"}'
-# 更新/收敛：同上（若后续需收敛 body 用 git-repo issues update）
-# 交办与收尾同场景 B Step 5/6
-```
-- 超限仍不清晰 → 建「待澄清」Issue（body 列出已获取/缺失信息）→ **仍必须 Step 6 收尾**（`next_step=a2a_need_clarify`）。
-
----
-
 ## 错误排查速查（命令返回异常时）
 
 | 现象 | 处理 |
@@ -133,6 +137,5 @@ grape git-repo issues create --owner "$ACCOUNT" --repo "$REPO_NAME" \
 
 ## 明确禁止
 
-- ❌ 不查 `grape --help | head`、`grape commands` 逐条探索——runbook 已给齐本技能所需命令，照抄即可。
 - ❌ 不用 `tree --path`（该参数不存在），层级用 `--depth`。
 - ❌ 不因"等待用户回复"跳过 Step 6（tasks complete）——澄清追问也算本轮完成，必须收尾。

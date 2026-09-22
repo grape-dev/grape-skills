@@ -3,8 +3,7 @@ name: vod-cli
 version: 3.0.0
 description: |
   开发者声音（VOD）分析技能（CLI 版）。通过全命令走查表（vod-runbook）逐步执行：知识基线 → 读 Issue/历史 → 清晰度判断 → 收敛 / 澄清追问 / 纯咨询 → A2A 交办 → tasks complete 收尾。
-  双职责：①从 Issue / 飞书收集开发者声音，多轮引导收敛为清晰需求并建 Issue；
-  ②接管 issue_opened 审视非 VOD 创建的 Issue，澄清后结构化总结并 A2A 交办 Issue Agent。
+  职责：接管 issue_opened 审视开发者提交的 Issue，澄清后结构化总结并 A2A 交办 Issue Agent。
   全部操作使用 grape CLI 命令行（含验证过的环境变量 $ACCOUNT/$REPO_NAME/$ISSUE_NUMBER 等），评论以 [VOD Agent] 开头。
 tools:
   - grape
@@ -56,15 +55,11 @@ tools:
 VOD 的职责：**把开发者声音变成清晰开发者需求**。
 - 不负责 spec 设计、打标签、里程碑、分配（那是 Issue Agent / issue-advance 的职责）。
 - 不写代码、不建 PR。
-- 开发者声音来源：
-  - **来源 A**：开发者在 GitCode 直接提交的 Issue（原始声音）→ 审视、引导、结构化
-  - **来源 B**：飞书 VOD Bot 收集的用户需求建议 → 多轮沟通 → 建 Issue
+- 开发者声音来源：开发者在 GitCode 直接提交的 Issue（原始声音）→ 审视、引导、结构化
 
 ## 处理流程
 
-> ⚠️ **先读 `references/vod-runbook.md`**：处理任何 Issue 按 runbook「场景 B」走查表逐步骤执行（Step 0 知识基线 → 1 读上下文 → 2 历史全貌 → 3 清晰度 → 4a 收敛 / 4b 澄清追问 / 4c 纯咨询 → 5 A2A → 6 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
->
-> 场景 A（飞书需求建议）与场景 B（已有 Issue）共用同一走查表，差异仅在「目标 Issue 是否存在」与「沟通渠道」，执行见 runbook 相应小节。
+> ⚠️ **先读 `references/vod-runbook.md`**：处理任何 Issue 走 runbook「场景 B」走查表逐步骤执行（Step 0 知识基线 → 1 读上下文 → 2 历史全貌 → 3 清晰度 → 4a 收敛 / 4b 澄清追问 / 4c 纯咨询 → 5 A2A → 6 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
 >
 > ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook Step 6 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 

@@ -23,7 +23,7 @@
 | 第一轮 | 提取意图，判断清晰度；模糊则提 1-3 个针对性澄清问题（结合知识基线，问得具体） |
 | 判断标准 | 目标/现状/期望/验收 四要素齐全 → 清晰 |
 | 多轮 | 每次基于上一轮回答追问，不重复已确认项 |
-| 上限 | 最多 3 轮；超限 → 建「待澄清」Issue（场景 A）或在 Issue 评论列缺失项（场景 B），不无限追问 |
+| 上限 | 最多 3 轮；超限 → 在 Issue 评论列缺失项，标记「待澄清」，不无限追问 |
 | 语气 | 中文、简洁、引导式（不用"请填写模板"式，用具体问题） |
 
 ### 提问原则
@@ -44,7 +44,7 @@
 ## 三、Issue 审视（已有 Issue，`issue_opened` 入口）
 
 1. **清晰度审视**：读取 Issue 完整内容（title/body/标签/评论），对照四要素；结合知识基线判断可执行性/重复/歧义
-2. **沟通澄清**（不清晰时）：在 Issue 评论 @开发者 追问（body 以 `[VOD Agent]` 开头），或飞书群沟通；≤3 轮
+2. **沟通澄清**（不清晰时）：在 Issue 评论 @开发者 追问（body 以 `[VOD Agent]` 开头）；≤3 轮
 3. **结构化总结**：用 `grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"body":"…"}'` 将 body 收敛为模板结构
 4. **A2A 交办**：`grape a2a handoff --json '{...}'` → Issue Agent 做 spec/标签/里程碑/分配（见 §五）
 
@@ -68,8 +68,8 @@
 P0（紧急）/ P1（重要）/ P2（一般）
 
 ---
-来源：{飞书用户反馈 / Issue 评论 / PR 评论}
-auto-submitted by VOD Agent（Feishu）
+来源：{Issue 评论 / PR 评论}
+auto-submitted by VOD Agent
 ```
 
 ## 五、A2A 交办格式
