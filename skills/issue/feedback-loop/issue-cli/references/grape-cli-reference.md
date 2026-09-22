@@ -89,14 +89,14 @@ grape tasks close --json '{"repo_key":"{owner}/{repo}","issue_number":{n}}'
 # A2A 交办（coding / vod / sre 等，专属命令）
 grape a2a handoff --json '{"agent":"coding","payload":{...}}'
 
-# 任务自报完成（收尾必做，见 SKILL「任务完成流程」）
+# 任务自报完成（收尾必做，见 runbook Step 8；会话 token 自动定位任务，无需 --task_id；⚠️ 结构化字段必填，服务端据此组装 archive）
 grape tasks complete --json '{
-  "result_text": "结论：...",
-  "next_step": "done",
-  "actions": ["...", "..."],
-  "conclusion": "...",
-  "artifacts": ["..."],
-  "issue_summary": "..."
+  "result_text": "结论：Issue #{n} 已按评级完成处理。",
+  "next_step": "a2a_coding",
+  "actions": ["深度可开发性分析", "打标签", "分配负责人", "回复评论", "grape tasks notify 上报任务", "A2A 交办 coding"],
+  "conclusion": "Issue #{n} 评级 {评级}，已完成 {动作}，{后续动作}",
+  "artifacts": ["Issue #{n} 评论", "标签 {labels}", "负责人 {assignee}", "A2A event seq=XXXX"],
+  "issue_summary": "已分诊 | 评级 {评级} | 已分配 {assignee} | 后续 {动作}"
 }'
 
 # 轮询任务至终态

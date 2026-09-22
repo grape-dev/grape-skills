@@ -3,6 +3,15 @@
 > 本技能**只使用 `grape` CLI**，统一使用系统注入的 **`$GRAPE_SESSION_TOKEN`**（任务级临时，随任务/会话失效）即可操作。
 > 详细指南见 `grape-cli-guidance` 技能（命令分组 / token 作用域 / 错误排查 / 反模式），本文件是 Coding 实际用到的命令与要点。
 
+## 安装与版本校验（Prerequisites 用）
+
+```bash
+grape --version            # 版本号必须 >= 0.3.2
+grape refresh              # 契约过期时重拉最新契约（或回退内置快照）
+```
+
+> 未装或版本 < 0.3.2 → 见 `references/grape-cli-installation.md` **自行安装/升级**（公开仓库 gitcode.com/grape-dev/grape-cli）；安装后仍失败再输出任务无法完成的理由，**不要**改用 curl 直连。对应 SKILL「Prerequisites」环节。
+
 ## 核心原则（先读）
 
 1. **命令是契约驱动的**：`grape <group> <verb> [--参数]` 由服务端 `/openapi.json`（或内置快照）动态生成。**不确定命令 → 先发现，别猜名字。**

@@ -2,18 +2,17 @@
 
 ## 执行前提
 
-- 项目知识基线已建立（`data/workspaces/{owner}/{repo}/project-info/` 下文档已存在）
-- 当前事件为 `issue_opened` 或 `issue_updated`
+- 当前事件为 Issue 事件（`issue_updated` / `issue_comment` / `issue_labeled`）
 - Issue 尚未被处理过（无标签且无负责人），或用户补充了信息需要重新分析
+- **目标分支 = `$GRAPE_WORK_BRANCH`（缺省 main/master）**：后续「是否已实现」「范围预估」均以该分支为基准
 
-## 前置步骤：读取项目知识
+## 前置步骤：读取项目知识（用 grape CLI，见 runbook Step 2）
 
 ```bash
-cat data/workspaces/{owner}/{repo}/project-info/project-graph.md
-cat data/workspaces/{owner}/{repo}/project-info/project-capabilities.md
+grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
 ```
 
-如果文档不存在，先执行 `references/codegraph-project-analysis.md` 生成。
+无基线 / `[degraded]` → 降级用 `grape git-repo repo` / `tree --depth 2` / `contents README --raw`。
 
 ## 四维分析（按 1→2→3→4 顺序执行，每步必须输出结论）
 
@@ -279,5 +278,5 @@ ELSE (不通过维度数 <= 2 且均为 minor 缺失)
 |---------|---------|--------|
 | 是否与仓库主题相关 | 技术可行性（前置） | 结合 project-graph 判断，不再仅凭 README |
 | 内容质量分析 | 需求完整性 | 按类型细化检查项，增加权重 |
-| 是否已实现 | 技术可行性（子步骤） | 结合 codegraph 分析 commit 内容 |
+| 是否已实现 | 技术可行性（子步骤） | 结合 **目标分支**（`$GRAPE_WORK_BRANCH`，缺省 main/master）commit 分析是否已实现 |
 | 是否重复 | 需求完整性（子步骤） | 保留原有逻辑 |
