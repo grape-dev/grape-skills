@@ -116,10 +116,15 @@ grape a2a handoff --json '{
 
 ```bash
 grape tasks complete --json '{
-  "result_text": "结论：Issue #'$ISSUE_NUMBER' <按分支写结论>。\n\n动作：\n• <动作逐条>：……\n\n产出：\n- <产出>：……\n\n摘要：一句话概括。",
-  "next_step": "a2a_need_clarify"
+  "result_text": "结论：Issue #'$ISSUE_NUMBER' <按分支写结论>。",
+  "next_step": "a2a_need_clarify",
+  "actions": ["<动作 1>", "<动作 2>", "…"],
+  "conclusion": "<处理结论/分析结果（简要）>",
+  "artifacts": ["<产出：评论 id / A2A seq / Issue #N>", "…"],
+  "issue_summary": "<Issue 最新聚合结论，紧凑文本，用 | 分隔>"
 }'
 ```
+> ✅ **结构化字段必填**：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` 服务端据此组装结构化 `_sd` 写入 archive（详情页结构化框、events.result）——**只传 result_text 会丢结构化归档**。`result_text` 可选（未结构化时服务端用兜底处理），但仍建议给一句结论。
 > `result_text` 按「结论 / 动作 / 产出（含可追溯 id）/ 摘要」组织，动作逐条 `•`，产出带 Issue #N / comment id / A2A `seq` 等标识。
 > 若返回 `already:true`（任务已终态），属正常，忽略即可。**然后结束任务**，不要继续思考或等待输入。
 

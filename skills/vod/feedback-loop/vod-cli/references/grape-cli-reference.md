@@ -68,8 +68,15 @@ grape git-repo contents --owner {owner} --repo {repo} --path "" --json-out     #
 # A2A 交办 Issue Agent（专属命令）
 grape a2a handoff --json '{"agent":"issue","payload":{...}}'
 
-# 任务自报完成（收尾必做，见 SKILL「任务完成流程」；会话 token 自动定位任务，无需 --task_id）
-grape tasks complete --json '{"result_text":"...","next_step":"a2a_issue"}'
+# 任务自报完成（收尾必做，见 SKILL「任务完成流程」；会话 token 自动定位任务，无需 --task_id；结构化字段必传，服务端据此组装 archive）
+grape tasks complete --json '{
+  "result_text": "结论：…",
+  "next_step": "a2a_issue",
+  "actions": ["…"],
+  "conclusion": "…",
+  "artifacts": ["…"],
+  "issue_summary": "…"
+}'
 ```
 
 **命令取舍速查（避免重复调用 / 试错）：**
