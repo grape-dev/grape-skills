@@ -12,11 +12,11 @@
 如果本地未安装 codegraph，需先完成安装：
 
 ```bash
-# 安装 codegraph（参考：https://github.com/colbymchenry/codegraph）
-npm install -g @colbymchenry/codegraph   # ⚠️ 勿用 `npm install -g codegraph`(npm 上是空壳占位包, 2026-08-18 实测)
+# 项目内本地安装（参考：https://github.com/colbymchenry/codegraph）
+npm install @colbymchenry/codegraph   # ⚠️ 项目内本地安装；勿全局安装，勿用 npm 空壳占位包 `codegraph`（2026-08-18 实测）
 
 # 验证安装
-codegraph --version
+npx --no-install codegraph --version
 ```
 
 详细安装部署指南参见：https://github.com/colbymchenry/codegraph
@@ -170,7 +170,7 @@ EOF
 | External Integrations | codegraph_explore("external API service") + 配置文件 |
 | Skills & Agents | `configs/agent-description.json` + `skills/` 目录 |
 | Data Model | codegraph_explore("database model schema") + DB 文件 |
-| Configuration | `configs/` 目录 + `.env` + `config.py` |
+| Configuration | `configs/` 目录 + 项目配置文件（仅按需读取环境变量，不收集明文）+ `config.py` |
 
 模板：
 

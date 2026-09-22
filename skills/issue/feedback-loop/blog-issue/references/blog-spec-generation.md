@@ -78,7 +78,7 @@
 - [ ] 5 秒视频可播放
 - [ ] PR 已创建，blog/{topic-slug}/ 目录结构完整
 - [ ] SRE 发布后博客首页可见
-- [ ] 文章详情页 http://{BLOG_HOST}/article/{id} 渲染正确
+- [ ] 文章详情页 https://{BLOG_HOST}/article/{id} 渲染正确
 
 ## Risks & Mitigations
 | Risk | Impact | Mitigation |
@@ -148,7 +148,7 @@ curl -X POST {{SERVER_URL}}/api/a2a \
       "repository": "'"$REPO_FULL_NAME"'",
       "account": "'"$ACCOUNT"'",
       "issue_number": "'"$ISSUE_NUMBER"'",
-      "context": "Issue #'"$ISSUE_NUMBER"' 博客需求已通过分析（评级: ready），博客 Spec 已发布。\n\n## 博客内容规格\n{spec.objective 摘要}\n\n## 文章结构\n{spec.structure 摘要}\n\n## 配图规格\n{spec.images 摘要}\n\n## 视频规格\n{spec.video 摘要}\n\n## 发布目标\n博客系统地址: {BLOG_HOST}\n发布接口: POST /api/articles + POST /api/upload\n\n请使用 ai-blog-generation 技能执行博客内容生成。完整 Spec 见 Issue 评论。"
+      "context": "Issue #'"$ISSUE_NUMBER"' 博客需求已通过分析（评级: ready），博客 Spec 已发布。\n\n## 博客内容规格\n{spec.objective 摘要}\n\n## 文章结构\n{spec.structure 摘要}\n\n## 配图规格\n{spec.images 摘要}\n\n## 视频规格\n{spec.video 摘要}\n\n## 发布目标\n博客系统地址: {BLOG_HOST}\n发布接口: POST /api/articles + POST /api/upload\n\n请使用博客内容生成技能执行博客内容生成。完整 Spec 见 Issue 评论。"
     }
   }'
 ```
@@ -158,11 +158,11 @@ curl -X POST {{SERVER_URL}}/api/a2a \
 ### context 构造规则
 
 1. **评级**：ready
-2. **指定技能**：明确告知 coding agent 使用 `ai-blog-generation` 技能
+2. **指定技能**：明确告知 coding agent 使用博客内容生成技能
 3. **博客规格摘要**：主题/结构/配图/视频/发布目标
 4. **Spec 位置**：告知完整 Spec 在 Issue 评论中
-5. **发布链路提示**：coding 完成后 A2A 给 sre（blog-publish 技能），非 qa
+5. **发布链路提示**：coding 完成后 A2A 给 sre（博客发布技能），非 qa
 
 ## Spec 版本管理
 
-与 issue-advance 原始逻辑一致：用户提出修改 → 更新章节 → 版本号 +1 → 重新发布 → A2A 重新通知 coding。
+与通用 Issue 运营原始逻辑一致：用户提出修改 → 更新章节 → 版本号 +1 → 重新发布 → A2A 重新通知 coding。

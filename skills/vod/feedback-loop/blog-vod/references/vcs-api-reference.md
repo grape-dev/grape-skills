@@ -1,4 +1,6 @@
-# VCS API Reference (Shared)
+# VCS API 参考（blog-vod Agent 用）
+
+> 配套 `skills/vod/feedback-loop/blog-vod/SKILL.md`。所有 GitCode 操作使用 `$BOT_TOKEN` 认证；A2A 等 Grape 接口使用 `$GRAPE_SESSION_TOKEN`，两者严禁混用。
 
 ## Base URL
 
@@ -6,7 +8,7 @@
 $VCS_API_BASE
 ```
 
-读写操作均使用此 Base URL（实测 POST/PATCH/DELETE 打到 `api.gitcode.com` 正常工作）。
+读写操作均使用此 Base URL。
 
 ## Authentication
 
@@ -16,126 +18,113 @@ PRIVATE-TOKEN: $BOT_TOKEN
 Authorization: Bearer $BOT_TOKEN
 ```
 
-⚠️ **`Authorization: token $BOT_TOKEN`（注意是 `token` 不是 `Bearer`）会导致 401！**
-GitCode 的 token 不是 OAuth token，`token` 关键字不被接受。只能用 `PRIVATE-TOKEN` 或 `Bearer`。
+注意事项（实测）：
 
-- token 长度约 24 字符是正常的，不要因为短就怀疑格式。
+- GitCode 的 token 不是 OAuth token，`Authorization: token xxx`（注意是 `token` 不是 `Bearer`）会导致 **401**；只能用 `PRIVATE-TOKEN` 或 `Bearer`。
 - `access_token=` 查询参数方式不推荐，部分端点不接受。
+- token 长度约 24 字符属正常，不要因短而怀疑格式。
 
 ## Content-Type 规则
 
 | 操作 | Content-Type | Body 格式 |
 |------|--------------|-----------|
 | 创建/更新 Label | `application/x-www-form-urlencoded` | `name=xxx&color=xxx` |
-| 给 Issue 加标签 | `application/x-www-form-urlencoded` | `labels=bug,priority:P0` |
-| 创建评论 / Issue / PR | `application/json` | `json.dumps(body).encode("utf-8")` |
+| 给 Issue 加标签 | `application/x-www-form-urlencoded` | `labels=blog-vod,type:feature` |
+| 创建评论（多行 markdown） | `application/json` | JSON body，用 `--data` 传文件避免转义问题 |
 
-⚠️ Label 接口**不接受 JSON body**（返回 400），必须用 form-encoding。
-多行 markdown 评论用 curl 直接传会 400，用 Python `urllib.request` + `json.dumps()`。
+注意：Label 接口**不接受 JSON body**（返回 400），必须用 form-encoding；多行 markdown 评论用 curl 传 `--data @file.json`（JSON 文件）而不是内联转义。
+
+## 常见操作示例（curl）
+
+### 1. 读取 Issue（步骤 1 必做）
+
+```bash
+curl -s --max-time 30 \
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+```
+
+### 2. 发布评论（多行 body 用文件）
+
+```bash
+cat > /tmp/blog_vod_comment.json << 'EOF'
+{"body": "[blog-vod Agent] 这是 blog-vod 的答复内容。"}
+EOF
+
+curl -s --max-time 30 -X POST \
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data @/tmp/blog_vod_comment.json \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
+```
+
+### 3. 列出评论（发布前幂等检查）
+
+```bash
+curl -s --max-time 30 \
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
+```
+
+### 4. 创建标签（form-encoded）
+
+```bash
+curl -s --max-time 30 -X POST \
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "name=blog-vod&color=f9d0c4" \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/labels"
+```
+
+### 5. 给 Issue 加标签（form-encoded，整体替换语义）
+
+```bash
+curl -s --max-time 30 -X PATCH \
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "labels=blog-vod,type:feature" \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+```
+
+### 6. 关闭 Issue
+
+```bash
+curl -s --max-time 30 -X PATCH \
+  -H "Authorization: Bearer $BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"state": "close"}' \
+  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+```
+
+## Endpoints 速查
+
+| 资源 | Method | Endpoint |
+|------|--------|----------|
+| 仓库详情 | GET | `/repos/:owner/:repo` |
+| 文件内容 | GET | `/repos/:owner/:repo/contents/:path?ref=:branch` |
+| Issue 列表 | GET | `/repos/:owner/:repo/issues` |
+| Issue 详情 | GET | `/repos/:owner/:repo/issues/:number` |
+| 建 Issue | POST | `/repos/:owner/:repo/issues` |
+| 更新 Issue | PATCH | `/repos/:owner/:repo/issues/:number` |
+| 评论列表 | GET | `/repos/:owner/:repo/issues/:number/comments` |
+| 发评论 | POST | `/repos/:owner/:repo/issues/:number/comments` |
+| Label 列表 | GET | `/repos/:owner/:repo/labels` |
+| 建 Label | POST | `/repos/:owner/:repo/labels` |
+| 更新 Label | PATCH | `/repos/:owner/:repo/labels/:name` |
+| 删除 Label | DELETE | `/repos/:owner/:repo/labels/:name` |
+| PR 列表 | GET | `/repos/:owner/:repo/pulls` |
+| PR 详情 | GET | `/repos/:owner/:repo/pulls/:number` |
+| 建 PR | POST | `/repos/:owner/:repo/pulls` |
+| PR 评论 | POST | `/repos/:owner/:repo/pulls/:number/comments` |
+| 分支列表 | GET | `/repos/:owner/:repo/branches` |
+| 提交列表 | GET | `/repos/:owner/:repo/commits` |
 
 ## 已知坑（实测）
 
-1. **`Authorization: token` 格式 → 401**：必须用 `PRIVATE-TOKEN` 或 `Authorization: Bearer`。这是文档老版本里最容易踩的坑。
-2. **403 = 权限不足**：token 对目标仓库没有写权限。检查 token 的 scope，不要尝试换 host 或换 header 绕过——换 host 无效。
-3. **Label 创建/Issue 标签** 用 form-encoding，不要用 JSON body。
-4. **多行 markdown 评论** 用 Python `urllib.request` + `json.dumps().encode("utf-8")`。
-5. **同一操作连续失败 3 次就停下来检查 auth 格式和 Content-Type**，不要继续微调。
-
-## 写操作模板（Python）
-
-```python
-import json, urllib.request, urllib.parse, os
-
-TOKEN = os.environ["BOT_TOKEN"]
-BASE = "$VCS_API_BASE"
-
-def gitcode_get(path):
-    url = f"{BASE}{path}"
-    req = urllib.request.Request(url)
-    req.add_header("PRIVATE-TOKEN", TOKEN)
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read())
-
-def gitcode_write(method, path, body, form=False):
-    url = f"{BASE}{path}"
-    if form:
-        data = urllib.parse.urlencode(body).encode("utf-8")
-        req = urllib.request.Request(url, data=data, method=method)
-        req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    else:
-        data = json.dumps(body).encode("utf-8")
-        req = urllib.request.Request(url, data=data, method=method)
-        req.add_header("Content-Type", "application/json")
-    req.add_header("PRIVATE-TOKEN", TOKEN)
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read())
-
-# 例：发评论（JSON）
-gitcode_write("POST", f"/repos/{owner}/{repo}/issues/{number}/comments",
-              {"body": "VOD 分析内容..."})
-
-# 例：创建标签（form-encoding）
-gitcode_write("POST", f"/repos/{owner}/{repo}/labels",
-              {"name": "type:bug", "color": "#E91E63"}, form=True)
-
-# 例：给 Issue 加标签（form-encoding）
-gitcode_write("PATCH", f"/repos/{owner}/{repo}/issues/{number}",
-              {"labels": "vod,type:bug,priority:P0"}, form=True)
-```
-
-## Endpoints
-
-### Repository
-- GET /repos/:owner/:repo - Get repository info
-- GET /repos/:owner/:repo/contents/:path - Get file contents
-
-### Issues
-- GET /repos/:owner/:repo/issues - List issues
-- GET /repos/:owner/:repo/issues/:number - Get single issue
-- POST /repos/:owner/:repo/issues - Create issue
-- PATCH /repos/:owner/:repo/issues/:number - Update issue
-- GET /repos/:owner/:repo/issues/:number/comments - List comments
-- POST /repos/:owner/:repo/issues/:number/comments - Create comment
-
-### Labels
-- GET /repos/:owner/:repo/labels - List labels
-- POST /repos/:owner/:repo/labels - Create label
-- PATCH /repos/:owner/:repo/labels/:name - Update label
-- DELETE /repos/:owner/:repo/labels/:name - Delete label
-
-### Pull Requests
-- GET /repos/:owner/:repo/pulls - List PRs
-- GET /repos/:owner/:repo/pulls/:number - Get PR detail
-- POST /repos/:owner/:repo/pulls - Create PR
-- GET /repos/:owner/:repo/pulls/:number/comments - List PR comments
-- POST /repos/:owner/:repo/pulls/:number/comments - Create PR comment
-- GET /repos/:owner/:repo/pulls/:number/files - List PR changed files
-
-### A2A
-- POST https://grape-dev.topxtopx.com/api/a2a - Trigger agent-to-agent handoff
-
-## Notes
-- All endpoints use v5 API unless specified
-- Pagination: ?page=1&per_page=100
-- Rate limiting: 5000 requests/hour
-
-## GitHub 与 GitCode 差异对照（重要！）
-
-调用 VCS API 前先确认仓库 provider（由 prompt 的 VCS API Access 段指定），按下表选择正确的参数格式：
-
-| 功能 | GitCode | GitHub |
-|------|---------|--------|
-| Issue 关闭 | `state="close"` | `state="closed"` |
-| labels 格式 | 逗号分隔字符串 `"bug,feature"` | 数组 `["bug","feature"]` |
-| assignees | `assignee` 单值字符串 | `assignees` 数组 `["user1"]` |
-| Create Issue body | 需带 `repo` 字段 | 不需要（repo 在 URL 里） |
-| PR 普通评论 | `POST /pulls/:n/comments` | `POST /issues/:n/comments`（GitHub 把 PR 视为 Issue） |
-| Create file | `POST /contents/:path` | `PUT /contents/:path` |
-| Update file | `PUT /contents/:path`（需 `sha`） | `PUT /contents/:path`（需 `sha`） |
-| Create branch | `POST /branches`（body: `branch_name`, `ref`） | `POST /git/refs`（body: `ref`, `sha`） |
-| Delete file | 不支持 | `DELETE /contents/:path` |
-| Accept header | 不需要 | `application/vnd.github+json`（必须带！） |
-| Create label | form-encoded | JSON body |
-| Add labels to issue | 通过 `PATCH /issues/:n` 的 `labels` 字段 | `POST /issues/:n/labels`（专用端点） |
-| Rate limit | 400 req/min | 5000 req/hour（认证用户） |
-| 关联 Issue | `inner_issue_nums` / `close_related_issue` | PR body 中 `Closes #N` / `Fixes #N` |
+1. **`Authorization: token` 格式会 401**：必须用 `PRIVATE-TOKEN` 或 `Authorization: Bearer`。
+2. **403 = 权限不足**：token 对目标仓库无写权限，检查 scope；不要换 host 或换 header 绕过。
+3. **Label 创建/Issue 标签用 form-encoding**，不要用 JSON body。
+4. **多行 markdown 评论**：用 curl `--data @file.json` 传 JSON 文件，避免转义与超长命令行问题。
+5. **同一操作连续失败 3 次就停下检查 auth 格式和 Content-Type**，不要继续微调。
+6. **分页**：`?page=1&per_page=100`（max 100）。
+7. **限流**：默认约 400 req/min、4000 req/hour，超限返回 429。

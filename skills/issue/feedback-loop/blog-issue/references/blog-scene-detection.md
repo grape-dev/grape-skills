@@ -22,29 +22,29 @@ Issue 到达后，先读取 Issue 标题和正文，按以下顺序判定是否�
 - VOD Agent 的 A2A context 中携带「博客需求清单」（requirement_summary 结构）
 
 命中 → 走博客专属链路（本文档下半部分）
-未命中 → 走 issue-advance 原始流程
+未命中 → 走通用 Issue 运营流程
 
 ### 第三步：已有标签检查
 
-如果 Issue 已带 `blog-vod` 标签，或 VOD A2A context 中明确标注博客场景，直接走博客链路。
+如果 Issue 已带博客需求澄清标签，或 VOD A2A context 中明确标注博客场景，直接走博客链路。
 
 ## 博客专属链路 vs 原始流程
 
-| 维度 | 原始 issue-advance | 博客专属链路 |
+| 维度 | 通用 Issue 运营 | 博客专属链路 |
 |------|-------------------|-------------|
 | Spec 格式 | 通用 Spec 模板 | 博客 Spec（含主题/风格/结构/配图/视频/长度/语调/标签/发布目标） |
-| A2A 目标 | coding（通用开发） | coding（指定 ai-blog-generation 技能生成博客内容） |
+| A2A 目标 | coding（通用开发） | coding（指定博客内容生成技能生成博客内容） |
 | 后续链路 | coding → qa → sre | coding → sre（跳过 qa，博客内容无需代码审查） |
 | SRE 职责 | 通用部署 | 合并 PR + 调用博客 API 发布文章 |
 
 ## 链路总览
 
 ```
-blog-vod Agent（需求澄清，已有技能）
+需求澄清 Agent（需求澄清）
   → A2A → blog-issue Agent（本技能）
     → 博客 Spec 生成
-    → A2A → coding（ai-blog-generation 技能：生成正文+配图+视频 → 提交 PR）
-      → A2A → sre（blog-publish 技能：合并 PR → 上传媒体 → 发布文章）
+    → A2A → coding（博客内容生成技能：生成正文+配图+视频 → 提交 PR）
+      → A2A → sre（博客发布技能：合并 PR → 上传媒体 → 发布文章）
 ```
 
 ⚠️ 博客链路中 qa 阶段跳过——博客内容是 HTML/图片/视频产物，不涉及代码变更审查。coding 提交的 PR 中只有 `blog/` 目录下的内容文件，SRE 合并后直接发布。

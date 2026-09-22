@@ -313,10 +313,10 @@ for sp in skill_paths:
 
 # Build top-level summary
 def verdict_icon(v):
-    return {'pass': '✅', 'fail': '❌', 'partial': '⚠️', 'skipped': '⏭️', 'downgraded': '🔄', 'missing': '⛔'}.get(v, '?')
+    return {'pass': '✅', 'fail': '❌', 'partial': '⚠️', 'dryrun': '🧪', 'skipped': '⏭️', 'downgraded': '🔄', 'missing': '⛔'}.get(v, '?')
 
-phases_pass = phases_partial = phases_fail = phases_skipped = phases_missing = 0
-total_cases = total_pass = total_fail = total_warn = total_skip = total_error = 0
+phases_pass = phases_partial = phases_fail = phases_skipped = phases_missing = phases_dryrun = 0
+total_cases = total_pass = total_fail = total_warn = total_skip = total_error = total_dryrun = 0
 total_manual = 0
 total_resources = 0
 total_issues = 0
@@ -328,6 +328,7 @@ for skill in all_skills:
         if v == 'pass': phases_pass += 1
         elif v == 'partial': phases_partial += 1
         elif v == 'fail': phases_fail += 1
+        elif v == 'dryrun': phases_dryrun += 1
         elif v == 'skipped': phases_skipped += 1
         elif v == 'missing': phases_missing += 1
         # #62-011: 统计 phase 级问题(fail_checks)。
@@ -349,6 +350,7 @@ for skill in all_skills:
         total_warn += st.get('warn', 0)
         total_skip += st.get('skip', 0)
         total_error += st.get('error', 0)
+        total_dryrun += st.get('dryrun', 0)
         total_manual += len(p4.get('manual_test_items', []))
         total_resources += len(p4.get('all_resources_changed', []))
         # #62-011: 用例级失败 + 文档缺口计入问题数
@@ -362,6 +364,8 @@ if phases_fail > 0 or total_error > 0:
     overall_verdict = 'fail'
 elif phases_partial > 0 or total_fail > 0 or phases_missing > 0:
     overall_verdict = 'partial'
+elif phases_dryrun > 0:
+    overall_verdict = 'dryrun'
 
 pass_rate = round(total_pass / total_cases * 100, 1) if total_cases > 0 else 0
 
@@ -375,19 +379,21 @@ adjusted_pass_rate = max(0.0, round(pass_rate - non_test_issues * 5, 1))
 
 summary = {
     'verdict': overall_verdict,
-    'verdict_label': {'pass': '✅ PASS', 'partial': '⚠️ PARTIAL', 'fail': '❌ FAIL'}.get(overall_verdict, overall_verdict),
+    'verdict_label': {'pass': '✅ PASS', 'partial': '⚠️ PARTIAL', 'fail': '❌ FAIL', 'dryrun': '🧪 DRYRUN'}.get(overall_verdict, overall_verdict),
     'phases_total': 7,
     'phases_pass': phases_pass,
     'phases_partial': phases_partial,
     'phases_fail': phases_fail,
     'phases_skipped': phases_skipped,
     'phases_missing': phases_missing,
+    'phases_dryrun': phases_dryrun,
     'test_cases_total': total_cases,
     'test_cases_pass': total_pass,
     'test_cases_fail': total_fail,
     'test_cases_warn': total_warn,
     'test_cases_skip': total_skip,
     'test_cases_error': total_error,
+    'test_cases_dryrun': total_dryrun,
     'pass_rate': pass_rate,
     'adjusted_pass_rate': adjusted_pass_rate,
     'manual_items_count': total_manual,
@@ -428,8 +434,10 @@ for skill in all_skills:
             findings.append(f"❌ {skill['name']} Phase 4: {st.get('fail', 0)} 个用例失败 (查看下方失败归类)")
         if st.get('warn', 0) > 0:
             findings.append(f"⚠️ {skill['name']} Phase 4: {st.get('warn', 0)} 个用例需手工补业务数据 (见 manual_test_items)")
+        if st.get('dryrun', 0) > 0:
+            findings.append(f"🧪 {skill['name']} Phase 4: {st.get('dryrun', 0)} 个用例以 DRYRUN/mock 模式标记（未调用真实 API，用户在 issue 评论选择选项 3）")
     else:
-        findings.append(f"⏭️ {skill['name']} Phase 4: 未执行 (Phase 4 因 env-var 中无 HUAWEI_ACCESS_KEY/HUAWEI_SECRET_KEY 而退出 77；用户需带外设置环境变量后重跑)")
+        findings.append(f"⏭️ {skill['name']} Phase 4: 未执行 (Phase 4 因无 AK/SK 凭证退出 77；已在 issue 评论向用户提供三选项：①机器 export 环境变量 ②grape 通用设置配置凭据 ③DRYRUN_MODE=1 以 dryrun/mock 继续)")
 
 test_id = f"test-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 env_info = {

@@ -3,6 +3,15 @@
 > 本技能**只使用 `grape` CLI**，统一使用系统注入的 **`$GRAPE_SESSION_TOKEN`**（任务级临时，随任务/会话失效）即可操作。
 > 详细指南见 `grape-cli-guidance` 技能（命令分组 / token 作用域 / 错误排查 / 反模式），本文件是 VOD 实际用到的命令与要点。
 
+## 安装与版本校验（Prerequisites 用）
+
+```bash
+grape --version            # 版本号必须 >= 0.3.2
+grape refresh              # 契约过期时重拉最新契约（或回退内置快照）
+```
+
+> 未装或版本 < 0.3.2 → 见 `references/grape-cli-installation.md` **自行安装/升级**（公开仓库 gitcode.com/grape-dev/grape-cli）；安装后仍失败再输出任务无法完成的理由，**不要**改用 curl 直连。对应 SKILL「Prerequisites」环节。
+
 ## 核心原则（先读）
 
 1. **命令是契约驱动的**：`grape <group> <verb> [--参数]` 由服务端 `/openapi.json`（或内置快照）动态生成。**不确定命令 → 先发现，别猜名字。**
@@ -37,9 +46,9 @@ grape issues events --owner {owner} --repo {repo} --number {n} --json-out
 grape issues pipeline --owner {owner} --repo {repo} --number {n} --json-out
 grape git-repo issues comments list --owner {owner} --repo {repo} --number {n} --json-out
 
-# 建 Issue（VOD 引导产出，仅入口/用户侧创建）
-grape issues create --owner {owner} --repo {repo} \
-  --json '{"title":"...","description":"..."}'
+# 建 Issue（VOD 引导产出，仅入口/用户侧创建；body 字段明确用 git-repo 组命令）
+grape git-repo issues create --owner {owner} --repo {repo} \
+  --json '{"title":"...","body":"..."}'
 
 # 更新/结构化 Issue body（收敛需求正文；body 字段在契约允许集内）
 grape git-repo issues update --owner {owner} --repo {repo} --number {n} \
@@ -52,8 +61,9 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 # 分支 / 提交 / 文件（知识基线降级、增量判断）
 grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
 grape git-repo commits --owner {owner} --repo {repo} --per_page 10 --json-out
-grape git-repo tree --owner {owner} --repo {repo} --ref main --json-out   # 目录树
+grape git-repo tree --owner {owner} --repo {repo} --ref main --depth 2 --json-out   # 目录树（--depth N 控制层级，无 --path）
 grape git-repo contents --owner {owner} --repo {repo} --path README.md --raw   # 文件原文（自动 base64 解码）
+grape git-repo contents --owner {owner} --repo {repo} --path "" --json-out     # 列根目录文件列表
 
 # A2A 交办 Issue Agent（专属命令）
 grape a2a handoff --json '{"agent":"issue","payload":{...}}'
@@ -61,6 +71,11 @@ grape a2a handoff --json '{"agent":"issue","payload":{...}}'
 # 任务自报完成（收尾必做，见 SKILL「任务完成流程」；会话 token 自动定位任务，无需 --task_id）
 grape tasks complete --json '{"result_text":"...","next_step":"a2a_issue"}'
 ```
+
+**命令取舍速查（避免重复调用 / 试错）：**
+- **读 Issue 上下文**：首选聚合视图 `grape issues detail`（含阶段/状态/事件/路线图）；`grape git-repo issues get`（原始字段）仅在 detail 缺字段时再用；评论用 `grape git-repo issues comments list`。**不要 three 者都调**。
+- **列目录**：`grape git-repo tree --depth 2`（目录树，**无 `--path`**）；`contents --path ""` 列根目录文件列表；读单个文件用 `contents --path <file> --raw`。一次 `tree --depth 2` 看清结构，再按需读 2-3 个关键文件，**不要逐目录 contents**。
+- **owner/repo**：用环境变量 `$ACCOUNT` / `$REPO_NAME`（如命令模板所示），不要硬编码。
 
 - 所有命令支持 `--json-out`（机器可读单行 JSON）；分页 `--per_page 20`（max 100）；出参结构 = GitCode 平台实际结构。
 - 契约不可达时 CLI 自动回退**内置契约快照**（`grape refresh` 显示来源）。

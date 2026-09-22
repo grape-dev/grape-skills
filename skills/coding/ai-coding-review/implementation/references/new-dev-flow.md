@@ -1,6 +1,6 @@
 # 新开发流程
 
-从 issue skill 通过 A2A 触发的新功能/fix 开发。
+由上游负责 Issue 处理的 Agent 通过 A2A 触发的新功能/fix 开发。
 
 ## 分析（按顺序执行，上一步未完成不得进入下一步）
 
@@ -49,7 +49,7 @@ curl -s -H "Authorization: Bearer $BOT_TOKEN" \
 
 ```
 分析结论：
-- 场景：新开发（从 issue skill 触发）
+- 场景：新开发（由上游 Issue 处理 Agent 触发）
 - 任务类型：feature 开发
 - 复杂度：大型（涉及 OAuth 外部服务集成）
 - 必须执行：需求文档 → 方案设计 → 编码 → 测试 → 自审查 → 创建 PR → A2A 通知 QA 审查
@@ -136,9 +136,15 @@ curl -sL -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
 
 ### ⚠️ 必须执行：发 Issue 评论告知
 
+> **PR 链接路径规则（重要）：**
+> - GitCode **Web 页面** PR 链接使用 `/pull/`（**单数**）：`https://gitcode.com/{owner}/{repo}/pull/{pr_number}`
+> - GitCode **API** 路径使用 `/pulls/`（复数）：`$VCS_API_BASE/repos/{owner}/{repo}/pulls`
+> - **Issue 评论中必须使用 Web 页面链接（`/pull/` 单数），不得使用 API 路径（`/pulls/` 复数）**
+> - **必须使用 markdown 链接格式** `[PR #{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})`，不得使用纯文本 `PR #{pr_number}`
+
 ```bash
 POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_TOKEN
+Authorization: Bearer $BOT_G...OKEN
 Content-Type: application/json
 {"body": "[Coding Agent] ✅ 已完成实现，请审查 PR [#{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})。"}
 ```
@@ -193,6 +199,7 @@ context 应包含：
   "actions": ["git push 分支 feat/issue-N", "创建 PR #N", "在 Issue #N 发评论告知", "A2A 通知 QA 审查 PR #N"],
   "conclusion": "完成情况总结：改动内容、测试结果、PR 是否创建成功（失败原因）",
   "artifacts": ["PR #N", "分支 feat/issue-N", "commit xxxxxx"],
+  "pr_url": "https://gitcode.com/{owner}/{repo}/pull/{pr_number}",
   "next_step": "QA Agent 审查 PR #N；或 PR 创建失败时说明需人工干预",
   "issue_summary": "实现完成 | 改动摘要 | PR 状态 | 覆盖率结果"
 }

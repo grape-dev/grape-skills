@@ -13,8 +13,23 @@ tools:
 2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
 3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
 4. token 不得写入任何文件/日志/评论。
+5. 删除操作（如关 PR/删分支）需用户确认后执行。
 
+## 输入事件 Schema（inputSchema）
 
+本 Skill 由 GitCode 平台 Webhook 事件驱动，输入为事件负载（JSON 对象）。字段声明如下，执行前必须先完成 Schema 校验，**缺少必填字段或事件类型不受支持时拒绝执行**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `event_type` | string | 是 | 事件类型，枚举：`pull_request_opened` / `pull_request_updated` / `push` / `note_hook_pr`（PR 评论事件） |
+| `repository` | string | 是 | 仓库全名 `{owner}/{repo}`，用于全部 API 路径 |
+| `account` | string | 是 | 事件触发账号 |
+| `pr_number` | string | 是 | PR 编号（pull_request 类事件必填） |
+| `issue_number` | string | 否 | 关联 Issue 编号；仅在能确认为真实 Issue 时使用（A2A 服务端强制校验字段） |
+| `head_sha` | string | 是 | PR 最新 head commit SHA，用于变更检视与行内评论 `commit_id` |
+| `body` | string | 否 | PR 描述/评论内容，仅作 claim 参考，须打开原对象核对，不直接采信 |
+
+校验规则：`event_type` 不在枚举内 → 拒绝执行并返回错误；缺少任一必填字段 → 拒绝执行；`issue_number` 缺失或无法确认 → A2A 能力项降级为跳过并在最终评论说明；`pr_number` 与 `issue_number` 相互独立，**严禁混用**。
 
 # PR 运营
 
@@ -248,12 +263,68 @@ Content-Type: application/json
 - ✅ 审查通过
 ```
 
+## 输出 Schema（outputSchema）
+
+本 Skill 的输出固定为两部分：PR 上的一条统一总结评论（Markdown，见「输出规范」）+ 一个结构化 JSON 结果块（供上游消费与存档）。JSON 结构声明如下：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `skill` | string | 是 | 固定值 `pr` |
+| `event_type` | string | 是 | 本次处理的事件类型 |
+| `repository` / `account` / `pr_number` | string | 是 | 事件上下文回显 |
+| `conclusion` | string | 是 | 枚举：`pass` / `needs_changes` / `needs_major_changes`（对应 ✅ / ⚠️ / ❌ 结论） |
+| `review_comments` | array | 是 | 行内评论清单，元素含 `file`/`line`/`level`/`problem`/`suggestion` |
+| `a2a_notified` | boolean | 是 | 是否已通过 A2A 通知 Coding Agent |
+| `report_markdown` | string | 是 | 最终统一评论正文，**必须以 `[QA Agent]` 开头** |
+
+校验规则：`conclusion` 必须是枚举值；`review_comments` 每个元素必须含 `file` 与 `line`；`report_markdown` 不以 `[QA Agent]` 开头视为非法输出，不得提交。
+
+## 性能预算
+
+| 指标 | 预算/基线 | 说明 |
+|------|-----------|------|
+| 单次执行时延（P95） | ≤ 60s（基线；暂无实测值时以此基线为准） | 5 个能力项线性执行；VCS API 调用 ≤ 10 次（GET pulls/files/comments、PUT resolve、POST 评论、A2A），外部 API 时延占主导 |
+| LLM 调用次数 | 1 次/事件 | 单次线性审查，无循环/自调用设计；A2A 交办后的优化实现计数归 Coding Agent 侧，不计入本 Skill |
+| token 消耗 | ≤ 15k token/事件 | 全量文档约 42.5KB；输入以事件负载 + 变更文件 diff + API 响应为主 |
+| API 调用预算 | ≤ 10 次/事件 | 全部为官方 VCS API（api.gitcode.com / {{SERVER_URL}} 占位符 A2A 端点） |
+
+上下文压缩策略：references 文档按能力项按需读取；变更检视只读 `.sha` 状态；PR diff 仅取变更文件部分；已有行内评论只摘要 status/path/line；所有发现合并为一条评论输出。
+
+超预算处理：上下文/token 接近上限时停止继续拉取，基于已获取信息出结论；API 调用失败重试 1 次仍失败 → 按「可靠性声明」降级处理。
+
+## 版本管理
+
+- 当前版本：v2.0.0（Frontmatter 声明 `version: 2.0.0`；GS-008 规范已调整为 Low 级「不建议带 version」，保留 version 字段合规）。
+- 版本识别：以仓库提交历史/本目录文件变更记录为版本基准，不依赖 Frontmatter version 字段。
+- 新旧版本兼容：输入采用「只读已声明字段 + 忽略未知字段」策略，事件负载新增字段不影响既有行为，向后兼容。
+- 灰度策略：行为变更（新增能力项、调整预算/基线）须在 `description` 中标注变更说明，并建议小流量观察后全量；服务端强制规则（如 A2A `issue_number` 校验）不随 Skill 版本变化。
+
+## 可靠性声明
+
+| 机制 | 声明 |
+|------|------|
+| 断点续跑（resume） | 每次审查后将 head SHA 写入 `../.last_pr_review/{pr_number}.sha`；中断后重新执行时，变更检视读取该文件：SHA 相同 → 跳过能力项直接结束（不重复审查/评论）；SHA 不同或文件缺失 → 从能力一继续。A2A 未返回时不阻塞流程，将「优化进行中」写入最终评论，由后续事件续跑 |
+| 重试幂等 | 写操作均为「先查后写」：发送评论前先经 SHA 变更检视与已有评论比对去重；重复事件（SHA 未变）不重复发评论；同次运行内 review_comments 统一合并为一条评论，重试不产生重复副作用 |
+| 资源清理 | 执行过程不创建临时文件/进程；唯一持久状态为 `../.last_pr_review/{pr_number}.sha`（设计内状态，覆盖写）；输出评论为 GitCode 平台托管资源，无本地残留；事件处理结束即结束任务 |
+| 工具失败降级 | API 返回 403/无权限 → 停止该操作并回复用户既有人工指引，不换 token 绕行；A2A 失败或 issue_number 无法确定 → 跳过 A2A 并在最终评论说明；网络失败 → 重试 1 次，仍失败则基于已获取信息出结论并在评论中标注 |
+
+## 依赖兼容声明
+
+| 依赖 | 类型 | 最低版本/兼容范围 | 说明 |
+|------|------|-------------------|------|
+| git | CLI 工具 | ≥ 2.20（2020 年后主流发行版均满足） | Frontmatter 声明工具；本 Skill 不依赖特定 git 子命令 |
+| curl | CLI 工具 | ≥ 7.58（支持 `-s`/`-X`/`-H`/`-d` 与 https） | 全部 API 示例调用 |
+| bash（POSIX） | 运行时 | POSIX sh 兼容即可 | 示例命令基础，均使用固定参数 + 占位符 |
+| VCS API | HTTP API | api/v5（现有端点范围） | 端点为官方域名与 {{SERVER_URL}} 占位符；响应结构按实际返回为准 |
+
+兼容策略：示例命令无版本特有语法；不安装任何全局依赖；依赖不可用时优先走平台 HTTP API 直连路径。
+
 ## 硬规则
 
 | 行为 | 态度 |
 |------|------|
 | 按分析结论执行 PR 审查 | ✅ **必须做** |
-| 审查发现问题需要修改时调用 A2A 通知 implementation | ✅ **必须做** |
+| 审查发现问题需要修改时调用 A2A 通知 Coding Agent | ✅ **必须做** |
 | 所有评论统一在最后发送 | ✅ **必须做，不得在中间步骤发评论** |
 | ⚠️ **发送评论是最终强制步骤** | ✅ **必须做**（除非 SHA 未变更跳过） |
 | 只通过 VCS API 获取信息 | ✅ **必须做** |

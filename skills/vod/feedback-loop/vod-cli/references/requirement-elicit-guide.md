@@ -1,6 +1,6 @@
 # 需求引导与 Issue 审视指南（VOD）
 
-> 配套 `skills/vod/SKILL.md`（v2.0）。覆盖：清晰度四要素、引导漏斗、Issue 审视流程、结构化模板、A2A 交办。
+> 配套 `skills/vod/vod-cli/SKILL.md`。覆盖：清晰度四要素、引导漏斗、Issue 审视流程、结构化模板、A2A 交办。
 
 ## 一、清晰度四要素
 

@@ -12,17 +12,14 @@
 如果本地未安装 codegraph，需先完成安装：
 
 ```bash
-# 安装 codegraph（参考：https://github.com/colbymchenry/codegraph）
-npm install -g @colbymchenry/codegraph   # ⚠️ 勿用 `npm install -g codegraph`(npm 上是空壳占位包, 2026-08-18 实测)
+# 安装 codegraph（按内部发布渠道提供的安装指引获取）
+npm install @colbymchenry/codegraph   # 在项目内本地安装（勿全局安装；勿用 npm 上的空壳占位包 codegraph, 2026-08-18 实测）
 
 # 验证安装
 codegraph --version
 ```
 
-详细安装部署指南参见：https://github.com/colbymchenry/codegraph
-
-> ⚠️ codegraph 依赖 Node.js 环境。如目标服务器未安装 Node.js，需先安装 Node.js >= 18。
-> 如安装失败，将降级为基于 README + VCS API 的项目信息获取（见降级方案）。
+> ⚠️ codegraph 依赖 Node.js >= 18。如安装失败，降级为基于 README + grape CLI 的项目信息获取（见降级方案）。
 
 ## 存储位置
 
@@ -38,8 +35,6 @@ data/workspaces/{owner}/{repo}/project-info/
 ## 流程（按顺序执行）
 
 ### Step 1: 检查 codegraph 索引
-
-检查项目工作目录下是否存在 `.codegraph/` 目录：
 
 ```bash
 ls -la .codegraph/
@@ -57,8 +52,6 @@ codegraph init
 
 ### Step 2: 检查项目知识文档是否需要更新
 
-读取 `.metadata.json`：
-
 ```bash
 cat data/workspaces/{owner}/{repo}/project-info/.metadata.json
 ```
@@ -69,7 +62,7 @@ cat data/workspaces/{owner}/{repo}/project-info/.metadata.json
 
 | 条件 | 检查方式 |
 |------|---------|
-| 当前工作分支 HEAD commit 与记录不同 | 工作分支 = `$GRAPE_WORK_BRANCH`（缺省 main/master）；`grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out` 定位该分支的 `commit.id` 与 `.metadata.json` 对比 |
+| 当前 main 分支 HEAD commit 与记录不同 | `grape git-repo commits --owner {owner} --repo {repo} --json-out` 对比 sha |
 | 距上次更新超过 7 天 | 对比 `.metadata.json.last_updated` |
 | project-graph.md 或 project-capabilities.md 缺失 | 检查文件是否存在 |
 
@@ -78,18 +71,15 @@ cat data/workspaces/{owner}/{repo}/project-info/.metadata.json
 ### Step 3: 获取分支列表
 
 ```bash
-# 获取分支列表（CLI，token/base_url 取注入 env）
-grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
+grape git-repo branches --owner {owner} --repo {repo} --json-out
 ```
 
 **筛选分析分支**（最多 3 个）：
 
-1. `$GRAPE_WORK_BRANCH`（场景工作基线分支，缺省 `main`/`master`——必须）
-2. 最近活跃的开发分支（按 `commit.last_activity_at` 排序取前 2，去重含工作分支）
+1. `main` 或 `master`（必须）
+2. 最近活跃的开发分支（按 `commit.last_activity_at` 排序取前 2）
 
 ### Step 4: 使用 codegraph 分析项目结构
-
-对每个待分析分支执行以下探索：
 
 #### 4.1 获取文件树
 
@@ -124,8 +114,6 @@ codegraph_explore --query "module import dependency" --maxFiles 15
 
 ### Step 5: 生成 project-graph.md
 
-基于 Step 4 的分析结果，按以下模板生成：
-
 ```markdown
 # Project Graph: {owner}/{repo}
 
@@ -149,15 +137,6 @@ codegraph_explore --query "module import dependency" --maxFiles 15
 
 **长度限制**：不超过 3000 字。超出时优先保留 Architecture Overview 和 Module Dependency Graph。
 
-写入文件：
-
-```bash
-mkdir -p data/workspaces/{owner}/{repo}/project-info/
-cat > data/workspaces/{owner}/{repo}/project-info/project-graph.md << 'EOF'
-{内容}
-EOF
-```
-
 ### Step 6: 生成 project-capabilities.md
 
 信息来源优先级：
@@ -170,38 +149,9 @@ EOF
 | External Integrations | codegraph_explore("external API service") + 配置文件 |
 | Skills & Agents | `configs/agent-description.json` + `skills/` 目录 |
 | Data Model | codegraph_explore("database model schema") + DB 文件 |
-| Configuration | `configs/` 目录 + `.env` + `config.py` |
+| Configuration | `configs/` 目录下项目配置文件（环境变量仅按需读取，不收集明文）+ `config.py` |
 
-模板：
-
-```markdown
-# Project Capabilities: {owner}/{repo}
-
-> Last updated: {datetime}
-
-## Tech Stack
-{语言、框架、关键依赖及版本}
-
-## Supported Features
-{项目已支持的功能特性清单}
-
-## API Endpoints
-{暴露的 API 端点列表}
-
-## External Integrations
-{外部服务集成}
-
-## Skills & Agents
-{已配置的 Agent 和 Skill 列表}
-
-## Data Model
-{核心数据表/模型概览}
-
-## Configuration
-{配置项和环境变量说明}
-```
-
-**长度限制**：不超过 3000 字。
+模板同 project-graph.md 结构，**长度限制**不超过 3000 字。
 
 ### Step 7: 更新 .metadata.json
 
@@ -227,18 +177,18 @@ EOF
 
 | 异常 | 处理 |
 |------|------|
-| `codegraph init` 失败 | 记录日志，降级为仅基于 README 和 API 获取项目信息 |
+| `codegraph init` 失败 | 记录日志，降级为仅基于 README 和 grape CLI 获取项目信息 |
 | `codegraph_explore` 超时 | 减小 `maxFiles` 参数重试，或跳过该查询 |
 | 分支列表获取失败 | 仅分析当前分支 |
 | 文件写入失败 | 记录日志，不阻塞后续分析流程 |
 
 ## 降级方案
 
-当 codegraph 工具不可用时，通过以下 grape CLI 获取基础项目信息（token/base_url 取注入 env）：
+当 codegraph 工具不可用时，通过 grape CLI 获取基础项目信息：
 
-1. **README**：`grape git-repo contents --owner {owner} --repo {repo} --path README.md --json-out` → 取 `content`（Base64）解码
-2. **仓库信息**：`grape git-repo repo --owner {owner} --repo {repo} --json-out` → description、default_branch
-3. **目录结构**：`grape git-repo contents --owner {owner} --repo {repo} --path "" --json-out` → 顶层文件列表
-4. **最近提交**：`grape git-repo commits --owner {owner} --repo {repo} --per_page 10 --json-out` → 活跃度
+1. **README**：`grape git-repo contents --owner {owner} --repo {repo} --path README.md --json-out`（返回 JSON，`content` 字段为 base64 编码，需解码后使用：`| python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['content']).decode())"`）
+2. **仓库信息**：`grape git-repo repo --owner {owner} --repo {repo} --json-out`
+3. **目录结构**：`grape git-repo tree --owner {owner} --repo {repo} --json-out`
+4. **最近提交**：`grape git-repo commits --owner {owner} --repo {repo} --json-out`
 
 降级生成的文档标注 `[degraded - codegraph unavailable]`。

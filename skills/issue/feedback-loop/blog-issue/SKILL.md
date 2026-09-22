@@ -1,36 +1,106 @@
 ---
 name: blog-issue
-version: 1.0.0
 description: |
-  Issue 高级运营（博客增强版）：在 issue-advance 全部能力基础上，增加博客场景专属链路。
-  博客场景：Issue → 博客 Spec → A2A coding（ai-blog-generation 生成内容）→ A2A sre（blog-publish 发布）。
-  非博客场景：保持 issue-advance 原始流程不变（通用 Spec → coding → qa → sre）。
-  处理进入 `issue` 生命周期阶段的 Issue（由 VOD/blog-vod Agent 审视交办后）。
+  Issue 高级运营（博客增强版）：在通用 Issue 运营全部能力基础上，增加博客场景专属链路。
+  博客场景：Issue → 博客 Spec → A2A coding（内容生成技能生成内容）→ A2A sre（发布技能发布）。
+  非博客场景：保持通用 Issue 运营原始流程不变（通用 Spec → coding → qa → sre）。
+  处理进入 `issue` 生命周期阶段的 Issue（由需求澄清 Agent 审视交办后）。
 tools:
-  - codegraph
+  - name: codegraph
+    min_version: "0.4.0"
+  - name: curl
+    min_version: "7.68.0"
+requires:
+  - env: BOT_TOKEN
+    description: VCS API 访问令牌
+  - env: REPO_FULL_NAME
+    description: 仓库全名（owner/repo 格式）
+  - env: ISSUE_NUMBER
+    description: Issue 编号
+  - env: BOT_USERNAME
+    description: 机器人 GitCode 用户名
+inputSchema:
+  type: object
+  required:
+    - REPO_FULL_NAME
+    - ISSUE_NUMBER
+  properties:
+    REPO_FULL_NAME:
+      type: string
+      pattern: "^[\\w-]+/[\\w-]+$"
+      description: 仓库全名，owner/repo 格式
+    ISSUE_NUMBER:
+      type: integer
+      minimum: 1
+      description: GitCode Issue 编号
+    BOT_TOKEN:
+      type: string
+      description: VCS API 访问令牌（从环境变量获取）
+    BOT_USERNAME:
+      type: string
+      description: 机器人 GitCode 用户名（用于 Issue 分配）
+    EVENT_TYPE:
+      type: string
+      enum: [issue_opened, issue_commented, issue_closed, issue_reopened]
+      description: 触发事件类型
+outputSchema:
+  type: object
+  required:
+    - scene
+    - actions
+    - conclusion
+    - next_step
+  properties:
+    scene:
+      type: string
+      enum: [blog, general]
+      description: 场景类型（博客/非博客）
+    actions:
+      type: array
+      items:
+        type: string
+      description: 执行动作列表
+    conclusion:
+      type: string
+      description: 处理结论
+    artifacts:
+      type: object
+      properties:
+        spec_comment_id:
+          type: integer
+        spec_ready:
+          type: boolean
+        a2a_to:
+          type: string
+    next_step:
+      type: string
+      description: 下一步动作描述
+    issue_summary:
+      type: string
+      description: Issue 摘要
 ---
 
 # Issue 运营 — 博客增强版（blog-issue）
 
 ## 核心定位
 
-本技能是 issue-advance 的博客领域特化版。**保留 issue-advance 全部原始能力**（项目知识基线、深度可开发性分析、分类/标签/分配/Spec/A2A/notify），在场景识别层增加博客分流：
+本技能是通用 Issue 运营的博客领域特化版。**保留通用 Issue 运营全部原始能力**（项目知识基线、深度可开发性分析、分类/标签/分配/Spec/A2A/notify），在场景识别层增加博客分流：
 
-- **博客场景** → 走博客专属链路（博客 Spec → coding ai-blog-generation → sre blog-publish，跳过 qa）
-- **非博客场景** → 走 issue-advance 原始流程（通用 Spec → coding → qa → sre）
+- **博客场景** → 走博客专属链路（博客 Spec → coding 博客内容生成 → sre 博客发布，跳过 qa）
+- **非博客场景** → 走通用 Issue 运营原始流程（通用 Spec → coding → qa → sre）
 
-## 核心原则（继承 issue-advance）
+## 核心原则（继承通用 Issue 运营）
 
 ### 建立项目知识基线
 每次处理 Issue 前，先确保项目知识文档（project-graph.md + project-capabilities.md）存在且未过期。
 不存在或过期时，使用 codegraph 工具分析项目结构并生成文档。
-详见 `references/codegraph-project-analysis.md`（从 issue-advance 继承）。
+详见 `references/codegraph-project-analysis.md`（从通用 Issue 运营技能继承）。
 
 ### 深度可开发性分析
 不再仅做简单的有效性检查，而是基于项目知识基线进行四维分析：
 需求完整性 → 技术可行性 → 依赖就绪性 → 范围确定性。
 根据分析结果给出可开发性评级（ready / almost-ready / needs-discussion / not-feasible）。
-详见 issue-advance `references/issue-developability-analysis.md`。
+详见通用 Issue 运营技能的 `references/issue-developability-analysis.md`。
 
 ### 守门不修 bug
 可以打标签、发评论、分配负责人，但**不要直接写代码修 bug**。
@@ -67,8 +137,8 @@ curl -X POST {{SERVER_URL}}/api/tasks/notify \
 | PR 审查、代码质量检查 | qa |
 | 构建失败分析、编译调试 | sre |
 | 云部署、拉取代码、重启服务 | sre |
-| **博客内容生成（正文+配图+视频）** | **coding**（ai-blog-generation 技能——博客场景指定） |
-| **博客发布（合并 PR + 调用博客 API）** | **sre**（blog-publish 技能——博客场景指定） |
+| **博客内容生成（正文+配图+视频）** | **coding**（博客场景指定内容生成技能） |
+| **博客发布（合并 PR + 调用博客 API）** | **sre**（博客场景指定发布技能） |
 | skill 发布/下架/同步 | sre |
 | skill 创建/生成 | coding |
 | 体验验证 / 运行时验证 | sre |
@@ -76,9 +146,9 @@ curl -X POST {{SERVER_URL}}/api/tasks/notify \
 
 判断标准：
 1. **用户明确要求做某事，而本技能的「硬约束」表中该行为被标记为 ❌ 禁止** → 说明此任务超出你的范围，查 Agent 列表交办。
-2. **博客场景 + 评级 ready** → 生成博客 Spec → A2A 交办 coding（指定 ai-blog-generation 技能）。
+2. **博客场景 + 评级 ready** → 生成博客 Spec → A2A 交办 coding（指定博客内容生成技能）。
 3. **非博客场景 + 评级 ready** → 生成通用 Spec → A2A 交办 coding。
-4. **需求不清晰 / 无法确定需求边界时** → 通过 A2A 交办 vod。
+4. **需求不清晰 / 无法确定需求边界时** → 通过 A2A 交办需求澄清 Agent。
 
 ### 验证外部 claim
 PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 都是 claim。**先打开原对象核对**。
@@ -98,7 +168,7 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 
 ## Issue 处理流程
 
-> 说明：`issue_opened` 已由 VOD/blog-vod Agent 接管（生命周期 `vod` 阶段审视澄清），本技能处理的是进入 `issue` 阶段的 Issue。所有事件类型共用以下流程。
+> 说明：`issue_opened` 已由需求澄清 Agent 接管（生命周期 `vod` 阶段审视澄清），本技能处理的是进入 `issue` 阶段的 Issue。所有事件类型共用以下流程。
 
 ### 1. 确定 Issue 与上下文（必须最先）
 - 从事件 payload 提取 issue 编号；缺失则用 VCS API 查询定位
@@ -117,24 +187,24 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 | 判定条件 | 结论 | 走哪条链路 |
 |---------|------|-----------|
 | VOD A2A context 携带博客需求清单 | 博客场景 | 博客链路 |
-| Issue 已带 `blog-vod` 标签 | 博客场景 | 博客链路 |
+| Issue 已带博客需求澄清标签 | 博客场景 | 博客链路 |
 | Issue 关键词命中博客场景候选 + 内容确认通过 | 博客场景 | 博客链路 |
-| 以上都不满足 | 非博客场景 | 原始 issue-advance 流程 |
+| 以上都不满足 | 非博客场景 | 通用 Issue 运营流程 |
 
 **博客场景** → 跳到 [§ 博客专属处理流程](#博客专属处理流程)
-**非博客场景** → 继续执行 [§ 通用处理流程](#通用处理流程issue-advance-原始流程)
+**非博客场景** → 继续执行 [§ 通用处理流程](#通用处理流程)
 
 ### 4. 深度可开发性分析（⚠️ 每次处理都执行，两条链路都需要）
-- 读取 issue-advance `references/issue-developability-analysis.md`
+- 读取通用 Issue 运营技能的 `references/issue-developability-analysis.md`
 - 执行四维分析：需求完整性 → 技术可行性 → 依赖就绪性 → 范围确定性
 - 输出可开发性评级：ready / almost-ready / needs-discussion / not-feasible
 - ⚠️ 评论事件同样分析——用户补充信息会改变评级，需重新分析后再答复/动作
 
 ---
 
-## 通用处理流程（issue-advance 原始流程）
+## 通用处理流程
 
-非博客场景走此流程，与 issue-advance 完全一致。
+非博客场景走此流程，与通用 Issue 运营完全一致。
 
 ### 5a. 理解事件意图
 
@@ -149,13 +219,13 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 | 对已发布 Spec 提出修改意见 | 更新 Spec（版本号 +1），重新发布，A2A 通知 coding |
 
 ### 6a. 按评级执行动作
-- **ready** → 生成通用 Spec（issue-advance `references/spec-generation.md`）→ 贴 Issue 评论 → 打 `spec-ready` → A2A 通知 coding
+- **ready** → 生成通用 Spec（通用 Issue 运营技能的 `references/spec-generation.md`）→ 贴 Issue 评论 → 打 `spec-ready` → A2A 通知 coding
 - **almost-ready** → 分配给项目责任人（CODEOWNERS）→ 精确追问 1-2 个问题
 - **needs-discussion** → 分配责任人 → 逐维度列缺失 → 逐一追问 → 标记 `need-info`
 - **not-feasible** → 评论说明不可行 → 标记 `invalid`
 
 ### 7a. 评论回复
-- 按 issue-advance `references/comment-guide.md` 格式回复
+- 按通用 Issue 运营技能的 `references/comment-guide.md` 格式回复
 - 评论 body 前缀固定为 `[issue agent]`
 
 ### 8a. A2A 通知 coding（通用场景）
@@ -186,14 +256,14 @@ PR body / commit message / 评论里的 `fixes #N`、`tests pass`、`small fix` 
 
 ```bash
 # 1. 验证博客系统
-curl -s --max-time 10 "http://{BLOG_HOST}/health"
+curl -s --max-time 10 "https://{BLOG_HOST}/health"
 # 期望: {"status":"ok","service":"blog-api",...}
 
 # 2. 查可用标签
-curl -s "http://{BLOG_HOST}/api/lables"
+curl -s "https://{BLOG_HOST}/api/lables"
 
 # 3. 查已有文章（确认接口可用）
-curl -s "http://{BLOG_HOST}/api/articles?page=1&size=2"
+curl -s "https://{BLOG_HOST}/api/articles?page=1&size=2"
 
 # 4. AI 模型配置从项目知识读取（project-info/member/ai-models.yaml）
 #    确认 image.url/key/model 和 video.url/key/model 存在
@@ -222,9 +292,9 @@ BLOG_HOST 解析优先级：
 ### 9b. A2A 通知 coding（博客专属）
 
 读取 `references/blog-a2a-workflow.md`，A2A 交办 coding agent：
-- context 中**明确指定使用 ai-blog-generation 技能**
+- context 中**明确指定使用博客内容生成技能**
 - context 包含博客规格摘要 + 发布目标 + 发布链路提示
-- 提示 coding 完成后 A2A 给 sre（blog-publish 技能），跳过 qa
+- 提示 coding 完成后 A2A 给 sre（博客发布技能），跳过 qa
 
 ⚠️ **重复 A2A 检查**：A2A 前先看 prompt 中的 Issue Pipeline 信息，如果已有 `coding:a2a_event` 则不重复 A2A。
 
@@ -238,18 +308,18 @@ curl -X POST {{SERVER_URL}}/api/tasks/notify \
     "assignee": "'"$BOT_USERNAME"'",
     "repo_key": "'"$REPO_FULL_NAME"'",
     "issue_number": "'"$ISSUE_NUMBER"'",
-    "task_description": "Issue #'"$ISSUE_NUMBER"' 博客需求已分析（评级 ready），博客 Spec 已发布，已 A2A 交办 coding agent 使用 ai-blog-generation 技能生成博客内容。"
+    "task_description": "Issue #'"$ISSUE_NUMBER"' 博客需求已分析（评级 ready），博客 Spec 已发布，已 A2A 交办 coding agent 使用 博客内容生成技能生成博客内容。"
   }'
 ```
 
 ### 博客链路总览
 
 ```
-blog-vod Agent（需求澄清，已有技能）
+需求澄清 Agent（需求澄清，已有技能）
   → A2A → blog-issue Agent（本技能）
     → 博客 Spec 生成 + 验证博客系统可用性
-    → A2A → coding（ai-blog-generation 技能：生成正文+配图+视频 → 提交 PR）
-      → A2A → sre（blog-publish 技能：合并 PR → 上传媒体 → 发布文章）
+    → A2A → coding（博客内容生成技能：生成正文+配图+视频 → 提交 PR）
+      → A2A → sre（博客发布技能：合并 PR → 上传媒体 → 发布文章）
 ```
 
 ⚠️ 博客链路跳过 QA：博客产物是 HTML/图片/视频，不涉及代码逻辑变更，无需代码审查。
@@ -281,24 +351,27 @@ curl -X POST {{SERVER_URL}}/api/tasks/close \
 
 ## 硬约束
 
-| 行为 | 态度 |
-|------|------|
-| 使用 codegraph 工具分析项目结构 | ✅ 允许 |
-| 在 data/workspaces/{owner}/{repo}/project-info/ 下创建/更新文档 | ✅ 允许 |
-| 执行 codegraph init 初始化索引 | ✅ 允许 |
-| 分类、打标签、分配 | ✅ 按分析结论执行 |
-| 回复 Issue、追问澄清 | ✅ 鼓励做 |
-| 用户要求开发/实现前，先确认已深度分析且 ready | ✅ 必须做 |
-| 博客场景验证博客系统 /health 可达 | ✅ 必须做 |
-| 博客场景 A2A 指定 coding 使用 ai-blog-generation 技能 | ✅ 必须做 |
-| 只通过 VCS API 获取信息 | ✅ 鼓励做 |
-| 评论 body 前缀：博客场景 `[blog-issue Agent]`，非博客场景 `[issue agent]` | ✅ 必须做 |
-| 直接写代码、修改文件 | ❌ 禁止 |
-| 直接写博客内容（正文/配图/视频） | ❌ 禁止（coding 职责） |
-| 直接调用博客发布 API | ❌ 禁止（sre 职责） |
-| 提交 PR、合并 PR | ❌ 禁止 |
-| 回复 Token、密码等敏感信息 | ❌ 禁止 |
-| 探索 Grape 系统文件（data/workspaces/ 项目知识文档除外） | ❌ 禁止 |
+| 行为 | 态度 | 读写语义 |
+|------|------|----------|
+| 使用 codegraph 工具分析项目结构 | ✅ 允许 | 读（自动执行） |
+| 在 data/workspaces/{owner}/{repo}/project-info/ 下创建/更新文档 | ✅ 允许 | 写（须确认） |
+| 执行 codegraph init 初始化索引 | ✅ 允许 | 写（须确认） |
+| 分类、打标签、分配 | ✅ 按分析结论执行 | 写（须确认） |
+| 回复 Issue、追问澄清 | ✅ 鼓励做 | 写（须确认） |
+| 用户要求开发/实现前，先确认已深度分析且 ready | ✅ 必须做 | 读（自动执行） |
+| 博客场景验证博客系统 /health 可达 | ✅ 必须做 | 读（自动执行） |
+| 博客场景 A2A 指定 coding 使用博客内容生成技能 | ✅ 必须做 | 写（须确认） |
+| 只通过 VCS API 获取信息 | ✅ 鼓励做 | 读（自动执行） |
+| 评论 body 前缀：博客场景 `[blog-issue Agent]`，非博客场景 `[issue agent]` | ✅ 必须做 | — |
+| 执行写操作前（如创建标签、发布评论、A2A 交办）须先向用户确认 | ✅ 必须做 | — |
+| 执行删除操作前（如关闭 Issue、删除标签）须先向用户确认 | ✅ 必须做 | — |
+| 直接写代码、修改文件 | ❌ 禁止 | — |
+| 直接写博客内容（正文/配图/视频） | ❌ 禁止（coding 职责） | — |
+| 直接调用博客发布 API | ❌ 禁止（sre 职责） | — |
+| 提交 PR、合并 PR | ❌ 禁止 | — |
+| 未经用户确认执行删除/关闭操作 | ❌ 禁止 | — |
+| 回复 Token、密码等敏感信息 | ❌ 禁止 | — |
+| 探索 Grape 系统文件（data/workspaces/ 项目知识文档除外） | ❌ 禁止 | — |
 
 ## API 调用参考
 
@@ -325,7 +398,7 @@ curl -s -X PATCH ... -d '{"state": "close"}' \
 - `references/blog-spec-generation.md` — 博客 Spec 生成指南
 - `references/blog-a2a-workflow.md` — 博客 A2A 协作链路
 
-### 从 issue-advance 继承的参考（路径指向 issue-advance 目录）
+### 从通用 Issue 运营技能继承的参考（路径指向同级 issue-advance 目录）
 - `../../issue-advance/references/issue-developability-analysis.md` — 深度可开发性分析
 - `../../issue-advance/references/spec-generation.md` — 通用 Spec 生成（非博客场景使用）
 - `../../issue-advance/references/labeling-guide.md` — 标签管理
@@ -344,17 +417,17 @@ curl -s -X PATCH ... -d '{"state": "close"}' \
 ```json
 {
   "scene": "blog",
-  "actions": ["场景识别:博客", "可开发性分析", "博客系统验证", "博客Spec生成", "A2A→coding(ai-blog-generation)"],
+  "actions": ["场景识别:博客", "可开发性分析", "博客系统验证", "博客Spec生成", "A2A→coding(博客内容生成技能)"],
   "conclusion": "博客需求已分析，评级ready，Spec已发布，coding已接办",
   "artifacts": {
     "spec_comment_id": 186385987,
-    "blog_host": "113.44.150.237",
+    "blog_host": "$BLOG_HOST",
     "spec_ready": true,
     "a2a_to": "coding",
-    "coding_skill": "ai-blog-generation"
+    "coding_skill": "博客内容生成技能（通过A2A context指定）"
   },
   "next_step": "coding 生成博客内容 → A2A sre 发布",
-  "issue_summary": "Issue#X 博客需求 | 评级ready | Spec已发布 | coding接办(ai-blog-generation) | 发布目标:http://{BLOG_HOST}/"
+  "issue_summary": "Issue#X 博客需求 | 评级ready | Spec已发布 | coding接办(博客内容生成) | 发布目标:https://{BLOG_HOST}/"
 }
 ```
 
@@ -376,3 +449,29 @@ curl -s -X PATCH ... -d '{"state": "close"}' \
 ```
 
 **不输出 JSON 块视为任务未完成。**
+
+## 性能预算
+
+| 指标 | 预算值 | 说明 |
+|------|--------|------|
+| P95 执行时延 | < 60s | 从 Issue 读取到 A2A 交办完成（不含用户交互等待） |
+| LLM 调用次数 | ≤ 8 次 | 上下文分析(1) + 可开发性分析(1) + 场景识别(1) + Spec 生成(1) + 评论生成(1) + A2A 构造(1) + 通知(1) + 容错(1) |
+| Token 消耗 | ≤ 12000 tokens | SKILL.md ~4000 tokens + references ~4000 tokens + 运行时上下文 ~4000 tokens |
+| 上下文压缩 | 超过 8000 tokens 时触发 | 自动压缩历史评论和早期分析，保留最近上下文 |
+
+## 版本管理策略
+
+- 当前版本：v1.0（frontmatter 不声明 version 字段，遵循 v1.0 规范）
+- 变更日志记录在仓库 CHANGELOG.md 中
+- 向后兼容策略：outputSchema 新增字段为可选（非 required），不破坏下游解析
+- 灰度机制：通过 GitCode 分支管理（dev → main），合并前需通过 linter + tester + auditor 三阶段测试
+
+## 断点续跑机制
+
+若会话因超时或中断重启，按以下策略恢复进度：
+
+1. **读取 Issue 最新评论**：检查是否包含 `[blog-issue Agent]` 前缀的评论，定位上次执行到哪一步
+2. **检查 Issue Pipeline 信息**：从 prompt 中的 Issue Pipeline 查看已有 stage 记录（如 `issue:a2a_event` 表示 A2A 已完成）
+3. **检查标签状态**：`spec-ready` 标签存在表示 Spec 已发布；`blog-issue` 标签存在表示已分类
+4. **从最后完成的步骤继续**：跳过已完成的步骤，从下一步继续执行
+5. **A2A 去重**：如 pipeline 中已有 `coding:a2a_event`，不重复 A2A

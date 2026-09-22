@@ -29,7 +29,7 @@ PR 合并后，通过 A2A 通知 SRE Agent 执行部署。
 ### A2A 触发示例
 
 ```bash
-curl -X POST https://grape-dev.topxtopx.com/api/a2a \
+curl -X POST $GRAPE_A2A_URL \
   -H "Authorization: Bearer $BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

@@ -1,9 +1,10 @@
 ---
 name: iac-qa
-version: 1.1.0
+version: 2.0.0
 description: |
-  QA 审查增强版。负责代码审查、自动化测试、功能验证、安全检查。
+  IaC QA 审查增强版。负责代码审查、自动化测试、功能验证、安全检查。
   通过 A2A 协议被 Coding Agent 调用执行审查。
+  审查时通过华为云资源查询能力交叉验证资源规格。
 tools:
   - git
   - curl
@@ -23,7 +24,8 @@ tags:
 - 已安装 git 和 curl
 - 已配置 `$BOT_TOKEN` 环境变量
 - 目标 PR 已创建且有可获取的 diff
-- Grape 平台 A2A 服务可用（https://grape-dev.topxtopx.com/api/a2a）
+- Grape 平台 A2A 服务可用（$GRAPE_A2A_URL）
+- 华为云凭证已通过 Grape 控制台注入（`HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`）
 
 ## 安全硬约束（必须遵守）
 
@@ -57,6 +59,12 @@ tags:
 - 确认测试用例覆盖是否充分
 - 检查边界条件处理
 - 验证错误处理逻辑
+
+#### 资源规格交叉验证（IaC 专项）
+- 通过华为云计算资源查询能力交叉验证 TF 配置中的 ECS flavor、镜像名称在目标区域真实可用
+- 通过华为云网络资源查询能力验证 VPC CIDR、安全组规则不与现有资源冲突
+- 通过华为云存储资源查询能力验证 OBS 桶名、EVS 磁盘类型在目标区域可用
+- 发现规格不一致时标记为 P1 问题，要求 Coding Agent 修正
 
 ### 3. 安全检查
 - 检查敏感信息泄漏（AK/SK/密码/token）
@@ -92,12 +100,80 @@ QA 审查通过（✅ LGTM）后，**自动合并 PR**，然后**通过 A2A 将 
 
 详见 `references/a2a-handoff.md`。
 
+## 声明
+
+### 输入参数（inputSchema）
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| repo_full_name | string | 是 | 仓库全名（owner/repo） |
+| issue_number | integer | 是 | 关联 Issue 编号 |
+| pr_number | integer | 是 | 待审查的 PR 编号 |
+| context | string | 否 | A2A 传入的审查上下文 |
+| pipeline | array | 否 | 当前 Issue 的 A2A pipeline 事件列表 |
+
+非法输入（缺失必填项、PR 不存在、PR 无 diff）时立即终止并输出结构化错误，不降级执行。
+
+### 输出格式（outputSchema）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| verdict | string | 审查结论：`LGTM` 或 `Request Changes` |
+| findings | array | 问题列表，每项含 {id, severity(P0-P3), description, file, line} |
+| summary | string | 审查结论摘要（贴 MR 评论区） |
+| full_report | string | 完整审查报告（贴 Issue 评论区） |
+| merged | boolean | 是否已自动合并 PR（verdict=LGTM 时） |
+| a2a_dispatched | boolean | 是否已 A2A 交办 SRE Agent（合并后） |
+| next_step | string | 下一步建议 |
+
+### 读写语义
+
+| 操作类型 | 行为 | 示例 |
+|----------|------|------|
+| 读操作 | 自动执行 | GET PR diff、GET PR files、GET Issue 信息、terraform plan（只读预览）、查询华为云资源规格 |
+| 写操作 | A2A 流水线自动执行（非交互式流水线设计，无需用户逐次确认） | POST Issue 评论、POST MR 评论、PUT 合并 PR、POST A2A |
+| 删除操作 | 禁止 | 不执行 terraform apply/destroy、不删除 PR、不删除分支 |
+
+### 性能预算
+
+| 指标 | 预算 | 说明 |
+|------|------|------|
+| Skill 加载时延 | < 3s | 纯文档型 skill，无加载期脚本 |
+| 审查执行时延 | P95 ≤ 8 min | 含 diff 获取 + 代码审查 + 安全扫描 + 资源交叉验证 + 报告输出 |
+| terraform plan | ≤ 5 min | 含 init + plan（OBS backend 连通） |
+| LLM token 消耗 | ≤ 12000 tokens/次 | 含参考文件按需加载 |
+| API 调用次数 | ≤ 15 次/次执行 | VCS API + 华为云查询 + A2A |
+
+### 兼容性声明
+
+| 依赖 | 版本要求 | 说明 |
+|------|----------|------|
+| terraform | >= 1.7.5, <= 1.10.5 | OBS backend 兼容窗口 |
+| git | >= 2.20 | 基础 git 操作 |
+| curl | >= 7.60 | VCS API 调用 |
+| VCS API | v5 | 所有 API 调用基于 v5 端点 |
+| Grape A2A | >= 1.0 | A2A payload 结构遵循 Grape 平台约定 |
+| 计算资源查询 | >= 1.0 | 资源规格交叉验证（声明在 requires 中） |
+| 网络资源查询 | >= 1.0 | 网络资源交叉验证（声明在 requires 中） |
+| 存储资源查询 | >= 1.0 | 存储资源交叉验证（声明在 requires 中） |
+| 版本演进策略 | — | 本 Skill 版本号在 frontmatter 中声明；A2A 调用方按 issue_number/pr_number 传参，不依赖 Skill 版本号 |
+
+### 可靠性声明
+
+| 机制 | 声明 |
+|------|------|
+| 超时处理 | API 调用 30s 超时；terraform plan 300s 超时；华为云查询 60s 超时；超时后重试 1 次，仍失败则降级 |
+| 重试幂等 | PUT 合并 PR 前检查 PR 状态（已合并则跳过）；A2A 前检查 pipeline 是否已有 sre:a2a_event；terraform plan 可安全重跑 |
+| 失败降级 | 合并失败 → 在 PR 评论告知等待人工处理，不提前 A2A 交办 SRE；A2A 失败 → 在 Issue 评论标注「待人工交办 SRE Agent」；华为云查询失败 → 审查报告中标注「资源规格未交叉验证」；API 403 → 立即停止并告知用户 |
+| 资源清理 | terraform plan 产生的 plan-review.tfplan 为中间产物，审查完成后可删除；不创建临时云资源；不修改 .terraform/ 目录以外的系统文件 |
+
 ## 硬规则
 
 | 行为 | 态度 |
 |------|-------|
 | 评论 body 前缀固定为 `[qa Agent]` | ✅ **必须做** |
 | 审查必须包含代码质量/功能/安全三方面 | ✅ **必须做** |
+| IaC PR 审查必须交叉验证资源规格可用性 | ✅ **必须做** |
 | 发现问题必须在 PR 评论中详细描述 | ✅ **必须做** |
 | 问题按严重程度分级（P0/P1/P2/P3） | ✅ **必须做** |
 | 审查通过后必须在 PR 评论标记 ✅ LGTM | ✅ **必须做** |

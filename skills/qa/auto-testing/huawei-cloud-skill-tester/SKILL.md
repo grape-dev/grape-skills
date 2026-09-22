@@ -73,7 +73,7 @@ User Input (--skills or --all-installed)
 
 1. **hcloud CLI** installed and authenticated (for Tier 2 CLI mode testing) — Reference: https://support.huaweicloud.com/qs-hcli/hcli_02_003.html
 2. **Python 3.8+** + `huaweicloudsdk` packages (for SDK mode testing) — SDK Reference: https://console.huaweicloud.com/apiexplorer/#/sdkcenter
-3. **Huawei Cloud AK/SK** — auto-scans all environment variables prefixed `HUAWEI` / `HW` / `HWC` (key-value pairs whose keys carry AK/SK markers). **If missing, the framework emits the env-var setup template to stderr and exits 77. NEVER ask the user to type AK/SK in chat; the user must set env vars in their shell profile out-of-band and re-run.** (full protocol: `references/agent-protocol.md`).
+3. **Huawei Cloud AK/SK** — auto-scans all environment variables prefixed `HUAWEI` / `HW` / `HWC` (key-value pairs whose keys carry AK/SK markers), or an active `hcloud` CLI profile. **If missing, the framework emits a three-option guide to stderr and exits 77: ① machine owner exports the missing env vars out-of-band; ② grape 环境在平台「通用设置」菜单配置凭据; ③ set `DRYRUN_MODE=1` to continue in dryrun/mock (cases marked `dryrun`, never `pass`). NEVER ask the user to type AK/SK in chat.** (full protocol: `references/agent-protocol.md`).
 4. **Target Skill** must be under `$SKILL_INSTALL_DIR/` (auto-detected: `~/.agents/skills/` → `~/.hermes/skills/` → default) or a user-specified path
 5. **jq** command (all JSON processing depends on it)
 6. **API Reference**: https://console.huaweicloud.com/apiexplorer/#/openapi
@@ -220,6 +220,7 @@ bash scripts/tier2/phase-6-full-flow.sh --skill "huawei-cloud-rds-intelligent-se
 | `ALLOW_WRITES` | `0` | When `1`, Phase 4/6 write cases actually execute against the live API (default is skip) |
 | `HUAWEI_REGION` | `cn-north-4` | Huawei Cloud region |
 | `HUAWEI_ACCESS_KEY` / `HUAWEI_SECRET_KEY` | — | Required for Phase 4/6 SDK/CLI execution; any `HUAWEI*` / `HW*` / `HWC*` prefixed AK/SK env var is also accepted |
+| `DRYRUN_MODE` | `0` | `1` = dryrun/mock mode (user option 3): skip credential check, mark every live case `dryrun` (never `pass`); report explicitly labels the mode |
 | `SKILL_QUALITY_ENDPOINT` | `https://skillsapi.developer.myhuaweicloud.com/api/quality/report` | Quality-report server URL (see Quality Reporting below) |
 | `SKILL_QUALITY_NAME` | auto (`huawei-cloud-skill-tester`) | Skill name reported to the operations console; read by the SDK when `report()` has no explicit `skill_name` |
 | `SKILL_QUALITY_DISABLE` | `0` | Set to `1` to disable quality reporting entirely (local debugging) |
@@ -334,7 +335,7 @@ See `references/output-schema-spec.md` for the JSON schema. Phase 5 and 6 additi
 - Three-track eight-phase strictly follows sequential order; chain verification prevents skipping
 - API endpoints are strictly prohibited from being inferred; only obtain from SDK `_http_info` or API Explorer
 - Credentials are read from environment variables; hardcoding is prohibited
-- **If AK/SK is missing, the framework emits the env-var setup template to stderr and exits 77. The Agent MUST output that template to the user verbatim and instruct them to set env vars out-of-band (in their shell / PowerShell $PROFILE). The Agent MUST NEVER ask the user to type or paste AK/SK in chat. Strictly prohibited from silently skipping any step that requires credentials.** (full protocol: `references/agent-protocol.md`)
+- **If AK/SK is missing, the framework emits a three-option guide to stderr and exits 77. The Agent MUST post the three options to the user in the issue comment and wait for their choice: ① machine owner exports missing env vars out-of-band; ② grape 环境在平台「通用设置」菜单配置凭据; ③ `DRYRUN_MODE=1` 以 dryrun/mock 继续（用例标记 `dryrun` 而非 `pass`）. NEVER ask the user to type or paste AK/SK in chat. Strictly prohibited from silently skipping any step that requires credentials.** (full protocol: `references/agent-protocol.md`)
 - Resources created during testing must be tracked; if any are left behind, output manual cleanup instructions
 - Orchestration scenarios are auto-derived; user should review and confirm before execution
 - Write operations in orchestration scenarios require per-step user confirmation
@@ -344,7 +345,7 @@ See `references/output-schema-spec.md` for the JSON schema. Phase 5 and 6 additi
 | Scenario | Handling |
 |----------|----------|
 | Skill directory does not exist | Report error and terminate, output available skill list |
-| AK/SK environment variables not set | Framework emits the env-var setup template (with `export HUAWEI_ACCESS_KEY=<your-access-key>` / `$env:HUAWEI_ACCESS_KEY=<your-access-key>` placeholder snippets) to stderr and exits 77. The Agent (or terminal caller) MUST output that template to the user and tell them to set env vars in their shell profile / PowerShell $PROFILE out-of-band, then re-run. **Never** ask the user to type or paste AK/SK in chat. Strictly prohibited from silently skipping. |
+| AK/SK environment variables not set | Framework emits a three-option guide to stderr and exits 77: ① 机器拥有者 export 缺失环境变量 ② grape 环境在平台「通用设置」菜单配置凭据 ③ `DRYRUN_MODE=1` 以 dryrun/mock 继续后续流程（用例标 `dryrun`，报告显式标注，绝不以 pass 呈现）. The Agent MUST post the options to the user in the issue comment and wait for their choice; user configures out-of-band then confirms. **Never** ask the user to type or paste AK/SK in chat. Strictly prohibited from silently skipping; dryrun is the only credential-less path and is always labeled. |
 | User specifies skill name but not installed in Hermes | `--fresh` performs directory-level detection; if not found, report error with guidance |
 | Some Phase JSON files deleted | Chain detection → Restart from the deleted Phase |
 | Network interruption during Phase 4 execution | Already executed case results are not lost; on rerun, skip passed cases (via `--phase` flag) |
@@ -356,15 +357,20 @@ See `references/output-schema-spec.md` for the JSON schema. Phase 5 and 6 additi
 | Cross-skill data flow mismatch | Logged in Phase 5 as `data_flow_tests` candidate; not auto-executed |
 | Orphaned resources detected after E2E flow | Listed in `phase-6-summary.json` under `cleanup.manual_required` with concrete cleanup commands |
 
-## Agent Protocol — Credential Request
+## Agent Protocol — Credential Request (三选项)
 
-When Phase 4 or Phase 6 needs to call live Huawei Cloud APIs but cannot find credentials in the environment, the framework does **not** silently skip. It emits a structured request (sentinel line `__HUAWEI_SKILL_TESTER_CRED_REQUEST_v1__` to stderr) and exits with code `77` so the calling agent is forced to surface the need to the user.
+When Phase 4 or Phase 6 needs to call live Huawei Cloud APIs but cannot find credentials in the environment, the framework does **not** silently skip. It emits a structured request (sentinel line `__HUAWEI_SKILL_TESTER_CRED_REQUEST_v1__` to stderr) plus a **three-option guide**, and exits with code `77` so the calling agent is forced to surface the choices to the user in the issue comment.
+
+**Three options the Agent MUST post to the user (wait for their choice):**
+1. **环境变量（机器拥有者）** — user exports the missing env vars on the current machine (template in stderr: export HUAWEI_ACCESS_KEY / HUAWEI_SECRET_KEY / HUAWEI_REGION) and replies confirmed
+2. **grape 平台通用设置** — for grape environments user configures the credentials in the「通用设置」menu and replies confirmed
+3. **dryrun/mock 模式** — caller re-runs with `DRYRUN_MODE=1`; live cases are marked `dryrun` (never `pass`) and the report explicitly labels the run as dryrun
 
 **Core rules (MUST follow):**
 1. On exit 77 or the sentinel → pause the pipeline; do not skip Phase 5/7
-2. Output the env-var setup template from stderr **verbatim** to the user; guide them to configure out-of-band in their shell profile / PowerShell $PROFILE (placeholders `<your-access-key-id>` / `<your-secret-access-key>`)
+2. Post the three options from stderr **verbatim** to the user in the issue comment; wait for their choice
 3. **Never** ask for AK/SK plaintext in the conversation (ask_user / read -p / clipboard round-trip / reading paths such as ~/.hcloud/config.json)
-4. After out-of-band setup, re-run the failed phase; if the user refuses, explicitly mark "live phases skipped — no credentials", never mark pass
+4. After the user configures out-of-band and confirms, re-run the failed phase; if the user picks option 3, re-run with `DRYRUN_MODE=1`. If the user declines everything, explicitly mark "live phases skipped — no credentials", never mark pass
 
 > Full protocol (6-step response flow, direct terminal mode, example behavior): `references/agent-protocol.md`.
 
@@ -374,10 +380,10 @@ When Phase 4 or Phase 6 needs to call live Huawei Cloud APIs but cannot find cre
 - **Agent-proof** — Write operations must be confirmed by the user; fake confirmations are not allowed
 - **Data-Driven** — All phases output in JSON format; Phase 7 merges
 - **Batch Repeatable** — The same set of skills can be tested repeatedly; --fresh resets
-- **Real-Environment First** — All orchestrations and E2E flows execute against real Huawei Cloud; no mocks
+- **Real-Environment First** — All orchestrations and E2E flows execute against real Huawei Cloud; no mocks unless the user explicitly chooses option 3 (dryrun/mock), which is always labeled `dryrun` in the report and never counts as a real pass
 - **Degrade Without Losing Value** — Single skill does not run empty orchestration phases; degrades to meaningful single-skill lifecycle tests
 - **Resource Safety** — Resources created during testing must be tracked; if any remain, output clear manual cleanup instructions
-- **Credentials Mandatory** — If AK/SK is missing, the framework emits the env-var setup template to stderr and exits 77. The Agent MUST output that template to the user and instruct them to set env vars out-of-band. The Agent MUST NEVER ask the user to type or paste AK/SK in chat. Strictly prohibited from silently skipping any step that requires credentials.
+- **Credentials Mandatory** — If AK/SK is missing, the framework emits a three-option guide to stderr and exits 77 (① export env vars ② grape 通用设置 ③ `DRYRUN_MODE=1` dryrun/mock). The Agent MUST post the options to the user in the issue comment and wait for their choice. The Agent MUST NEVER ask the user to type or paste AK/SK in chat. Strictly prohibited from silently skipping any step that requires credentials; the only credential-less path is an explicitly labeled dryrun run.
 
 
 

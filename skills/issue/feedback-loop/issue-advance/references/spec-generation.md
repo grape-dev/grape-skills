@@ -107,7 +107,7 @@
 - 必须包含：所有现有测试通过 + 新增测试覆盖新功能
 - **若需求含"运行验证"（起本地服务看效果，如 `python -m http.server 8080`）**：
   - 在 Spec 中**改写为一次性验证模式**，严禁把裸前台命令写入 Spec：
-    `python3 -m http.server 8080 >/tmp/httpd.log 2>&1 & sleep 1; curl -s http://localhost:8080/ | head -20; kill %1`
+    `python3 -m http.server 8080 >/tmp/httpd.log 2>&1 & sleep 1; curl -s http://localhost:8080/ | head -20; kill %1`（仅限本地回环地址的一次性验证示例，不涉及外部网络）
   - 或将"运行验证"标注为**由 sre Agent 执行**（构建部署/运行验证），编码阶段不做运行时验证；
   - 原因：coding 前台执行长驻命令会导致 opencode 等待命令退出而超时失败（见 coding-worktree-skill-collision.md §4.5）。
 
