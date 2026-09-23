@@ -3,7 +3,7 @@
 > 目的：把 Coding 处理 Issue / PR 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$PR_NUMBER`、`$GRAPE_WORK_BRANCH`（工作基线分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
 > **评论前缀硬规**：所有 Coding 评论 body 一律以 `[Coding Agent]` 开头（用 `grape git-repo issues comments create` / `grape git-repo pulls comments create ... --json '{"body":"[Coding Agent] ..."}'`）。
-> 命令取舍速查：读 Issue 聚合用 `issues detail`；取原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth 2`（**`tree` 无 `--path`**）。
+> 命令取舍速查：读 Issue 聚合用 `issues detail`；取原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth single`（**`tree` 无 `--path`**）。
 
 ---
 
@@ -50,7 +50,7 @@ grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
 grape knowledge stats --repo "$REPO_FULL_NAME" --json-out
 grape knowledge list --repo "$REPO_FULL_NAME" --source agent --json-out
 ```
-- 基线降级（`meta.degraded=true` 或 files 空）→ `grape git-repo repo` / `grape git-repo tree --depth 2` / `contents README --raw`。
+- 基线降级（`meta.degraded=true` 或 files 空）→ `grape git-repo repo` / `grape git-repo tree --depth single` / `contents README --raw`。
 - 任一命令报 403 → 跳过该来源，其余正常执行。
 - ⚠️ **同一 `$WORK_BRANCH` 贯穿本场景后续所有步骤**：建 PR 的 `base`、开发分支的创建/切换、基线同步必须一致，确保 PR 指向正确的目标合入分支。
 
@@ -227,7 +227,7 @@ grape tasks complete --json '{
 | `git commit` 被拒（无 user.name/email） | 先 `grape git config user.name/user.email`（见 Step 0）再 commit |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能不涉及 |
-| `contents` 路径不存在 | 用 `tree --depth 2` 或 `contents --path ""` 定位 |
+| `contents` 路径不存在 | 用 `tree --depth single` 或 `contents --path ""` 定位 |
 
 ## 明确禁止
 

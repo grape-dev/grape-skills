@@ -3,7 +3,7 @@
 > 目的：把 Issue Agent 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
 > **评论前缀硬规**：所有 Issue 评论 body 一律以 `[issue agent]` 开头。
-> 命令取舍速查：读 Issue 聚合用 `issues detail`；原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth 2`（`tree` 无 `--path`）。
+> 命令取舍速查：读 Issue 聚合用 `issues detail`；原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth single`（`tree` 无 `--path`）。
 
 ---
 
@@ -35,7 +35,7 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source agent --json-out
 grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
 ```
 - `meta.degraded=false` 且 `files` 非空 → 基线可用，基于它分析，不再逐文件探索。
-- 无基线/`[degraded]` → 降级：`grape git-repo repo` / `grape git-repo tree --depth 2` / `contents README --raw`。
+- 无基线/`[degraded]` → 降级：`grape git-repo repo` / `grape git-repo tree --depth single` / `contents README --raw`。
 - ⚠️ **首次必做**（建立分析基础）；后续事件按需——若已掌握足够项目上下文、且本次是简单追问/澄清，可由 agent 自行判断是否需要重新拉取（如项目可能更新或评论需基于新信息时再取）。
 
 ### Step 3 · 深度可开发性分析（⚠️ 每次处理都执行）
@@ -155,7 +155,7 @@ grape tasks complete --json '{
 | `unknown request field(s): ...` | `--json` 字段不在允许集，看 `--help` 的 Body fields 删除多余字段 |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能一般不涉及 |
-| `contents` 路径不存在 | 用 `tree --depth 2` 或 `contents --path ""` 定位 |
+| `contents` 路径不存在 | 用 `tree --depth single` 或 `contents --path ""` 定位 |
 
 ## 明确禁止
 

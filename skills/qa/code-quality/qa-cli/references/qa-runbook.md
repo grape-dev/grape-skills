@@ -65,7 +65,7 @@ grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NU
 
 ### Step 4 · 工作流审查（Agent Work Loop 五维：任务理解/受控执行/变更验证/可靠交付/经验沉淀）
 ```bash
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth 2 --json-out                          # 目录树（无基线降级时；$WORK_BRANCH 见 Step A1）
+grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth single --json-out                          # 目录树（无基线降级时；$WORK_BRANCH 见 Step A1）
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path AGENTS.md --raw                                # 任务理解/受控执行
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path spec --raw                                      # 任务理解
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path tests --raw                                    # 变更验证
@@ -124,7 +124,7 @@ grape tasks complete --json '{
 | `unknown request field(s): ...` | `--json` 字段不在允许集，看 `--help` 的 Body fields 删多余字段 |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能一般不涉及 |
-| `contents` 路径不存在 / 无基线 | 用 `tree --depth 2` / `contents --path ""` 定位 |
+| `contents` 路径不存在 / 无基线 | 用 `tree --depth single` / `contents --path ""` 定位 |
 
 ## 明确禁止
 

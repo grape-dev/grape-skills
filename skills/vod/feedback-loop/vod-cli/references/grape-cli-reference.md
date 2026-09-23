@@ -70,7 +70,7 @@ grape knowledge detail --knowledge_id {id} --json-out               # 读单条�
 # 分支 / 提交 / 文件（知识基线降级、增量判断）
 grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
 grape git-repo commits --owner {owner} --repo {repo} --per_page 10 --json-out
-grape git-repo tree --owner {owner} --repo {repo} --ref main --depth 2 --json-out   # 目录树（--depth N 控制层级，无 --path）
+grape git-repo tree --owner {owner} --repo {repo} --ref main --depth single --json-out   # 目录树（--depth single=单层默认/recursive 仅 GitHub，无 --path）
 grape git-repo contents --owner {owner} --repo {repo} --path README.md --raw   # 文件原文（自动 base64 解码）
 grape git-repo contents --owner {owner} --repo {repo} --path "" --json-out     # 列根目录文件列表
 
@@ -90,7 +90,7 @@ grape tasks complete --json '{
 
 **命令取舍速查（避免重复调用 / 试错）：**
 - **读 Issue 上下文**：首选聚合视图 `grape issues detail`（含阶段/状态/事件/路线图）；`grape git-repo issues get`（原始字段）仅在 detail 缺字段时再用；评论用 `grape git-repo issues comments list`。**不要 three 者都调**。
-- **列目录**：`grape git-repo tree --depth 2`（目录树，**无 `--path`**）；`contents --path ""` 列根目录文件列表；读单个文件用 `contents --path <file> --raw`。一次 `tree --depth 2` 看清结构，再按需读 2-3 个关键文件，**不要逐目录 contents**。
+- **列目录**：`grape git-repo tree --depth single`（目录树，**无 `--path`**）；`contents --path ""` 列根目录文件列表；读单个文件用 `contents --path <file> --raw`。一次 `tree --depth single` 看清结构，再按需读 2-3 个关键文件，**不要逐目录 contents**。
 - **owner/repo**：用环境变量 `$ACCOUNT` / `$REPO_NAME`（如命令模板所示），不要硬编码。
 
 - 所有命令支持 `--json-out`（机器可读单行 JSON）；分页 `--per_page 20`（max 100）；出参结构 = GitCode 平台实际结构。

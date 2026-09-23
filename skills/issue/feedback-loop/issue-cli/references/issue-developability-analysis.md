@@ -12,7 +12,7 @@
 grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
 ```
 
-无基线 / `[degraded]` → 降级用 `grape git-repo repo` / `tree --depth 2` / `contents README --raw`。
+无基线 / `[degraded]` → 降级用 `grape git-repo repo` / `tree --depth single` / `contents README --raw`。
 
 ## 四维分析（按 1→2→3→4 顺序执行，每步必须输出结论）
 

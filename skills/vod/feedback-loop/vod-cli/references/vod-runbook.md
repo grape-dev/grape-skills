@@ -3,7 +3,7 @@
 > 目的：把 VOD 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
 > **评论前缀硬规**：所有 VOD 评论 body 一律以 `[VOD Agent]` 开头（用 `grape git-repo issues comments create ... --json '{"body":"[VOD Agent] ..."}'`）。
-> 命令取舍速查：读 Issue 聚合用 `issues detail`；取原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth 2`（**`tree` 无 `--path`**）。
+> 命令取舍速查：读 Issue 聚合用 `issues detail`；取原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth single`（**`tree` 无 `--path`**）。
 
 ---
 
@@ -31,7 +31,7 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out  # 系�
   # 目标分支：$GRAPE_WORK_BRANCH → repos project info 的 branches_analyzed 首个 → main/master 探测
   TARGET_BRANCH="${GRAPE_WORK_BRANCH:-}"
   grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out   # 取 default_branch（若有）
-  grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "${TARGET_BRANCH:-main}" --depth 2 --json-out
+  grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "${TARGET_BRANCH:-main}" --depth single --json-out
   grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md --raw
   # 若 main 不存在（404）→ 用 master 重试：--ref master
   ```
@@ -163,7 +163,7 @@ grape tasks complete --json '{
 | `unknown request field(s): ...` | `--json` 里有契约不允许的字段，看确认的 Body fields，删掉多余字段 |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能不涉及 |
-| `contents` 路径不存在 | 用 `tree --depth 2` 或 `contents --path ""` 定位 |
+| `contents` 路径不存在 | 用 `tree --depth single` 或 `contents --path ""` 定位 |
 
 ## 明确禁止
 

@@ -33,7 +33,7 @@
 ### Step 1 · 理解项目结构（判断构建方式）
 ```bash
 grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out   # 项目知识基线（优先）
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth 2 --json-out
+grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth single --json-out
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md --raw
 ```
 | 文件标记 | 推断 |
