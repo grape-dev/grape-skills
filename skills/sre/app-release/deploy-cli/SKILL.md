@@ -33,7 +33,6 @@ tools:
    ```bash
    grape refresh
    ```
-   - 刷新后核对本技能关键命令存在（`git-repo issues comments` / `git-repo contents` / `git-repo tree` / `repos project info` / `tasks complete`）；缺关键命令 → 视为版本过旧，先升级再试。
    - ⚠️ 契约权威 = `grape commands` 实列；不猜命令名。
 3. **认证与环境变量就绪**：
    ```bash
