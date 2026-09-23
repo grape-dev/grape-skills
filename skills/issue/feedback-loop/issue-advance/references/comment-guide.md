@@ -41,10 +41,7 @@
 ## 评论格式要求
 
 ```bash
-POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_TOKEN
-Content-Type: application/json
-{"body": "> 用户的问题原文\n\n[issue agent] 这是机器人的回复内容。"}
+grape git-repo issues comments create --owner {owner} --repo {repo} --number {number} --json '{"body": "> 用户的问题原文\n\n[issue agent] 这是机器人的回复内容。"}'
 ```
 
 - body 必须以 `[issue agent]` 开头

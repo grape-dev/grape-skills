@@ -15,20 +15,19 @@
 优先从 `codeowner` 分支获取：
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_TOKEN" \
-  "$VCS_API_BASE/repos/{owner}/{repo}/contents/CODEOWNERS?ref=codeowner"
+grape git-repo contents --owner {owner} --repo {repo} --path CODEOWNERS --ref codeowner --raw --json-out
 ```
 
 如果返回 404，尝试默认分支：
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_TOKEN" \
-  "$VCS_API_BASE/repos/{owner}/{repo}/contents/CODEOWNERS"
+grape git-repo contents --owner {owner} --repo {repo} --path CODEOWNERS --raw --json-out
 ```
 
-返回 JSON，`content` 字段是 Base64 编码，需解码后读取：
+返回 JSON，`--raw` 已自动 Base64 解码为原始文本；如需手动解码则取 `content` 字段：
 
 ```python
+# 仅当未使用 --raw 时：content 字段是 Base64 编码
 import base64, json
 data = json.loads(response_text)
 text = base64.b64decode(data['content']).decode('utf-8')
@@ -56,36 +55,30 @@ text = base64.b64decode(data['content']).decode('utf-8')
 
 判断 Issue 是否与仓库项目范围完全无关：
 - **完全无关** → 不分配，直接关闭：
-  ① `PATCH /issues/{number}` `{"labels": "invalid"}`
-  ② `PATCH /issues/{number}` `{"state": "close"}`
+  ① `grape git-repo issues update --owner {owner} --repo {repo} --number {number} --json '{"labels":"invalid"}'`
+  ② `grape git-repo issues update --owner {owner} --repo {repo} --number {number} --json '{"state":"closed"}'`
   ③ 评论说明该 Issue 与项目无关，已关闭 → 结束处理
 - **可能相关但无法确认** → 走兜底负责人，让人工判断
 
 ### 7. 能确定负责人
 
-立即调用 API 分配（必须先执行，再评论）：
+立即调用 CLI 分配（必须先执行，再评论）：
 
 ```bash
-curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"assignee": "younger_eric"}' \
-  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
+grape git-repo issues update --owner {owner} --repo {repo} --number {number} --json '{"assignee":"younger_eric"}'
 ```
 
 ### 7.1 通知责任人 / 确保任务存在（必做）
 
-**在分配动作完成后（处理结束、责任人最终确定时），调用 `POST /api/tasks/notify`** 创建任务（接口幂等，换人时自动关闭原责任人任务）：
+**在分配动作完成后（处理结束、责任人最终确定时），调用 `grape tasks notify`** 创建任务（接口幂等，换人时自动关闭原责任人任务）：
 
 ```bash
-curl -X POST {{SERVER_URL}}/api/tasks/notify \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "assignee": "younger_eric",
-    "repo_key": "'"$REPO_FULL_NAME"'",
-    "issue_number": "'"$ISSUE_NUMBER"'",
-    "task_description": "Issue #'"$ISSUE_NUMBER"' 已分配给你，请处理：<简要任务描述>"
-  }'
+grape tasks notify --json '{
+  "assignee": "younger_eric",
+  "repo_key": "{owner}/{repo}",
+  "issue_number": "{number}",
+  "task_description": "Issue #{number} 已分配给你，请处理：<简要任务描述>"
+}'
 ```
 
 - assignee 必须是仓库有效成员（GitCode 用户名）

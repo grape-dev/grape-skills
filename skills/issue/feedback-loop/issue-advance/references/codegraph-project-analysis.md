@@ -22,7 +22,7 @@ npx --no-install codegraph --version
 详细安装部署指南参见：https://github.com/colbymchenry/codegraph
 
 > ⚠️ codegraph 依赖 Node.js 环境。如目标服务器未安装 Node.js，需先安装 Node.js >= 18。
-> 如安装失败，将降级为基于 README + VCS API 的项目信息获取（见降级方案）。
+> 如安装失败，将降级为基于 README + GitCode API 的项目信息获取（见降级方案）。
 
 ## 存储位置
 
@@ -69,7 +69,7 @@ cat data/workspaces/{owner}/{repo}/project-info/.metadata.json
 
 | 条件 | 检查方式 |
 |------|---------|
-| 当前 main 分支 HEAD commit 与记录不同 | `GET /repos/{owner}/{repo}/commits?per_page=1` 对比 sha |
+| 当前 main 分支 HEAD commit 与记录不同 | `grape git-repo commits --owner {owner} --repo {repo} --per_page 1 --json-out` 对比 sha |
 | 距上次更新超过 7 天 | 对比 `.metadata.json.last_updated` |
 | project-graph.md 或 project-capabilities.md 缺失 | 检查文件是否存在 |
 
@@ -78,8 +78,7 @@ cat data/workspaces/{owner}/{repo}/project-info/.metadata.json
 ### Step 3: 获取分支列表
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_TOKEN" \
-  "$VCS_API_BASE/repos/{owner}/{repo}/branches?per_page=50"
+grape git-repo branches --owner {owner} --repo {repo} --per_page 50 --json-out
 ```
 
 **筛选分析分支**（最多 3 个）：
@@ -227,7 +226,7 @@ EOF
 
 | 异常 | 处理 |
 |------|------|
-| `codegraph init` 失败 | 记录日志，降级为仅基于 README 和 API 获取项目信息 |
+| `codegraph init` 失败 | 记录日志，降级为仅基于 README 和 grape git-repo 命令获取项目信息 |
 | `codegraph_explore` 超时 | 减小 `maxFiles` 参数重试，或跳过该查询 |
 | 分支列表获取失败 | 仅分析当前分支 |
 | 文件写入失败 | 记录日志，不阻塞后续分析流程 |
@@ -236,9 +235,9 @@ EOF
 
 当 codegraph 工具不可用时，通过以下方式获取基础项目信息：
 
-1. **README**：`GET /repos/{owner}/{repo}/readme` → Base64 解码
-2. **仓库信息**：`GET /repos/{owner}/{repo}` → description, language, topics
-3. **目录结构**：`GET /repos/{owner}/{repo}/contents/` → 顶层文件列表
-4. **最近提交**：`GET /repos/{owner}/{repo}/commits?per_page=10` → 活跃度
+1. **README**：`grape git-repo contents --owner {owner} --repo {repo} --path README.md --raw --json-out` → 解码后读取
+2. **仓库信息**：`grape git-repo repo --owner {owner} --repo {repo} --json-out` → description, language, topics
+3. **目录结构**：`grape git-repo tree --owner {owner} --repo {repo} --json-out` → 顶层文件列表
+4. **最近提交**：`grape git-repo commits --owner {owner} --repo {repo} --per_page 10 --json-out` → 活跃度
 
 降级生成的文档标注 `[degraded - codegraph unavailable]`。

@@ -8,11 +8,10 @@
 
 读取 A2A context 中的审查意见，明确需要修改的问题点。
 
-通过 API 获取 PR 上的行内评论，确认具体问题和代码位置：
+通过 grape CLI 获取 PR 上的行内评论，确认具体问题和代码位置：
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_TOKEN" \
-  "$VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/comments"
+grape git-repo pulls comments list --owner {owner} --repo {repo} --number {number} --json-out
 ```
 
 对每条评论检查代码是否已修改、问题是否已解决。如有不明确之处，在 PR 中评论追问。
@@ -56,10 +55,7 @@ git push origin {pr_branch}
 修改完成后，在 PR 中评论告知：
 
 ```bash
-POST /repos/{owner}/{repo}/pulls/{number}/comments
-Authorization: Bearer $BOT_TOKEN
-Content-Type: application/json
-{"body": "[Coding Agent] 已根据审查意见完成修改，请重新审查。"}
+grape git-repo pulls comments create --owner {owner} --repo {repo} --number {number} --json '{"body": "[Coding Agent] 已根据审查意见完成修改，请重新审查。"}'
 ```
 
 > 注：评论 body 前缀固定为 `[Coding Agent]`。
