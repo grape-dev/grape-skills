@@ -132,11 +132,20 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 ```
 
 ### Step 7 · A2A 通知 QA Agent（必须执行，跳过 = 事件未完成）
-> ⚠️ 交办前先用 `$GRAPE_SCENE_ID` 取当前场景，确认存在 `qa` 节点再交办；场景未注入且默认链路包含 QA → 用默认 `qa`。
+> ⚠️ 交办前必须先取当前场景 nodes 并校验含 `qa` 节点，命中才交办；场景未注入且默认链路含 QA → 用默认 `qa`。
 ```bash
 echo "scene_id=${GRAPE_SCENE_ID:+set} PR_NUMBER=${PR_NUMBER:+set}"
-grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out   # 仅 ${GRAPE_SCENE_ID:-} 非空时执行；nodes[].skill 判断
-
+# 场景 ID 非空时：取场景 nodes → 解析可用 Agent 集合 → 校验 qa 命中
+SCENE_NODES="$(grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out 2>/dev/null)"
+echo "scene_agents: $(echo "$SCENE_NODES" | jq -r '[.nodes[]?.tag // .nodes[]?.skill] | unique | join(",")' 2>/dev/null)"
+if echo "$SCENE_NODES" | jq -e --arg a "qa" '[.nodes[] | ((.tag // "")|ascii_downcase) + " " + ((.skill // "")|ascii_downcase)] | any(startswith($a) or startswith("$a-"))' >/dev/null 2>&1; then
+  echo "OK: scene contains qa node → 可 A2A QA"
+else
+  echo "BLOCK: scene (id=$GRAPE_SCENE_ID) 不含 qa 节点 → 不发起 QA A2A"
+fi
+```
+- **命中 qa 节点 / 场景未注入** → 发起 A2A：
+```bash
 grape a2a handoff --json '{
   "agent": "qa",
   "payload": {
@@ -149,7 +158,7 @@ grape a2a handoff --json '{
 }' --json-out
 ```
 - **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（本 PR 关联的真实 Issue 编号），**无法确定则不要调用 A2A**，在最终评论中说明；`pr_number` 有则填、无则不填，**严禁把 PR 编号填入 issue_number**。
-- 场景无 `qa` 节点 → 在评论说明「当前场景未配置 QA 审查环节」，`next_step` 用 `done`。
+- **场景无 `qa` 节点（BLOCK）** → **不发起 QA A2A**：在评论说明「当前场景未配置 QA 审查环节（scene=`$GRAPE_SCENE_ID`，可选 agents=`$scene_agents`）」，`next_step` 用 `done`。
 - A2A 失败重试 ≤3 次；仍失败 → 评论说明，`next_step` 标注需人工介入。
 
 ### Step 8 · 任务完成流程（必做，任何分支都必须执行到最后）

@@ -91,14 +91,17 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 
 > ⚠️ **本步为强制流程，不得跳过**：交办前必须先用 `$GRAPE_SCENE_ID` 取当前场景，据此确定目标节点，再发起 A2A；**禁止不查场景直接照抄默认 `issue`**。
 
-**第 1 步：取当前场景节点**
+**第 1 步：取当前场景节点，并显式解析出"可用 Agent 集合"**
 ```bash
 echo "scene_id=${GRAPE_SCENE_ID:+set} GRAPE_SCENE_ID=<$GRAPE_SCENE_ID>"
-# 场景 ID 未注入（空串）→ 跳过本步，沿用默认交办 issue（见第 3 步）
-grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out   # nodes[].skill 标识各环节 Agent
+# 场景 ID 未注入（空串）→ 跳到第 2 步（标注"场景未绑定，沿用默认交办 issue"）
+SCENE_NODES="$(grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out 2>/dev/null)"
+echo "$SCENE_NODES"
+# 输出本场景可用 Agent 集合（nodes[].tag 或 skill 名 → agent 值）
+echo "scene_agents: $(echo "$SCENE_NODES" | jq -r '[.nodes[]?.tag // .nodes[]?.skill] | unique | join(",")' 2>/dev/null)"
 ```
 
-**第 2 步：按场景节点确定 A2A 目标**
+**第 2 步：按"场景 Agent 集合 × 任务类型"确定 A2A 目标（先校验命中，再交办）**
 | 场景节点 skill 含 | agent 值 | 用途 |
 |------------------|---------|------|
 | `issue` / `issue-*` | `issue` | 默认目标：spec 设计/打标签/排里程碑/分配责任人 |
@@ -106,8 +109,19 @@ grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out   # nodes[].skill �
 | `qa` / `qa-*` | `qa` | PR 审查（由 coding 触发，VOD 不直接交） |
 | `sre` / `deploy-*` / `cloud-*` | `sre` | 部署/构建/运维 |
 
-- **只对场景中实际存在的节点发 A2A**：当前场景可能只有部分环节（如只配 `issue`、无 coding/qa/sre），则**无需也不应**向不存在的 Agent 交办。
-- 若必需环节缺失 → 在评论中说明"当前场景未包含该开发环节"，`next_step=a2a_need_clarify` 标注需人工确认，**不发起 A2A**。
+```bash
+# ⚠️ 校验：默认目标 issue 是否在当前场景节点集合中
+TARGET_AGENT="issue"
+if echo "$SCENE_NODES" | jq -e --arg a "$TARGET_AGENT" '[.nodes[] | ((.tag // "")|ascii_downcase) + " " + ((.skill // "")|ascii_downcase)] | any(startswith($a) or startswith(("$a-")))' >/dev/null 2>&1; then
+  echo "OK: scene contains $TARGET_AGENT node → 可 A2A"
+else
+  echo "BLOCK: scene (id=$GRAPE_SCENE_ID) 不含 $TARGET_AGENT 节点 → 不发起 A2A"
+  # ⚠️ 发评论说明 + next_step=a2a_need_clarify + 人工确认，不 A2A
+fi
+```
+- **命中** → 进入第 3 步发起 A2A。
+- **未命中**（如场景只有部分节点、无 issue）→ **不发起 A2A**：评论说明"当前场景未包含该开发环节（scene=`$GRAPE_SCENE_ID`，可选 agents=`$scene_agents`）"，`next_step=a2a_need_clarify` 标注需人工确认。
+- 场景未绑定（`$GRAPE_SCENE_ID` 空）→ 沿用默认 `issue` 交办，在评论注明"场景未绑定，按默认路由交办"。
 
 **第 3 步：发起 A2A**
 ```bash

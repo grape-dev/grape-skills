@@ -70,26 +70,41 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 
 ### Step 5 · A2A 交办（仅 ready 且已生成 Spec；必须严格按以下三步）
 
-> ⚠️ **不得跳过场景核验**：交办目标由"当前开发场景节点 + 实际任务类型"决定，**禁止不查场景直接照抄 coding**。
+> ⚠️ **不得跳过场景核验**：交办目标是"当前场景实际存在的 Agent 节点 ∩ 任务类型"，**必须先取场景 nodes 清单并校验目标 agent 存在，命中才 A2A；禁止不查场景直接照抄 coding**。
 
-**第 1 步：取当前场景节点**
+**第 1 步：取当前场景节点，并显式解析出"可用 Agent 集合"**
 ```bash
 echo "scene_id=${GRAPE_SCENE_ID:+set} GRAPE_SCENE_ID=<$GRAPE_SCENE_ID>"
-# 场景 ID 未注入（空串）→ 跳过本步，按常见约定路由（见第 2 步表）
-grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out   # nodes[].skill 标识各环节 Agent
+# 场景 ID 未注入（空串）→ 跳到第 2 步（标注"场景未绑定，按常见约定路由"）
+SCENE_NODES="$(grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out 2>/dev/null)"
+echo "$SCENE_NODES"
+# 输出本场景可用 Agent 集合（nodes[].tag 或 skill 名 → agent 值）
+echo "scene_agents: $(echo "$SCENE_NODES" | jq -r '[.nodes[]?.tag // .nodes[]?.skill] | unique | join(",")' 2>/dev/null)"
 ```
 
-**第 2 步：按"场景节点 × 任务类型"确定 A2A 目标**
-| 任务类型 | 交办 agent | 说明 |
-|---------|-----------|------|
-| 开发类（feature/bug 实现，评级 ready） | `coding` | 生成 Spec 后交办开发；场景须含 coding 节点 |
-| 需求不清晰 / 需引导澄清 | `vod` | 交回开发者声音引导，收敛后再回 issue |
-| 部署 / 构建 / 运维 / 发布类 | `sre` | 云部署、拉取代码、重启服务、skill 发布等 |
-| PR 审查 / 质量检查 | `qa` | 代码审查（通常由 coding 触发，issue 一般不经手） |
+**第 2 步：按"场景 Agent 集合 × 任务类型"确定 A2A 目标（先校验命中，再交办）**
+| 任务类型 | 需命中的 agent | 说明 |
+|---------|------------|------|
+| 开发类（feature/bug 实现，评级 ready） | `coding` | 生成 Spec 后交办开发；**场景必须含 coding 节点** |
+| 需求不清晰 / 需引导澄清 | `vod` | 场景须含 vod 节点 |
+| 部署 / 构建 / 运维 / 发布类 | `sre` | 场景须含 sre 节点 |
+| PR 审查 / 质量检查 | `qa` | 场景须含 qa 节点 |
 
-- **只对场景中实际存在的节点发 A2A**：若场景链不包含目标 Agent 节点（如开发类但场景只有 issue 无 coding），则在评论说明"当前场景未包含该开发环节"，`next_step=a2a_need_clarify` 并标注需人工确认，**不发起 A2A**。
+```bash
+# ⚠️ 校验：目标 agent 是否在当前场景节点集合中
+TARGET_AGENT="coding"   # 按任务类型取上表值
+if echo "$SCENE_NODES" | jq -e --arg a "$TARGET_AGENT" '[.nodes[] | ((.tag // "")|ascii_downcase) + " " + ((.skill // "")|ascii_downcase)] | any(startswith($a) or startswith(("$a-")))' >/dev/null 2>&1; then
+  echo "OK: scene contains $TARGET_AGENT node → 可 A2A"
+else
+  echo "BLOCK: scene (id=$GRAPE_SCENE_ID) 不含 $TARGET_AGENT 节点 → 不发起 A2A"
+  # ⚠️ 发评论说明 + next_step=a2a_need_clarify + 人工确认，不 A2A
+fi
+```
+- **命中** → 进入第 3 步发起 A2A。
+- **未命中**（如开发类但场景只有 issue 无 coding）→ **不发起 A2A**：发评论"当前场景未包含该开发环节（scene=`$GRAPE_SCENE_ID`，可选 agents=`$scene_agents`）"，`next_step=a2a_need_clarify` 并标注需人工确认。
+- 场景未绑定（`$GRAPE_SCENE_ID` 空）→ 按常见约定路由（开发→coding 等），在评论注明"场景未绑定，按默认路由交办"。
 
-**第 3 步：发起 A2A**（agent 值取第 2 步结果）
+**第 3 步：发起 A2A**（agent 值取第 2 步命中结果）
 ```bash
 grape a2a handoff --json '{
   "agent": "coding",

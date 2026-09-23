@@ -81,6 +81,19 @@ grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_
 - 发现按 `references/findings-format.md` 契约记录（维度/证据/严重度/影响/修复/验收）。
 
 ### Step 5 · A2A 通知 coding（有 Critical/Required 问题需修改时）
+> ⚠️ 交办前先取当前场景 nodes 并校验含 `coding` 节点，命中才交办；场景未注入且默认链路含 coding → 用默认 `coding`。
+```bash
+echo "scene_id=${GRAPE_SCENE_ID:+set}"
+# 场景 ID 非空时：取场景 nodes → 解析可用 Agent → 校验 coding 命中
+SCENE_NODES="$(grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out 2>/dev/null)"
+echo "scene_agents: $(echo "$SCENE_NODES" | jq -r '[.nodes[]?.tag // .nodes[]?.skill] | unique | join(",")' 2>/dev/null)"
+if echo "$SCENE_NODES" | jq -e --arg a "coding" '[.nodes[] | ((.tag // "")|ascii_downcase) + " " + ((.skill // "")|ascii_downcase)] | any(startswith($a) or startswith("$a-"))' >/dev/null 2>&1; then
+  echo "OK: scene contains coding node → 可 A2A coding"
+else
+  echo "BLOCK: scene (id=$GRAPE_SCENE_ID) 不含 coding 节点 → 不发起 coding A2A"
+fi
+```
+- **命中 coding 节点 / 场景未注入** → 发起 A2A：
 ```bash
 grape a2a handoff --json '{
   "agent": "coding",
@@ -94,6 +107,7 @@ grape a2a handoff --json '{
 }' --json-out
 ```
 - ⚠️ `issue_number` 必填，`pr_number` 填 PR 编号，禁止混用；无法确定 issue_number 则不调 A2A，在评论说明。
+- **场景无 `coding` 节点（BLOCK）** → **不发起 coding A2A**：在汇总评论说明「当前场景未配置 Coding/修改环节（scene=`$GRAPE_SCENE_ID`，可选 agents=`$scene_agents`）」，`next_step` 用 `reply_comment` 并标注需人工确认。
 
 ### Step 6 · 评论回复（⚠️ 所有能力项执行完毕最后统一发，不得中间单独发）
 ```bash
