@@ -21,27 +21,29 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 
 ### Step 2 · 项目知识基线 + Agent 知识 + 目标分支（首次必做，后续按需——由 agent 自判是否需要）
 ```bash
-# 项目知识基线（project-graph.md + project-capabilities.md 全文 + meta）
+# ① 解析目标分支（目标合入分支/工作基线）：优先 $GRAPE_WORK_BRANCH；未注入则取仓库默认分支（不要写死 main/master）
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
+echo "work_branch=$WORK_BRANCH"   # 后续「是否已实现」判断、范围预估、Spec 基准、A2A 交接都以它为准
+grape git-repo branches --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 50 --json-out   # 确认 $WORK_BRANCH 存在
+
+# ② 项目知识基线（project-graph.md + project-capabilities.md 全文 + meta）
 grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
-# 目标分支（开发基准）：确认工作分支存在，后续判断/预估均以它为基准
-echo "target_branch=${GRAPE_WORK_BRANCH:-main/master}"
-grape git-repo branches --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 50 --json-out   # 确认 $GRAPE_WORK_BRANCH 存在
-# 仓库沉淀知识（前序经验）
+
+# ③ 仓库沉淀知识（前序经验）
 grape knowledge stats --repo "$REPO_FULL_NAME" --json-out
 grape knowledge list --repo "$REPO_FULL_NAME" --source agent --json-out
 grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
 ```
 - `meta.degraded=false` 且 `files` 非空 → 基线可用，基于它分析，不再逐文件探索。
 - 无基线/`[degraded]` → 降级：`grape git-repo repo` / `grape git-repo tree --depth 2` / `contents README --raw`。
-- ⚠️ **目标分支 = `$GRAPE_WORK_BRANCH`（缺省 main/master）**：后续「是否已实现」判断、范围预估、Spec 基准、A2A 交接都以该分支为准；无该环境变量时用默认分支。
 - ⚠️ **首次必做**（建立分析基础）；后续事件按需——若已掌握足够项目上下文、且本次是简单追问/澄清，可由 agent 自行判断是否需要重新拉取（如项目可能更新或评论需基于新信息时再取）。
 
 ### Step 3 · 深度可开发性分析（⚠️ 每次处理都执行）
 - 执行四维分析（需求完整性 → 技术可行性 → 依赖就绪性 → 范围确定性），输出评级：
   `ready` / `almost-ready` / `needs-discussion` / `not-feasible`。
-- **技术可行性·是否已实现**：先核对**目标分支**（`$GRAPE_WORK_BRANCH`，缺省 main/master）commit 是否已实现本需求（标题/正文关键字匹配 feature/fix 等）：
+- **技术可行性·是否已实现**：先核对**目标分支 `$WORK_BRANCH`**（Step 2 ① 解析，缺省仓库默认分支）commit 是否已实现本需求（标题/正文关键字匹配 feature/fix 等）：
   ```bash
-  grape git-repo commits --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 20 --json-out   # 结合 meta 的工作分支 commit 核对
+  grape git-repo commits --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 20 --json-out   # 结合 $WORK_BRANCH 的 commit 核对
   ```
   已实现 → 回复建议关闭（引用 commit sha），不进入评级。
 - 细则见 `references/issue-developability-analysis.md`；评论事件同样重新分析（用户补充信息会改变评级）。
@@ -49,7 +51,7 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
 ### Step 4 · 按评级执行动作 + 标签 + 分配
 ```bash
 # ready → 生成 Spec（→ Step 5）；贴 Issue 评论；打 spec-ready；A2A 交办 coding
-#   ⚠️ Spec 中注明目标分支（开发基准 = $GRAPE_WORK_BRANCH，缺省 main/master），供 coding 在正确分支开发
+#   ⚠️ Spec 中注明目标分支（开发基准 = $WORK_BRANCH，Step 2 ① 解析），供 coding 在正确分支开发
 grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{原有标签},spec-ready","assignee":"{BOT_USERNAME}"}'
 # almost-ready → 分配责任人（CODEOWNERS）→ 精确追问 1-2 个问题
@@ -92,7 +94,7 @@ grape a2a handoff --json '{
     "account": "'"$ACCOUNT"'",
     "issue_number": '"$ISSUE_NUMBER"',
     "pr_number": 0,
-    "context": "Issue #'$ISSUE_NUMBER' 已通过深度可开发性分析（评级 ready），Spec 已发布。请基于 Spec 在目标分支（$GRAPE_WORK_BRANCH，缺省 main/master）启动开发实现。<Spec 摘要>"
+    "context": "Issue #'$ISSUE_NUMBER' 已通过深度可开发性分析（评级 ready），Spec 已发布。请基于 Spec 在目标分支（$WORK_BRANCH）启动开发实现。<Spec 摘要>"
   }
 }' --json-out
 ```
@@ -110,7 +112,7 @@ grape tasks notify --json '{
 ```
 
 ### Step 7 · 判断"是否已实现" + 评论回复（必做，除非是机器人自己的评论）
-**① 核对需求是否已实现（工作分支 `$GRAPE_WORK_BRANCH`，缺省 main/master）——避免重复开发/误判**：
+**① 核对需求是否已实现（目标分支 `$WORK_BRANCH`，Step 2 ① 解析）——避免重复开发/误判**：
 ```bash
 grape git log --oneline -20 --all                                     # 本地裸库核对合并历史
 grape git-repo commits --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 20 --json-out   # 平台 commit

@@ -29,12 +29,18 @@ tools:
 > 动手前先确认工具链就绪；**grape CLI 是公开可安装的**（`gitcode.com/grape-dev/grape-cli`），未装/版本过低时**自行安装**（`pip install git+https://gitcode.com/grape-dev/grape-cli.git`）。
 
 1. **grape CLI 版本满足**：`grape --version`（过低/未装 → 自装/升级，再验证）。
-2. **认证与环境变量就绪**：
+2. **刷新契约到最新**（避免本地缓存过期导致命令/参数不识别；执行前必做）：
+   ```bash
+   grape refresh
+   ```
+   - 刷新后核对本技能关键命令存在（`git-repo issues comments` / `git-repo contents` / `git-repo tree` / `repos project info` / `tasks complete`）；缺关键命令 → 视为版本过旧，先升级再试。
+   - ⚠️ 契约权威 = `grape commands` 实列；不猜命令名。
+3. **认证与环境变量就绪**：
    ```bash
    echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME issue=$ISSUE_NUMBER ak=${HUAWEICLOUD_SDK_AK:+ok}"
    ```
    - 缺华为云 AK/SK → 回复「请在 Grape 控制台配置华为云 AK/SK 后重试」，结束。
-3. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束；通过后才读取 `deploy-runbook.md` 进入处理流程。
+4. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束；通过后才读取 `deploy-runbook.md` 进入处理流程。
 
 ## 环境变量（服务端已注入，直接使用）
 
@@ -49,6 +55,7 @@ tools:
 | `PR_NUMBER` | PR 编号（可选） | PR 分支定位 / A2A |
 | `HUAWEICLOUD_SDK_AK` / `HUAWEICLOUD_SDK_SK` | 华为云凭证 | hcloud 认证 |
 | `GRAPE_SCENE_ID` | 当前场景 ID（可选） | `grape scenes detail` 取节点 |
+| `GRAPE_WORK_BRANCH` | 目标合入分支（缺省取仓库默认分支，如 main/master） | 入口判定与获取代码的分支基准；runbook 解析为 `$WORK_BRANCH` |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 入口判定 |
 
 > ⚠️ token/URL/华为云 AK-SK 为敏感信息：**不要 printenv/写日志/写评论/写文件**。
@@ -67,7 +74,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 >
 > ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：部署/释放完成 + 评论告知后**必须**调用，**评论发完 ≠ 任务完成**；调完即结束，不再输出 JSON 块。
 
-**入口判定**：A2A 直接触发（部署/资源释放） / `pull_request_merged`（master/main）→ 部署流程；其他事件 → `SKIP`。（详见 runbook「入口判定」）
+**入口判定**：A2A 直接触发（部署/资源释放） / `pull_request_merged`（目标合入分支，runbook 解析为 `$WORK_BRANCH`）→ 部署流程；其他事件 → `SKIP`。（详见 runbook「入口判定」）
 
 ## 部署流程（hcloud 实测详细命令与坑位，runbook 引用）
 

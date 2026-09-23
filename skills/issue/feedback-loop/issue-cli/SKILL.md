@@ -27,11 +27,17 @@ tools:
    grape --version
    ```
    - 未装或版本过低 → 用 `pip install git+https://gitcode.com/grape-dev/grape-cli.git` 安装/升级，装好再验证一次。
-2. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$ACCOUNT`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不打印 token）：
+2. **刷新契约到最新**（避免本地缓存过期导致命令/参数不识别；执行前必做）：
+   ```bash
+   grape refresh
+   ```
+   - 刷新后核对本技能关键命令存在（`issues detail` / `git-repo pulls …` / `repos project info` / `knowledge list` / `scenes list`）；缺关键命令 → 视为版本过旧，先升级再试。
+   - ⚠️ 契约权威 = `grape commands` 实列；不猜命令名。
+3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$ACCOUNT`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不打印 token）：
    ```bash
    echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
    ```
-3. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `issue-runbook.md` 进入处理流程。
+4. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `issue-runbook.md` 进入处理流程。
 
 ## 环境变量（服务端已注入，直接使用）
 
@@ -44,7 +50,7 @@ tools:
 | `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | `--number "$ISSUE_NUMBER"` / A2A `issue_number` |
 | `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空） | A2A `pr_number`（无则不填） |
-| `GRAPE_WORK_BRANCH` | 场景工作基线分支 / 目标分支（缺省 main/master） | **贯穿全流程的开发基准**：判断"需求是否已实现"（`grape git log`/`commits` 核对该分支）、深度分析范围预估、Spec 基准、A2A 交接给 coding 的目标分支 |
+| `GRAPE_WORK_BRANCH` | 目标合入分支 / 工作基线（缺省则取仓库默认分支，如 main/master） | **贯穿全流程的开发基准**：runbook Step 2 ① 解析为 `$WORK_BRANCH`；判断"需求是否已实现"、深度分析范围预估、Spec 基准、A2A 交接给 coding 的目标分支 |
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标 |
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[issue agent]` 前缀） |
 | `DEVOPS_EVENT_TYPE` | 事件类型（如 `issue_updated`） | 判断入口/是否需要处理 |

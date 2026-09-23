@@ -52,7 +52,7 @@ grape repos project info --owner {owner} --repo {repo} --json-out   # project-gr
 
 # 仓库信息 / 文件内容（识别项目结构降级；--raw 自动 base64 解码）
 grape git-repo repo --owner {owner} --repo {repo} --json-out
-grape git-repo tree --owner {owner} --repo {repo} --ref main --json-out    # 目录树（先看根定位构建文件）
+grape git-repo tree --owner {owner} --repo {repo} --ref "$WORK_BRANCH" --json-out    # 目录树（先看根定位构建文件；$WORK_BRANCH 见 runbook 目标合入分支解析）
 grape git-repo contents --owner {owner} --repo {repo} --path README.md --raw
 grape git-repo contents --owner {owner} --repo {repo} --path package.json --raw
 

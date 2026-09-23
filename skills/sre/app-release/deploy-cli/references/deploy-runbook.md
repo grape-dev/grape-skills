@@ -16,9 +16,15 @@
 ### 入口
 | 入口 | 判断 | 处理 |
 |------|------|------|
-| `a2a_event` | 由 Issue/Coding 交办 | 有 `pr_number`→拉 PR 分支；无→默认分支；资源释放→跳过构建直接释放 |
-| `pull_request_merged` | 分支为 master/main | 走完整部署流程 |
+| `a2a_event` | 由 Issue/Coding 交办 | 有 `pr_number`→拉 PR 分支；无→目标分支；资源释放→跳过构建直接释放 |
+| `pull_request_merged` | 分支为目标合入分支（`$WORK_BRANCH`，解析见下） | 走完整部署流程 |
 | 其他事件 | — | 输出 `SKIP` 并返回 |
+
+> **目标合入分支解析（必做，入口判定与 Step 2 用）**：优先 `$GRAPE_WORK_BRANCH`；未注入取仓库默认分支（不要写死 main/master）：
+> ```bash
+> WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
+> echo "work_branch=$WORK_BRANCH"
+> ```
 
 ---
 
@@ -27,7 +33,7 @@
 ### Step 1 · 理解项目结构（判断构建方式）
 ```bash
 grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out   # 项目知识基线（优先）
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref main --depth 2 --json-out
+grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth 2 --json-out
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md --raw
 ```
 | 文件标记 | 推断 |
@@ -45,7 +51,7 @@ grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md 
 # git 一律用 grape git（凭据自动注入、token 零暴露）：
 # A2A + 有 pr_number → grape git clone <repo_url> && grape git checkout <pr_branch>
 # A2A + 无 pr_number → grape git clone <repo_url>
-# PR 合并触发 → grape git checkout master|main && grape git pull
+# PR 合并触发 → grape git checkout "$WORK_BRANCH" && grape git pull
 cd /path/to/repo
 # 按需：npm install && npm run build / pip install -r requirements.txt / go build ./...
 ```

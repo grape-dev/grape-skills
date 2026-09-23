@@ -4,7 +4,7 @@
 
 - 当前事件为 Issue 事件（`issue_updated` / `issue_comment` / `issue_labeled`）
 - Issue 尚未被处理过（无标签且无负责人），或用户补充了信息需要重新分析
-- **目标分支 = `$GRAPE_WORK_BRANCH`（缺省 main/master）**：后续「是否已实现」「范围预估」均以该分支为基准
+- **目标分支 = `$WORK_BRANCH`（runbook Step 2 ① 解析，缺省取仓库默认分支）**：后续「是否已实现」「范围预估」均以该分支为基准
 
 ## 前置步骤：读取项目知识（用 grape CLI，见 runbook Step 2）
 
@@ -278,5 +278,5 @@ ELSE (不通过维度数 <= 2 且均为 minor 缺失)
 |---------|---------|--------|
 | 是否与仓库主题相关 | 技术可行性（前置） | 结合 project-graph 判断，不再仅凭 README |
 | 内容质量分析 | 需求完整性 | 按类型细化检查项，增加权重 |
-| 是否已实现 | 技术可行性（子步骤） | 结合 **目标分支**（`$GRAPE_WORK_BRANCH`，缺省 main/master）commit 分析是否已实现 |
+| 是否已实现 | 技术可行性（子步骤） | 结合 **目标分支**（`$WORK_BRANCH`，runbook Step 2 ① 解析）commit 分析是否已实现 |
 | 是否重复 | 需求完整性（子步骤） | 保留原有逻辑 |

@@ -1,7 +1,7 @@
 # QA-CLI 执行走查表（runbook）
 
 > 目的：把 QA Agent 审查 PR 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
-> 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$PR_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_WORK_BRANCH`（目标分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$PR_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_WORK_BRANCH`（目标分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。目标合入分支统一解析为 `$WORK_BRANCH`（Step A1 取 PR base，缺省仓库默认分支）。
 > **评论前缀硬规**：评论 body 一律以 `[$AGENT_NAME]`（当前 Agent 名）开头；构造 `--json` body 时用双引号使 `$AGENT_NAME` 展开。
 
 ---
@@ -15,7 +15,10 @@
 
 ### Step A1 · PR 配置检查（仅首次 `pull_request_opened`）
 ```bash
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+# 取 PR 详情；同时解析目标合入分支（PR 的 base）供 Step 4 工作流审查核对基准
+grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 取 head.sha / base.ref
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out | jq -r '.base.ref // "main"')}"
+echo "work_branch=$WORK_BRANCH"   # 缺省仓库默认分支，不要写死 main
 ```
 - 按 `references/pr-config-check.md` 检查，不通过项记录到 `review_comments`（暂不评论）。
 - 有关联 Issue → `grape git-repo issues comments create ... --json '{"body":"[$AGENT_NAME] 📌 关联 PR #'"$PR_NUMBER"'"}'`；对应 Issue 是 bug → 更新标签 `bug,triaged`。
@@ -62,7 +65,7 @@ grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NU
 
 ### Step 4 · 工作流审查（Agent Work Loop 五维：任务理解/受控执行/变更验证/可靠交付/经验沉淀）
 ```bash
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref main --depth 2 --json-out                          # 目录树（无基线降级时）
+grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth 2 --json-out                          # 目录树（无基线降级时；$WORK_BRANCH 见 Step A1）
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path AGENTS.md --raw                                # 任务理解/受控执行
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path spec --raw                                      # 任务理解
 grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path tests --raw                                    # 变更验证
