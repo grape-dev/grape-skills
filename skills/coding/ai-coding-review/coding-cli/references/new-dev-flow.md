@@ -77,9 +77,15 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {nu
 # 默认：已就绪，直接确认当前在 feat/issue-{number} 上
 grape git status
 
-# 仅当分支不存在（降级场景）才创建（基于目标合入分支，缺省仓库默认分支；不要写死 main/master）
+# worktree 未就绪（降级）：克隆到当前目录再建分支（基于目标合入分支，不要写死 main/master；除非确有跨 PR 依赖，不基于上个 issue 分支）
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
-grape git checkout -b feat/issue-{number} "origin/$WORK_BRANCH"
+grape git clone https://gitcode.com/"$REPO_FULL_NAME".git . 2>/dev/null || true
+grape git checkout "feat/issue-{number}" 2>/dev/null \
+  || grape git checkout -b "feat/issue-{number}" "origin/$WORK_BRANCH"
+
+# 首次 commit 前先配置 git 身份（避免 commit 被拒）
+grape git config user.name  "$BOT_USERNAME"
+grape git config user.email "$BOT_USERNAME@noreply.git.com"
 ```
 
 ### 能力四：需求文档
@@ -100,6 +106,7 @@ grape git checkout -b feat/issue-{number} "origin/$WORK_BRANCH"
 
 1. 测试先行 — 读取 `references/test-driven-development.md`（RED→GREEN→REFACTOR）
 2. 增量实现 — 读取 `references/incremental-implementation.md`
+3. commit 前确保 git 身份已设置（见能力三；未设置会 commit 被拒）
 
 ```bash
 grape git add -A && grape git commit -m "feat: #{number} 描述"

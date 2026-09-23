@@ -44,7 +44,13 @@ tools:
    ```bash
    echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
    ```
-4. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `coding-runbook.md` 进入处理流程。
+   - ⚠️ 只用注入的 `$GRAPE_SESSION_TOKEN`，**不探测** `BOT_*`/`USER_*`/其它 token。
+4. **git 身份预置**（避免 commit 被拒；进入 worktree/表明后、首次 commit 前执行一次）：
+   ```bash
+   grape git config user.name  "$BOT_USERNAME"
+   grape git config user.email "$BOT_USERNAME@noreply.git.com"
+   ```
+5. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `coding-runbook.md` 进入处理流程。
 
 ## 环境变量（服务端已注入，直接使用）
 
@@ -62,6 +68,7 @@ tools:
 | `GRAPE_WORK_BRANCH` | 目标合入分支（工作基线；服务端注入，缺省则取仓库默认分支，如 main/master） | 建 PR 的 `base`；开发分支 `feat/issue-{issue_number}` 基于它创建，本地 push/同步均以它为基线 |
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标（见 runbook Step 7） |
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[Coding Agent]` 前缀） |
+| `BOT_USERNAME` | Bot 在 GitCode 的 VCS 用户名 | `grape git config user.name` 的 git 身份（见 Prerequisites 4 / runbook Step 0）；Issue 分配 `assignee` 也用它 |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要处理 |
 
 > ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
@@ -161,6 +168,9 @@ grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --nu
 4. **交办必带 issue_number**：A2A 无法确定 issue_number 则不调用，在评论中说明。
 5. **A2A 失败降级**：重试 ≤3 次；仍失败 → 评论说明并标注需人工介入，不得静默跳过交办。
 6. **结构化产出**：`grape tasks complete` 的结构化字段（`actions[]`/`conclusion`/`artifacts[]`/`issue_summary`）**must 真实填充**，只传 `result_text` 会丢结构化归档（空数组/空串也会导致结构化框为空）。
+7. **只用一个 token**：只用注入的 `$GRAPE_SESSION_TOKEN`，不探测 `BOT_*`/`USER_*`/其它 token，token 不落日志/评论/文件。
+8. **git 身份预置**：进入 worktree 后、首次 `grape git commit` 前先 `grape git config user.name/user.email`（见 Prerequisites 4 / runbook Step 0），避免 commit 被拒。
+9. **命令出错先看完整错误**：runbook 命令失败先去 `tail` 截断看完整 stderr，再按「错误排查速查」处理，**不反复盲试**同一命令。
 
 ## 参考
 

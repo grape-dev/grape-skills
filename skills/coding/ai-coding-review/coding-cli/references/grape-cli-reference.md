@@ -110,9 +110,12 @@ grape git status                                   # 本地命令（无需凭据
 grape git clone https://gitcode.com/owner/repo.git # 从 URL 识别仓库 → 注入凭据
 grape git pull
 grape git add -A
+# commit 前先设 git 身份（未设置会 commit 被拒）；只本次会话逐仓库即可
+grape git config user.name  "$BOT_USERNAME"
+grape git config user.email "$BOT_USERNAME@noreply.git.com"
 grape git commit -m "feat: #7 描述"
 grape git push origin feat/issue-7
-# 仅当 feat/issue-7 不存在（降级）才创建，基于目标合入分支（缺省仓库默认分支）
+# 仅当 feat/issue-7 不存在（降级）才创建，基于目标合入分支（缺省仓库默认分支）；除非确有跨 PR 依赖，不基于上个 issue 分支
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner {owner} --repo {repo} --json-out | jq -r '.default_branch // "main"')}"
 grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 ```
@@ -121,6 +124,12 @@ grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 > **直接在该分支（`feat/issue-{issue_number}`）上工作**，不要另建分支名，避免与 PR head 不一致；仅分支不存在时按上面降级命令创建。
 > 若目录非 git 仓库（降级，无法 `grape git`），改用 `grape git-repo contents` **只读**仓库文件内容（仅 `get`），写文件能力受限需在评论中说明。
 
+## `pulls create` 字段说明（错误排查用）
+
+- 允许字段常见为：`title`、`head`、`base`、`inner_issue_nums`（`owner/repo#N` 关联 Issue）、`close_related_issue`（bool）等。
+- ⚠️ 字段以 `grape git-repo pulls create --help` 的 **Body files** 为准（契约版本不同字段集略有差异）；`inner_issue_nums`/`close_related_issue` 不是所有契约都有——缺失时报 `unknown request field(s)` 就删掉这些字段、保留 `title`/`head`/`base` 精简重试。
+- `pulls update` 仅允许 `body`/`labels` 等字段，**不支持 `state`**（关闭/合并走其他渠道或人工）。
+
 ## 错误排查
 
 | 现象 | 含义 | 处理 |
@@ -128,7 +137,9 @@ grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 | `HTTP 401: ... re-inject` | token 无效/过期/缺失 | 任务级 token 短命，失效属正常：说明「凭据已失效」，不尝试换 token |
 | `HTTP 403: ... 不支持会话 token / use GRAPE_API_TOKEN` | 账户/平台类（D 类）拒绝会话凭据 | 本技能一般不涉及；确需时改用 `GRAPE_API_TOKEN`（`grape_`）或 Web JWT |
 | `No such command 'X'. Did you mean: A, B?` | 命令名写错 | 按建议改；或 `grape commands <关键词>` 查 |
-| `unknown request field(s): ... allowed for ...` | `--json` 字段不在请求体允许集 | 看 `grape <group> <verb> --help` 的 Body fields |
+| `unknown request field(s): ... allowed for ...` | `--json` 字段不在请求体允许集 | 看 `grape <group> <verb> --help` 的 Body fields；删多余字段（`pulls create` 常见为 `inner_issue_nums`/`close_related_issue`，`pulls update` 常见为 `state`） |
+| `pulls create` 重复失败 | base/字段/契约问题 | 先去掉 `tail` 看完整错误；核对 `base`（默认 `$WORK_BRANCH`，跨依赖场景为所依赖分支）；精简 JSON；仍失败 `grape git-repo pulls create --help` |
+| `git commit` 被拒（identity 缺失） | 未配置 user.name/email | 先 `grape git config user.name/user.email` 再 commit |
 | `(path not found; try --path '' to list root)` | `contents` 路径不存在 | 先 `--path ""` 看根列表定位 |
 | 403（无权限） | 写操作无权限 | 停止并回复「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」 |
 
@@ -145,6 +156,9 @@ grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 - ❌ 大 JSON 手拼内联 —— 用 `--json @file.json`。
 - ❌ 用 `tk_` 会话 token 打账户/平台管理接口（会 403）—— 需要时切换 `grape_`/JWT。
 - ❌ 在本地 worktree 用裸 `git` 绕过 `grape git`（会丢失凭据注入，token 暴露）—— 一律用 `grape git`。
+- ❌ 探测其它 token（`printenv BOT_*`/`USER_*`、`env | grep TOKEN`）—— 只用 `$GRAPE_SESSION_TOKEN`。
+- ❌ 命令报错用 `| tail -N` 截断后反复盲试—— 先看完整错误再按「错误排查」处理。
+- ❌ 给 `pulls update` 传 `state`（不在允许集）。
 
 ## 安全与边界（必须遵守）
 

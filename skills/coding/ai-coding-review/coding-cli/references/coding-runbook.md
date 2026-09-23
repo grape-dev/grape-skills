@@ -12,18 +12,37 @@
 > 进入前已通过 SKILL「Prerequisites」。下表步骤按顺序执行，命中分支后到对应步骤，**未命中的步骤直接跳过**。
 
 ### Step 0 · 前置确认（必做）
+> ⚠️ 认证只用注入的 `$GRAPE_SESSION_TOKEN`（`grape` 自动读取）：**不探测** `BOT_*`/`USER_*`/其它 token（`printenv`/`env | grep` 均无效且被禁止）；token 不落日志/评论/文件。
+
 ```bash
 # ① 解析目标合入分支（工作基线）：优先 $GRAPE_WORK_BRANCH；未注入则取仓库默认分支（不要写死 main/master）
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 echo "work_branch=$WORK_BRANCH"   # 后续建 PR 的 base、分支创建/切换、基线同步一律用这个值
 
-# ② 确认本地开发分支：应为 feat/issue-{issue_number}（服务端已按 $WORK_BRANCH 建好 worktree）
+# ② 确认本地开发分支：应为 feat/issue-{issue_number}（服务端通常已按 $WORK_BRANCH 备好 worktree）
 grape git status
-# 分支不符/缺失才执行（勿另造分支名）：
-# grape git checkout "feat/issue-$ISSUE_NUMBER" \
-#   || grape git checkout -b "feat/issue-$ISSUE_NUMBER" "origin/$WORK_BRANCH"
-# ③ 基线同步（可选，避免 base 过期）：grape git fetch origin "$WORK_BRANCH" && grape git rebase "origin/$WORK_BRANCH"
+```
 
+- **worktree 已就绪（默认路径）**：当前已在 `feat/issue-{N}` → 直接使用，进入 ③。
+- **worktree 未就绪（降级路径）**：目录无 `.git` / 不在正确分支才按下面处理，**不要 clone 成子目录、不要另造分支名**：
+  ```bash
+  # 若目录非 git 仓库 → 克隆到当前目录（凭据由 grape git 自动注入）
+  grape git clone https://gitcode.com/"$REPO_FULL_NAME".git .
+  # 建/切开发分支：基于目标合入分支 origin/$WORK_BRANCH（⚠️ 除非确有跨 PR 依赖，否则不要基于上个 issue 分支）
+  grape git checkout "feat/issue-$ISSUE_NUMBER" 2>/dev/null \
+    || grape git checkout -b "feat/issue-$ISSUE_NUMBER" "origin/$WORK_BRANCH"
+  # 首次 commit 前配置 git 身份（本次会话有效，逐仓库即可）
+  grape git config user.name  "$BOT_USERNAME"
+  grape git config user.email "$BOT_USERNAME@noreply.git.com"
+  ```
+- **git 身份预置（必做，避免 commit 被拒）**：走到编码/推送前确保已设置（未设置时 commit 会失败）：
+  ```bash
+  grape git config user.name  "$BOT_USERNAME"
+  grape git config user.email "$BOT_USERNAME@noreply.git.com"
+  ```
+- ③ 基线同步（可选，避免 base 过期）：`grape git fetch origin "$WORK_BRANCH" && grape git rebase "origin/$WORK_BRANCH"`
+
+```bash
 # ④ 项目知识基线（解题背景；meta.degraded=false 且 files 非空 → 基于它分析，不再逐文件探索）
 grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
 
@@ -70,8 +89,10 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 读取 `references/code-review-and-quality.md` 按 5 轴审查，修复发现的问题；审查通过才进入 Step 6。
 
 ### Step 6 · 创建 PR + Issue 评论告知
+> **base 分支选择**：默认用目标合入分支 `$WORK_BRANCH`（＝$GRAPE_WORK_BRANCH 或仓库默认分支，见 Step 0 ①）。**跨 PR 依赖（stacked PR）**——本 Issue 依赖另一个未合入 PR（如基于 `feat/issue-4`）→ `base` 用该 PR 的 head 分支，并在 PR body 说明依赖关系，**不要**换用 main/master 试错。
+
 ```bash
-# base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支，见 Step 0 ①），不要写死 main
+# 默认路径：base = $WORK_BRANCH
 grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
   --json '{
     "title": "feat: #'"$ISSUE_NUMBER"' 标题",
@@ -81,10 +102,22 @@ grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
     "close_related_issue": true
   }'
 
-# PATCH 补充 body
+# 跨 PR 依赖路径：base = 所依赖未合入 PR 的 head 分支（如 feat/issue-4）；inner_issue_nums/close_related_issue 字段可不带
+grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+  --json '{
+    "title": "feat: #'"$ISSUE_NUMBER"' 标题",
+    "head": "feat/issue-'"$ISSUE_NUMBER"'",
+    "base": "feat/issue-4"
+  }'
+```
+
+- ⚠️ **创建失败不要反复盲试**：先看完整 stderr（去掉 `| tail` 截断），对照「错误排查速查」；缺少 `inner_issue_nums` 等字段时删除多余字段、精简 JSON 再试。
+- ⚠️ **误建 PR 处理**：若创建出 base 错误的 PR（如 base=main 而应依赖未合入 PR），**不要**尝试 `pulls update {"state":"closed"}`（`state` 不在更新允许集）——用 `pulls update` 只补一条 body 说明「误建/废弃」，随后用正确 base 另建新 PR，并在最终评论中说明。
+
+# PATCH 补充 body（pulls update 仅允许 body/labels 等字段，不传 state）
 grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${PR_NUMBER:-$PR_NUMBER_FROM_CREATE}" \
   --json '{"body":"## 概述\n\n自动实现 Issue #'"$ISSUE_NUMBER"'","labels":"auto-pr"}'
-```
+
 > `$PR_NUMBER` 取 `pulls create` 返回值中的 PR 编号；若该变量未注入则从返回结果取。
 
 **⚠️ 创建 PR 后必须在 Issue 发评论告知（跳过 = 事件未完成）**；PR 链接用 Web 页面 `/pull/`（单数）markdown 格式：
@@ -136,9 +169,12 @@ grape tasks complete --json '{
 
 > 按审查意见修改已有 PR，**不需要**需求文档/方案设计/建 PR。进入前已通过 SKILL「Prerequisites」。
 
-### Step 0 · 前置确认（同场景 A Step 0，仅确认分支即可）
+### Step 0 · 前置确认（同场景 A Step 0，确认分支 + 预置 git 身份）
+> ⚠️ 认证只用注入的 `$GRAPE_SESSION_TOKEN`，**不探测**其它 token。
 ```bash
-grape git status   # 应在 PR 对应分支上
+grape git status                                    # 应在 PR 对应分支上
+grape git config user.name  "$BOT_USERNAME"
+grape git config user.email "$BOT_USERNAME@noreply.git.com"
 ```
 
 ### Step 1 · 读审查反馈（必做）
@@ -151,10 +187,10 @@ grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_
 
 ### Step 2 · 制定修改方案并实施
 - 针对每个审查问题确定修改方案、评估影响范围。
-- 每个问题一个原子提交，commit message 注明问题编号：
+- 每个问题一个原子提交，commit message 注明问题编号（git 身份已预置，见 Step 0）：
   ```bash
   grape git add -A && grape git commit -m "fix: #$ISSUE_NUMBER 根据审查意见修正"
-  grape git push origin "{pr_branch}"
+  grape git push origin "$PR_HEAD"   # PR 的 head 分支（Step 1 pulls get 的 head.ref），不要凭印象写分支名
   ```
 
 ### Step 3 · PR 评论告知（必须执行）
@@ -180,18 +216,25 @@ grape tasks complete --json '{
 
 ## 错误排查速查（命令返回异常时）
 
+> ⚠️ 出错时**先看完整错误**（命令去掉 `| tail -N` 截断，`2>&1` 保留 stderr）；runbook 命令照抄仍失败，才允许 `grape commands <关键词>` / `grape <group> --help` 按 Body fields 修正。
+
 | 现象 | 处理 |
 |------|------|
 | `No such command 'X'` | 命令名错，核对 runbook / reference 抄写；仍不确定再 `grape commands <关键词>` |
-| `unknown request field(s): ...` | `--json` 里有契约不允许的字段，看确认的 Body fields，删掉多余字段 |
+| `unknown request field(s): ...` | `--json` 里有契约不允许的字段（如 `pulls update` 的 `state`），看 `grape <group> <verb> --help` 的 Body fields，删掉多余字段 |
+| `pulls create` 返回异常 | ①去掉 `tail` 看完整错误；②核对 `base` 是否为该 PR 应有的 base（默认 `$WORK_BRANCH`，跨依赖场景为所依赖分支）；③精简 JSON（去掉 `inner_issue_nums`/`close_related_issue`）再试；仍失败 `grape git-repo pulls create --help` |
+| `pulls create` 成功但 head/base 不对 | 误建 PR → 不尝试 `state:closed`；用 `pulls update` 补 body 标注“误建/废弃”，另建正确 PR（见 Step 6） |
+| `git commit` 被拒（无 user.name/email） | 先 `grape git config user.name/user.email`（见 Step 0）再 commit |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能不涉及 |
 | `contents` 路径不存在 | 用 `tree --depth 2` 或 `contents --path ""` 定位 |
-| `pulls create` 返回异常 | 核对 base 是否为 `$GRAPE_WORK_BRANCH`（缺省 main）、head 是否与分支一致 |
 
 ## 明确禁止
 
 - ❌ 不用 `tree --path`（该参数不存在），层级用 `--depth`。
+- ❌ 不探测其它 token（`printenv BOT_*`/`USER_*`、`env | grep TOKEN`）——只用 `$GRAPE_SESSION_TOKEN`。
+- ❌ 不 clone 成子目录复用（应克隆到当前目录或用服务端 worktree）。
+- ❌ 不给 `pulls update` 传 `state`（不在允许集；误建 PR 按 Step 6 标注废弃）。
 - ❌ 不因"等待用户回复/审查结果"跳过最终 Step（tasks complete）——回复/交办后即算本轮完成，必须收尾。
 - ❌ 不在本地 worktree 用裸 `git` 绕过 `grape git`（丢失凭据注入，token 暴露）。
 - ❌ 不直接合并 PR、不做 Issue 分类/打标签/分配（issue skill 职责）。
