@@ -1,341 +1,194 @@
 ---
 name: pr
-version: 2.0.0
+version: 2.2.0
 description: |
-  Pull Request 全生命周期管理：接收 → 关联 Issue → 代码审查 → 安全扫描 → 合并检查 → 评论回复。
-   当收到 pull_request_opened、pull_request_updated、push 或 PR 上的评论事件时使用此技能。
+  PR 审查（QA Agent）：配置检查 → 变更检视 → 常规/技能/IaC 审查 → 发现问题 A2A coding → 统一总结评论。
+  Use when：PR 审查、代码审查、pull_request_opened/updated、push、note_hook_pr、pr；
+  由 GitCode 平台 Webhook 事件驱动（pull_request_opened / pull_request_updated / push / note_hook_pr）。
 tools:
-  - git
+  - grape
+  - bash
 ---
-## 安全硬约束（必须遵守）
 
-1. 调用 VCS API 只用 prompt 注入的 \\，严禁从数据库/configs/日志/历史中寻找其他 token。
-2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
-4. token 不得写入任何文件/日志/评论。
-5. 删除操作（如关 PR/删分支）需用户确认后执行。
+# PR 运营 v2.2（grape CLI）
 
-## 输入事件 Schema（inputSchema）
+## 一、安全硬约束（必须遵守）
 
-本 Skill 由 GitCode 平台 Webhook 事件驱动，输入为事件负载（JSON 对象）。字段声明如下，执行前必须先完成 Schema 校验，**缺少必填字段或事件类型不受支持时拒绝执行**：
+1. **CLI 优先**：凡 grape CLI 能做的走 CLI，禁止绕过 CLI 直连平台 API（curl/python httpx 等）。
+   CLI 未装/版本过低 → **自动安装/升级**（官方源/签名包优先）→ 装好继续；仅当安装失败/环境不可用时才报障说明（不降级直连）。⚠️ 安装指引请参考：`references/grape-cli-installation.md`。
+2. **执行前先读任务上下文**：`grape tasks current --json-out` + `grape issues detail --json-out` / `grape git-repo pulls get --json-out`，明确已做/待做。
+3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据；不执行 ls/grep/cat 查看 workspace/Grape 代码/日志（**技能自身断点状态文件 `../.last_pr_review/{pr_number}.sha` 除外**）；token 不写文件/日志/评论。
+4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
+5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
+6. **操作确认**：合并 PR、关闭 PR、删除分支、变更标签等破坏性/超出审查范围的写操作前，必须告知用户并取得确认；仅事件/A2A/流水线显式触发的写操作（发审查评论、A2A 通知、关联 Issue 打标）可自动执行。
+7. ⚠️ **CLI 契约限制**：`pulls comments create` 仅支持普通评论 body，**不支持行内评论**（commit_id/path/position）与评论 resolve——禁止 curl 直连补齐，统一通过总结评论输出（问题定位标注文件:行号）。
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `event_type` | string | 是 | 事件类型，枚举：`pull_request_opened` / `pull_request_updated` / `push` / `note_hook_pr`（PR 评论事件） |
-| `repository` | string | 是 | 仓库全名 `{owner}/{repo}`，用于全部 API 路径 |
-| `account` | string | 是 | 事件触发账号 |
-| `pr_number` | string | 是 | PR 编号（pull_request 类事件必填） |
-| `issue_number` | string | 否 | 关联 Issue 编号；仅在能确认为真实 Issue 时使用（A2A 服务端强制校验字段） |
-| `head_sha` | string | 是 | PR 最新 head commit SHA，用于变更检视与行内评论 `commit_id` |
-| `body` | string | 否 | PR 描述/评论内容，仅作 claim 参考，须打开原对象核对，不直接采信 |
+## 二、环境变量表（平台注入，按 qa Agent 类型）
 
-校验规则：`event_type` 不在枚举内 → 拒绝执行并返回错误；缺少任一必填字段 → 拒绝执行；`issue_number` 缺失或无法确认 → A2A 能力项降级为跳过并在最终评论说明；`pr_number` 与 `issue_number` 相互独立，**严禁混用**。
+| 变量 | 语义 | 用在哪 | 何时有 |
+|------|------|--------|--------|
+| `GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` | 服务端地址 / 会话 token（tk_）| grape CLI 自动读取 | 全部任务 |
+| `REPO_FULL_NAME` / `ACCOUNT` | 仓库全名 / 属主 | --owner/--repo 参数 | 全部 |
+| `REPO_NAME` | 仓库名（派生：`${REPO_FULL_NAME#*/}`）| --repo 参数 | 全部 |
+| `PR_NUMBER` | 审查对象 PR 编号 | --number / A2A pr_number | 事件任务 |
+| `ISSUE_NUMBER` | 关联 Issue 编号（能确认真实才用）| A2A issue_number（必填校验）| 有关联时 |
+| `DEVOPS_EVENT_TYPE` | 事件类型（pull_request_opened 等）| 场景路由判断 | 全部 |
 
-# PR 运营
+派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
+本技能不涉及 `GRAPE_WORK_BRANCH`/`BOT_USERNAME`（无 git 分支/身份操作——审查只读 diff）、`HUAWEICLOUD_SDK_AK/SK`（SRE 域）与 `USER_GITCODE_TOKEN`（Chat 域）。
 
-## 核心原则
+## 三、前置检查门（自愈 → 重试 → STOP）
 
-### 验证外部 claim
-PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 claim，不是事实。**先打开原对象核对**。
+| 检查项 | 判定命令 | 通过标准 | 失败动作 |
+|--------|---------|---------|---------|
+| CLI 可用 | `grape --version` | ≥0.3.2 | **自愈**：按 `references/grape-cli-installation.md` 自动安装/升级（`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`）→ 装好再验证；仍不可用 → 输出「前置检查未通过：<原因>」结束 |
+| 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退快照），"命令不识别"时再 refresh |
+| 任务上下文 | `grape tasks current` + `git-repo pulls get` | 拿到任务与 PR 全貌 | PR 定位不到 → STOP（不执行写操作）|
+| 认证变量就绪 | `${VAR:+ok}` 校验（不打印 token）| token/repo/pr 有值 | 缺失 → STOP「前置检查未通过」|
+| 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
-### Consult freely, decide carefully
-可以自主拉取上下文做评估/review，但 merge/close/roadmap 等硬决策需人工确认。
+> 本技能无外部凭据类前置——token 由平台注入。
 
-### 所有评论统一在能力项执行完毕后发送
-各能力项的分析结果先记录，最后统一合并为一条评论发送，不得在中间步骤单独发评论。
+## 四、技能定义与执行
 
-### 禁止探索 Grape 内部
-不要执行 `ls`、`grep`、`cat` 等命令查看 workspace 目录、Grape 代码、日志文件或数据库。
-**所有信息通过 VCS API 获取**，不读取本地文件。
+### 4.1 定位与职责边界
 
-### 涉及代码需要继续优化时，A2A 通知 Coding Agent
-审查发现代码需要继续优化/修改（存在 Critical 或 Required 级别问题），**必须通过 A2A 调用 Coding Agent 进行优化实现**，不得由 QA 直接改代码。
-
-```bash
-curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "coding",
-    "payload": {
-      "repository": "'"$REPO_FULL_NAME"'",
-      "account": "'"$ACCOUNT"'",
-      "issue_number": "'"$ISSUE_NUMBER"'",
-      "pr_number": "'"$PR_NUMBER"'",
-      "context": "PR #'"$PR_NUMBER"' 审查发现代码需要优化：'"$REVIEW_SUMMARY"'"
-    }
-  }'
-```
-
-> ⚠️ **字段规则（A2A 服务端强制校验）：** `issue_number` 必填，必须是本 PR 关联的真实 Issue 编号（`$ISSUE_NUMBER`）。**若无法确定关联的 issue_number，则不要调用 A2A**，在最终审查评论中说明。`pr_number` 填写 PR 编号（`$PR_NUMBER`）；**严禁把 PR 编号填入 issue_number，两者不可混用**。
-
-**触发条件**：review_comments 中存在 Critical 或 Required 级别问题需要修改代码时。
-**响应**：A2A 返回后，将优化结论合并进最终审查评论。
-
-## PR 分析（每次执行前先分析，⚠️ 必须按 1→2→3 顺序依次执行，上一步未完成不得进入下一步）
-
-### 分析内容
-
-1. **PR 配置检查（仅首次 `pull_request_opened` 事件时执行）**
-
-   如果是 `pull_request_updated`、`push` 或 `note_hook_pr` 事件，**跳过此步**（配置已在 PR 创建时检查过）。
-
-   读取 `references/pr-config-check.md` 执行检查，将不通过项记录到 `review_comments` 中（暂不评论，统一到最后处理）。
-
-   如果有关联 Issue，在对应 Issue 中评论 `📌 关联 PR #{pr_number}`，对应 Issue 是 bug 则更新标签 `labels="bug,triaged"`。
-
-2. **变更检视**
-
-   判断是否有新的代码变更：
-
-   ```bash
-   cat ../.last_pr_review/{pr_number}.sha 2>/dev/null
-   ```
-
-   - 文件不存在或 SHA 不同 → 有新的变更，继续
-   - SHA 相同 → 无新变更，**跳过以下所有能力项**（配置检查的评论仍会发送）
-
-3. **任务类型判断**
-
-   | 判断条件 | 任务类型（按顺序执行） |
-   |---------|----------------------|
-   | PR 修改了 `skills/` 目录下的文件 | 常规审查 → Skill 审查 → A2A 通知 → 回复评论 |
-   | PR 包含 IaC 文件（K8s/Terraform/Dockerfile） | 常规审查 → IaC 审查 → A2A 通知 → 回复评论 |
-   | 普通代码变更 | 常规审查 → A2A 通知 → 回复评论 |
-   | 无新变更 | 不做处理，结束 |
-
-### 分析结论示例
-
-```
-分析结论：
-- 配置检查：Title 和 Description 通过，缺少 Labels 和 Assignee
-- 变更检视：有新变更（首次审查）
-- 任务类型：常规审查 + 安全扫描（IaC 文件变更）
-- 需要执行：常规审查 → IaC 审查 → A2A 通知 → 评论回复
-```
-
-## 能力项
-
-审查过程中对每个发现的问题直接在对应代码位置发布行内评论，最后在「评论回复」中发一条总结性评论。
-
-### 能力一：常规审查
-
-读取 `references/code-review-and-quality.md`，按 5 轴标准逐项审查（正确性、可读性、架构、安全、性能）。
-
-**审查前先获取 PR 上已有行内评论，检查上次发现的问题是否已修复：**
-
-```bash
-# 获取 PR 所有行内评论
-GET /repos/{owner}/{repo}/pulls/{number}/comments
-```
-
-对每条已有评论：
-- 检查对应代码位置的代码是否已无问题（问题已修复）
-- 如果已修复 → 调用 API 标记为已解决：
-
-```bash
-curl -s -X PUT -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"resolved": true}' \
-  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/comments/{discussion_id}
-```
-
-其中 `discussion_id` 为评论对象的 `discussion_id` 字段（不是 `id` 字段）。
-
-**然后审查新变更，对发现的每个问题发布行内评论：**
-
-```bash
-# 先获取 PR 变更文件列表和 diff 信息
-GET /repos/{owner}/{repo}/pulls/{number}/files
-```
-
-从返回中获取每个文件在 diff 中的行号映射。然后在对应位置发布评论：
-
-```bash
-curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "body": "[QA Agent] 🔴 Critical: 硬编码密钥，建议使用环境变量",
-    "commit_id": "'"$HEAD_SHA"'",
-    "path": "src/config.py",
-    "position": 42
-  }' \
-  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{number}/comments
-```
-
-- `commit_id` 为 PR 最新的 head.sha（阶段 0 已获取）
-- `path` 为问题所在的文件路径
-- `position` 为问题在 diff 中的行号（从 PR files API 返回的 diff 中获取）
-- 发现 Critical 或 Required 级别问题时，记录问题摘要用于后续 A2A 通知
-
-### 能力二：Skill 审查
-
-**仅当 PR 修改了 `skills/` 目录时执行。**
-
-读取 `references/skill-review-and-quality.md`，审查技能文件的格式规范、完整性、引用路径、向后兼容性。
-
-对发现的每个问题，参照能力一的格式在对应代码位置发布行内评论。
-
-### 能力三：IaC 审查（仅当 PR 包含 IaC 文件）
-
-额外扫描 IaC（基础设施即代码）文件：
-
-| 文件类型 | 关注点 |
-|---------|--------|
-| Kubernetes Manifest | 特权容器、hostPath 挂载、`securityContext` 缺失、`runAsRoot`、资源限制未设置 |
-| Terraform / OpenTofu | 公开 S3 bucket、`ingress` 全开放（`0.0.0.0/0`）、硬编码凭据、未启用加密 |
-| Dockerfile | `FROM latest`、`ADD` 替代 `COPY`、root 用户运行、多余端口暴露 |
-| Helm Chart | values 中的敏感默认值、RBAC 权限过度、镜像拉取策略不当 |
-
-对发现的每个问题，参照能力一的格式在对应代码位置发布行内评论。
-
-### 能力四：A2A 通知
-
-**当审查发现问题需要修改时，调用 A2A 通知 Coding Agent（coding）处理。**
-
-如果 review_comments 中存在 Critical 或 Required 级别的问题，说明需要修改代码。此时调用 A2A API 将审查意见传递给 Coding Agent：
-
-```bash
-curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "coding",
-    "payload": {
-      "repository": "'"$REPO_FULL_NAME"'",
-      "account": "'"$ACCOUNT"'",
-      "issue_number": "'"$ISSUE_NUMBER"'",
-      "pr_number": "'"$PR_NUMBER"'",
-      "context": "PR #'$PR_NUMBER' 审查发现问题需要修改：'$REVIEW_SUMMARY'"
-    }
-  }'
-```
-
-> ⚠️ **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（本 PR 关联的真实 Issue 编号 `$ISSUE_NUMBER`），**无法确定则不要调用 A2A**；`pr_number` 填 PR 编号；**严禁把 PR 编号填入 issue_number，两者不可混用**。
-
-其中 `$REVIEW_SUMMARY` 为上述审查中发现的 Critical 和 Required 级别问题的汇总。
-A2A 返回后，将 Coding Agent 的优化结论合并进最终审查评论（能力五）。
-
-### 能力五：评论回复
-
-**⚠️ 所有能力项执行完毕后，最后统一执行此步。不得在中间步骤单独发评论。**
-
-将所有 `review_comments` 中的内容合并为一条评论发送：
-
-```bash
-POST /repos/{owner}/{repo}/pulls/{number}/comments
-Authorization: Bearer $BOT_TOKEN
-Content-Type: application/json
-{"body": "[QA Agent] 审查报告\n\n## 配置检查\n- ✅ Title：通过\n- ⚠️ Labels：缺少分类标签\n\n## 代码审查\n✅ 通过\n\n## 安全扫描\n✅ 安全\n\n## 合并检查\n⚠️ 测试未确认"}
-```
-
-- body **必须**以 `[QA Agent]` 开头
-- 汇总所有能力项的发现，按章节组织
-- 如果全部通过，评论：`[QA Agent] 审查通过，所有检查项均正常。`
-
-**跳过此步 = 事件未完成处理。**
-
-**例外：** 变更检视判定 SHA 未变更而跳过时，不发评论。
-
-## 输出规范
-
-```markdown
-## PR 审查报告
-
-### 关联 Issue
-- Closes #N — 状态: triaged
-
-### 变更摘要
-- 文件: X 个文件变更，+Y -Z
-
-### 代码审查
-**结论**: ✅ 通过 / ⚠️ 需修改 / ❌ 需重大修改
-
-| 级别 | 文件 | 行号 | 问题 | 建议 |
-|------|------|------|------|------|
-| 🔴 | src/main.go | 42 | 硬编码密钥 | 使用环境变量 |
-
-### 安全扫描
-**结论**: ✅ 安全
-
-### 合并检查
-- ✅ 安全通过
-- ✅ 审查通过
-```
-
-## 输出 Schema（outputSchema）
-
-本 Skill 的输出固定为两部分：PR 上的一条统一总结评论（Markdown，见「输出规范」）+ 一个结构化 JSON 结果块（供上游消费与存档）。JSON 结构声明如下：
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `skill` | string | 是 | 固定值 `pr` |
-| `event_type` | string | 是 | 本次处理的事件类型 |
-| `repository` / `account` / `pr_number` | string | 是 | 事件上下文回显 |
-| `conclusion` | string | 是 | 枚举：`pass` / `needs_changes` / `needs_major_changes`（对应 ✅ / ⚠️ / ❌ 结论） |
-| `review_comments` | array | 是 | 行内评论清单，元素含 `file`/`line`/`level`/`problem`/`suggestion` |
-| `a2a_notified` | boolean | 是 | 是否已通过 A2A 通知 Coding Agent |
-| `report_markdown` | string | 是 | 最终统一评论正文，**必须以 `[QA Agent]` 开头** |
-
-校验规则：`conclusion` 必须是枚举值；`review_comments` 每个元素必须含 `file` 与 `line`；`report_markdown` 不以 `[QA Agent]` 开头视为非法输出，不得提交。
-
-## 性能预算
-
-| 指标 | 预算/基线 | 说明 |
-|------|-----------|------|
-| 单次执行时延（P95） | ≤ 60s（基线；暂无实测值时以此基线为准） | 5 个能力项线性执行；VCS API 调用 ≤ 10 次（GET pulls/files/comments、PUT resolve、POST 评论、A2A），外部 API 时延占主导 |
-| LLM 调用次数 | 1 次/事件 | 单次线性审查，无循环/自调用设计；A2A 交办后的优化实现计数归 Coding Agent 侧，不计入本 Skill |
-| token 消耗 | ≤ 15k token/事件 | 全量文档约 42.5KB；输入以事件负载 + 变更文件 diff + API 响应为主 |
-| API 调用预算 | ≤ 10 次/事件 | 全部为官方 VCS API（api.gitcode.com / {{SERVER_URL}} 占位符 A2A 端点） |
-
-上下文压缩策略：references 文档按能力项按需读取；变更检视只读 `.sha` 状态；PR diff 仅取变更文件部分；已有行内评论只摘要 status/path/line；所有发现合并为一条评论输出。
-
-超预算处理：上下文/token 接近上限时停止继续拉取，基于已获取信息出结论；API 调用失败重试 1 次仍失败 → 按「可靠性声明」降级处理。
-
-## 版本管理
-
-- 当前版本：v2.0.0（Frontmatter 声明 `version: 2.0.0`；GS-008 规范已调整为 Low 级「不建议带 version」，保留 version 字段合规）。
-- 版本识别：以仓库提交历史/本目录文件变更记录为版本基准，不依赖 Frontmatter version 字段。
-- 新旧版本兼容：输入采用「只读已声明字段 + 忽略未知字段」策略，事件负载新增字段不影响既有行为，向后兼容。
-- 灰度策略：行为变更（新增能力项、调整预算/基线）须在 `description` 中标注变更说明，并建议小流量观察后全量；服务端强制规则（如 A2A `issue_number` 校验）不随 Skill 版本变化。
-
-## 可靠性声明
-
-| 机制 | 声明 |
-|------|------|
-| 断点续跑（resume） | 每次审查后将 head SHA 写入 `../.last_pr_review/{pr_number}.sha`；中断后重新执行时，变更检视读取该文件：SHA 相同 → 跳过能力项直接结束（不重复审查/评论）；SHA 不同或文件缺失 → 从能力一继续。A2A 未返回时不阻塞流程，将「优化进行中」写入最终评论，由后续事件续跑 |
-| 重试幂等 | 写操作均为「先查后写」：发送评论前先经 SHA 变更检视与已有评论比对去重；重复事件（SHA 未变）不重复发评论；同次运行内 review_comments 统一合并为一条评论，重试不产生重复副作用 |
-| 资源清理 | 执行过程不创建临时文件/进程；唯一持久状态为 `../.last_pr_review/{pr_number}.sha`（设计内状态，覆盖写）；输出评论为 GitCode 平台托管资源，无本地残留；事件处理结束即结束任务 |
-| 工具失败降级 | API 返回 403/无权限 → 停止该操作并回复用户既有人工指引，不换 token 绕行；A2A 失败或 issue_number 无法确定 → 跳过 A2A 并在最终评论说明；网络失败 → 重试 1 次，仍失败则基于已获取信息出结论并在评论中标注 |
-
-## 依赖兼容声明
-
-| 依赖 | 类型 | 最低版本/兼容范围 | 说明 |
-|------|------|-------------------|------|
-| git | CLI 工具 | ≥ 2.20（2020 年后主流发行版均满足） | Frontmatter 声明工具；本 Skill 不依赖特定 git 子命令 |
-| curl | CLI 工具 | ≥ 7.58（支持 `-s`/`-X`/`-H`/`-d` 与 https） | 全部 API 示例调用 |
-| bash（POSIX） | 运行时 | POSIX sh 兼容即可 | 示例命令基础，均使用固定参数 + 占位符 |
-| VCS API | HTTP API | api/v5（现有端点范围） | 端点为官方域名与 {{SERVER_URL}} 占位符；响应结构按实际返回为准 |
-
-兼容策略：示例命令无版本特有语法；不安装任何全局依赖；依赖不可用时优先走平台 HTTP API 直连路径。
-
-## 硬规则
+**职责**：**PR 审查守门人**——配置检查 → 变更检视 → 常规/Skill/IaC 审查 → 发现问题 A2A coding → 统一总结评论（输出检查结论，不做合并决策）。
+**Consult freely, decide carefully**：merge/close/roadmap 等硬决策需人工确认，QA 只输出结论。
 
 | 行为 | 态度 |
 |------|------|
-| 按分析结论执行 PR 审查 | ✅ **必须做** |
-| 审查发现问题需要修改时调用 A2A 通知 Coding Agent | ✅ **必须做** |
-| 所有评论统一在最后发送 | ✅ **必须做，不得在中间步骤发评论** |
-| ⚠️ **发送评论是最终强制步骤** | ✅ **必须做**（除非 SHA 未变更跳过） |
-| 只通过 VCS API 获取信息 | ✅ **必须做** |
-| 直接合并 PR | ❌ **禁止**（仅输出检查结论） |
-| 修改 PR 代码或文件 | ❌ **禁止** |
-| 删除 PR | ❌ **禁止** |
-| 回复 Token、密码等敏感信息 | ❌ **禁止** |
-| 探索 workspace、Grape 系统文件 | ❌ **禁止** |
+| 按分析结论执行 PR 审查（1→2→3 顺序）| ✅ 必须做 |
+| 发现问题需要修改时 A2A 通知 coding | ✅ 必须做（不得由 QA 直接改代码）|
+| 所有评论统一在最后发送 | ✅ **必须做，不得中间单独发** |
+| 发送总结评论（最终强制步骤）| ✅ 必须做（除非 SHA 未变更跳过）|
+| 只通过 grape CLI 获取平台信息 | ✅ 必须做 |
+| 合并/关闭 PR（硬决策）| ⚠️ 需用户确认后执行 |
+| 直接合并 PR | ❌ 禁止（仅输出检查结论）|
+| 修改 PR 代码或文件 | ❌ 禁止 |
+| 删除 PR | ❌ 禁止 |
+| 回复 Token/密码等敏感信息 | ❌ 禁止 |
+| 探索 workspace/Grape 系统文件（.sha 断点除外）| ❌ 禁止 |
+| curl 直连 API | ❌ 禁止 |
 
-## 参考
+### 4.2 场景路由（事件/变更 → 任务类型）
 
-需要调用 VCS API 时，读取 `references/vcs-api-reference.md`。
+| 条件 | 任务类型（顺序执行）|
+|------|-------------------|
+| 首次 `pull_request_opened` | **配置检查**（`references/pr-config-check.md`）→ 常规审查 → 按类型追加 → A2A → 回复 |
+| PR 修改 `skills/` 目录文件 | 常规审查 → **Skill 审查** → A2A → 回复 |
+| PR 包含 IaC 文件（K8s/Terraform/Dockerfile/Helm）| 常规审查 → **IaC 审查** → A2A → 回复 |
+| 普通代码变更 | 常规审查 → A2A → 回复 |
+| 变更检视 SHA 未变 | **跳过能力项**（配置检查评论仍发送）→ 结束 |
+| 其他事件类型（不在 Schema 枚举）| 拒绝执行并返回错误 |
 
-> ⚠️ **任务结束**：完成所有业务动作（审查评论/A2A 交办）后，输出最终 JSON 块并**结束任务**，不要继续思考或等待输入。
+> 所有路径共用分析骨架：**① PR 配置检查（仅首次）→ ② 变更检视（.sha 断点）→ ③ 任务类型判断**——上一步未完成不得进入下一步。
+
+### 4.3 处理流程（统一骨架）
+
+**流程总览（一行）**：⓪ 上下文 → ① 配置检查（仅首次）→ ② 变更检视（.sha）→ ③ 任务类型 → 能力一 常规审查 → 能力二 Skill 审查 / 能力三 IaC 审查（按类型）→ 能力四 A2A coding（发现 Critical/Required）→ 能力五 统一总结评论 → 收尾（4.8）
+
+**执行规则**：
+- ⚠️ **启动即读 `references/pr-runbook.md`**——每步命令照抄执行（不现场查 --help）
+- 分析三步必须 1→2→3 顺序；**所有评论统一在能力项执行完毕后合并为一条发送**（跳过 = 事件未完成）
+- 变更检视：`.sha` 相同 → 跳过能力项（不重复审查/评论）；不同/缺失 → 从能力一继续
+- 发现 Critical/Required 问题 → 必须 A2A coding（不得 QA 改代码）；`issue_number` 无法确定 → 不调用 A2A，最终评论说明
+- 防重复 A2A：先 `issues pipeline` 查已含 `coding:a2a_event` 则不重复
+
+### 4.4 命令标准（子集与坑点）
+
+完整命令与参数见 `references/pr-runbook.md` 与 `references/grape-cli-reference.md`。坑点：
+
+| 坑点 | 正确做法 |
+|------|---------|
+| ⚠️ 行内评论契约限制 | pulls comments create 仅普通 body——不带 commit_id/path/position；不 resolve——统一总结评论标注文件:行号 |
+| 评论前缀 | 总结评论 `[QA Agent]` 开头（校验规则：不以它开头 = 非法输出）|
+| 评论统一最后发 | 各能力项结果先记录 review_comments，最后合并一条发送——不得中间单独发 |
+| 变更检视 | 读 `../.last_pr_review/{pr_number}.sha`——相同跳过/不同继续（断点续跑）|
+| 验证外部 claim | `fixes #N`/`tests pass`/`small fix` 都是 claim → 打开原对象核对（pulls get/files/commits）|
+| 关联 Issue 打标 | 对应 Issue 是 bug → `issues update --json '{"labels":"bug,triaged"}'` |
+| 长 body | `--json @file`（总结评论长——先写文件再发）|
+| 命令失败 | 先看完整 stderr（去 `\| tail`）→ 按 runbook 错误排查速查 → 不反复盲试 |
+
+### 4.5 故障决策表
+
+| 故障 | 分类 | 动作 |
+|------|------|------|
+| 403/权限不足（Required 操作）| Required | **STOP**：按安全硬约束④回复用户，等待配置 |
+| 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
+| 命令失败（报错/参数/字段错误）| — | **先看完整 stderr** → 按 runbook 错误排查速查处理 → 不反复盲试 |
+| `pulls files`/`pulls get` 失败 | Required | 网络失败 → 重试 1 次 → 仍失败基于已获取信息出结论并标注 |
+| A2A 调用非 2xx / 超时 | Required | 重试 ≤3 次 → 仍失败：最终评论说明 + next_step 标人工介入 |
+| `issue_number` 无法确定 | Required（A2A 前置）| 不调用 A2A——最终审查评论说明原因 |
+| CLI 契约未覆盖（行内评论/resolve）| — | 统一总结评论输出标注文件:行号——禁止 curl 直连补齐 |
+| 事件类型不在枚举 | Required | 拒绝执行并返回错误 |
+| 知识基线 [degraded] | Optional | 降级分析 + 标注，不阻塞 |
+| 命令参数不识别 | — | `--help` 查精确参数后重试（≤2 次），仍失败 STOP 报障 |
+
+### 4.6 输出格式（固定产物）
+
+**PR 审查报告**（总结评论 body）：
+```markdown
+[QA Agent] 审查报告
+
+## 配置检查
+- ✅ Title：通过
+- ⚠️ Labels：缺少分类标签
+
+## 代码审查
+**结论**: ✅ 通过 / ⚠️ 需修改 / ❌ 需重大修改
+| 级别 | 文件 | 行号 | 问题 | 建议 |
+
+## 安全扫描
+**结论**: ✅ 安全
+
+## 合并检查
+- ✅ 安全通过
+- ✅ 审查通过
+```
+- 结论枚举：`pass` / `needs_changes` / `needs_major_changes`（✅/⚠️/❌）
+- 全部通过 → `[QA Agent] 审查通过，所有检查项均正常。`
+- 含「已修复问题」清单（上次评论问题已修复的核对结果）
+
+### 4.7 写操作协议
+
+| 操作 | 确认要求 |
+|------|---------|
+| 读操作（查/核对/分析）| 自动执行，无需确认 |
+| 发总结评论 / 关联 Issue 评论 / bug 打标 / A2A 通知 | **流程内声明**——直接执行 |
+| 合并/关闭 PR、删除分支、变更标签 | **硬决策**——用户确认后执行 |
+| 会话结束 | 列出本次变更（评论/A2A/标签）——无变更声明「只读会话」|
+
+### 4.8 任务收尾（必做）
+
+业务动作完成后：输出人类可读摘要（配置检查/变更检视/任务类型/审查结论/A2A 结果）→ 调用：
+
+```bash
+grape tasks complete --json '{
+  "result_text":  "结论：PR #{pn} 审查完毕（{结论}）",
+  "actions":      ["配置检查: {通过/问题项}", "变更检视: {新变更/SHA 未变跳过}", "常规审查: {结论}", "Skill/IaC 审查: {如执行}", "评论: [QA Agent] 总结评论", "A2A: coding/无"],
+  "conclusion":   "{pass / needs_changes / needs_major_changes}，{已 A2A coding / 无需修改}",
+  "artifacts":    ["PR #{pn} 总结评论", "A2A handoff（如有）", ".sha 断点更新"],
+  "issue_summary":"{审查结论摘要——结论/问题级别/去向 一句话}",
+  "next_step":    "a2a_coding 或 等待人工决策"
+}'
+```
+
+⚠️ **结构化字段必填**（结尾 = 下一节点的输入）：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` must 真实填充——只传 `result_text` 会丢结构化归档；下游/A2A 接收方以结构化字段为主消费，`result_text` 作为人类可读补充参考。
+
+**立即结束**，不继续思考或等待输入。
+
+## 五、参考文件清单
+
+| 文件 | 用途 | 先读 |
+|------|------|------|
+| `references/pr-runbook.md` | **执行走查表：分析三步 + 能力一~五命令逐步照抄 + 错误排查速查** | ⭐ 最先 |
+| `references/grape-cli-installation.md` | grape CLI 安装/升级指引（前置门自愈用）| CLI 未装时 |
+| `references/code-review-and-quality.md` | 常规审查 5 轴标准 | 能力一时 |
+| `references/pr-config-check.md` | PR 配置检查（仅首次）| 分析①时 |
+| `references/skill-review-and-quality.md` | Skill 文件审查标准 | 能力二时 |
+| `references/grape-cli-reference.md` | grape CLI 命令参考 | 命令不确定时 |
+
+## 六、Best Practices（实践积累区）
+
+> 暂无，后续沉淀后更新补充。

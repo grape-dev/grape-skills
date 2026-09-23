@@ -37,10 +37,7 @@
   ```
 - **Issue 评论追问格式**（body 以 `[VOD Agent]` 开头）：
   ```bash
-  POST /repos/{owner}/{repo}/issues/{number}/comments
-  Authorization: Bearer $BOT_TOKEN
-  Content-Type: application/json
-  {"body": "> 用户的问题原文\n\n[VOD Agent] 您指的是哪个对象的批量操作？……"}
+  grape git-repo issues comments create --owner {owner} --repo {repo} --number {number} --json '{"body": "> 用户的问题原文\n\n[VOD Agent] 您指的是哪个对象的批量操作？……"}'
   ```
 
 ## 三、Issue 审视流程（场景 B，`issue_opened`）
@@ -48,8 +45,8 @@
 1. **自建排除**：Issue 含 `auto-submitted by VOD Agent` 标记 → 跳过审视，直接 A2A 交办 Issue Agent
 2. **清晰度审视**：读取 Issue 完整内容（title/body/标签/评论），对照四要素；结合知识基线判断可执行性/重复/歧义
 3. **沟通澄清**（不清晰时）：在 Issue 评论 @开发者 追问（body 以 `[VOD Agent]` 开头），或飞书群沟通；≤3 轮
-4. **结构化总结**：`PATCH /issues/{number}` 将 body 收敛为模板结构
-5. **A2A 交办**：`POST /api/a2a {"agent":"issue", ...}` → Issue Agent 做 spec/标签/里程碑/分配
+4. **结构化总结**：`grape git-repo issues update --owner {owner} --repo {repo} --number {number} --json '{"body":"{按模板结构化的 body}"}'` 将 body 收敛为模板结构
+5. **A2A 交办**：`grape a2a handoff --json '{"agent":"issue","payload":{"repository":"{owner}/{repo}","account":"{user}","issue_number":{n},"context":"VOD 已完成需求收敛与结构化"}}'` → Issue Agent 做 spec/标签/里程碑/分配
 
 ## 四、结构化 Issue 模板
 
@@ -78,19 +75,7 @@ auto-submitted by VOD Agent（Feishu）
 ## 五、A2A 交办格式
 
 ```bash
-curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "issue",
-    "payload": {
-      "repository": "'"$REPO_FULL_NAME"'",
-      "account": "'"$ACCOUNT"'",
-      "issue_number": "'"$ISSUE_NUMBER"'",
-      "pr_number": "",
-      "context": "VOD 已完成需求收敛与结构化，请继续 spec 设计/打标签/排里程碑/分配责任人。结构化需求：<摘要>"
-    }
-  }'
+grape a2a handoff --json '{"agent":"issue","payload":{"repository":"{owner}/{repo}","account":"{user}","issue_number":{n},"context":"VOD 已完成需求收敛与结构化，请继续 spec 设计/打标签/排里程碑/分配责任人。结构化需求：<摘要>"}}'
 ```
 
 > ⚠️ `issue_number` 必填；无法确定则不调 A2A，在评论中说明。交办后 Issue 生命周期进入 `issue` 阶段（`issue_state` 归属更新）。

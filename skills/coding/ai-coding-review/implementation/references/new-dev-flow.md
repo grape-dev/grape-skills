@@ -8,11 +8,10 @@
 
 获取 Issue 的标题、正文、标签、评论等完整信息，判断需求的目标、范围、关键功能点。
 
-⚠️ A2A context 可能只包含摘要。必须通过 VCS API 获取 Issue 完整内容：
+⚠️ A2A context 可能只包含摘要。必须通过 grape CLI 获取 Issue 完整内容：
 
 ```bash
-curl -s -H "Authorization: Bearer $BOT_TOKEN" \
-  "$VCS_API_BASE/repos/{owner}/{repo}/issues/{number}"
+grape git-repo issues get --owner {owner} --repo {repo} --number {number} --json-out
 ```
 
 如有不明确之处，先通过评论向用户确认，确认后再继续。
@@ -62,10 +61,7 @@ curl -s -H "Authorization: Bearer $BOT_TOKEN" \
 仅当无 A2A context 且通过 issue_labeled + PATCH 标签触发时执行。
 
 ```bash
-POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_TOKEN
-Content-Type: application/json
-{"body": "此需求是否启动开发？回复「启动」或「暂缓」。如需调整方案，请一并说明。"}
+grape git-repo issues comments create --owner {owner} --repo {repo} --number {number} --json '{"body": "此需求是否启动开发？回复「启动」或「暂缓」。如需调整方案，请一并说明。"}'
 ```
 
 ### 能力二：CODEOWNERS 生成
@@ -117,36 +113,20 @@ git push origin feat/issue-{number}
 
 ```bash
 # 创建 PR
-curl -sL -X POST -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "feat: #{number} 标题",
-    "head": "feat/issue-{number}",
-    "inner_issue_nums": "#{owner}/{repo}#{number}",
-    "close_related_issue": true
-  }' \
-  $VCS_API_BASE/repos/{owner}/{repo}/pulls
+grape git-repo pulls create --owner {owner} --repo {repo} --json '{"title": "feat: #{number} 标题", "head": "feat/issue-{number}", "base": "main", "inner_issue_nums": "#{owner}/{repo}#{number}", "close_related_issue": true}'
 
-# PATCH 补充 body
-curl -sL -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"body": "## 概述\n\n自动实现 Issue #{number}", "labels": "auto-pr", "prune_branch": true}' \
-  $VCS_API_BASE/repos/{owner}/{repo}/pulls/{pr_number}
+# 补充 PR body 与 label
+grape git-repo pulls update --owner {owner} --repo {repo} --number {pr_number} --json '{"body": "## 概述\n\n自动实现 Issue #{number}", "labels": "auto-pr"}'
 ```
 
 ### ⚠️ 必须执行：发 Issue 评论告知
 
 > **PR 链接路径规则（重要）：**
-> - GitCode **Web 页面** PR 链接使用 `/pull/`（**单数**）：`https://gitcode.com/{owner}/{repo}/pull/{pr_number}`
-> - GitCode **API** 路径使用 `/pulls/`（复数）：`$VCS_API_BASE/repos/{owner}/{repo}/pulls`
-> - **Issue 评论中必须使用 Web 页面链接（`/pull/` 单数），不得使用 API 路径（`/pulls/` 复数）**
+> - GitCode **Web 页面** PR 链接使用 `/pull/`（**单数**）：`https://gitcode.com/{owner}/{repo}/pull/{pr_number}`，Issue 评论中必须使用该 Web 页面链接格式
 > - **必须使用 markdown 链接格式** `[PR #{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})`，不得使用纯文本 `PR #{pr_number}`
 
 ```bash
-POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_G...OKEN
-Content-Type: application/json
-{"body": "[Coding Agent] ✅ 已完成实现，请审查 PR [#{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})。"}
+grape git-repo issues comments create --owner {owner} --repo {repo} --number {number} --json '{"body": "[Coding Agent] ✅ 已完成实现，请审查 PR [#{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})。"}'
 ```
 
 **跳过此步 = 事件未完成处理。**
@@ -156,19 +136,7 @@ Content-Type: application/json
 ⚠️ 创建 PR 后必须执行，否则 QA Agent 不会收到审查请求。
 
 ```bash
-curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "qa",
-    "payload": {
-      "repository": "'"$REPO_FULL_NAME"'",
-      "account": "'"$ACCOUNT"'",
-      "issue_number": "'"$ISSUE_NUMBER"'",
-      "pr_number": "'"$PR_NUMBER"'",
-      "context": "Issue #'"$ISSUE_NUMBER"' 开发已完成，PR #'"$PR_NUMBER"' 已创建。请对该 PR 进行代码审查。原始需求：[简要描述]"
-    }
-  }'
+grape a2a handoff --json '{"agent": "qa", "payload": {"repository": "{owner}/{repo}", "account": "{account}", "issue_number": {number}, "pr_number": {pr_number}, "context": "Issue #{number} 开发已完成，PR #{pr_number} 已创建。请对该 PR 进行代码审查。原始需求：[简要描述]"}}'
 ```
 
 > ⚠️ **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（当前开发任务的 Issue 真实编号）。**若无法确定 issue_number，则不要调用 A2A**，在最终评论中说明 PR 已创建但未通知 QA 的原因。`pr_number` 有则填（PR 编号）、无则不填，严禁把 PR 编号填入 issue_number。
@@ -183,7 +151,7 @@ context 应包含：
 #### 注意
 
 - 仅「新开发」场景执行此步；代码优化场景（pr-optimization-flow）无新 PR，不触发。
-- `$PR_NUMBER` 来自能力八创建 PR 的 API 返回值。
+- `$PR_NUMBER` 来自能力八创建 PR 的 grape CLI 返回值。
 - `$ISSUE_NUMBER` 来自原始 Issue 编号。
 
 **跳过此步 = 事件未完成处理。**
@@ -208,5 +176,5 @@ context 应包含：
 **注意：**
 - 该 JSON 块放在**最终答复末尾**，是任务结束的唯一标记；
 - **不得**用长流程叙述（场景识别→方案→实现过程）替代该 JSON 块；
-- 若 PR 创建失败或某动作未完成，`actions`/`conclusion` 中如实说明（如 `"PR 创建失败：VCS API 返回 xxx"`），不要伪造；
+- 若 PR 创建失败或某动作未完成，`actions`/`conclusion` 中如实说明（如 `"PR 创建失败：grape CLI 返回 xxx"`），不要伪造；
 - `issue_summary` 覆盖 Issue 档案聚合结论，供下游 Agent 快速浏览。

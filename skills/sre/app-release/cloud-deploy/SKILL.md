@@ -1,139 +1,173 @@
 ---
 name: cloud-deploy
-version: 2.0.0
+version: 2.1.0
 description: |
-  华为云部署技能：自动构建项目并部署到华为云 ECS，支持 A2A 直接触发与 PR 合并触发。
-  职责：项目结构识别 → 代码获取与构建 → hcloud CLI 部署 → HTTP 验证 → 资源释放。
-  适用于部署/上线/更新华为云服务及释放/销毁云资源。
+  华为云部署技能：自动构建项目并部署到华为云 ECS——项目结构识别 → 代码获取构建 → hcloud CLI 部署 → HTTP 验证 → 资源释放。
+  Use when：部署、上线、deploy、更新华为云服务、释放/销毁云资源、PR 合并触发自动部署、cloud-deploy；
+  经 A2A 触发（部署/资源释放）或 PR 合并 main/master 事件触发。
 tools:
+  - grape
   - bash
 ---
 
-## 安全硬约束
+# 华为云部署 v2.1（grape CLI）
 
-1. 调用 VCS API 只用 `$BOT_TOKEN`，严禁从数据库/configs/日志/历史中寻找其他 token；token 不得写入文件/日志/评论。
-2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止并回复用户「需要管理员/维护者权限」，严禁尝试其他 token 或绕行。
-4. AK/SK 从 Grape 控制台配置获取；未配置时停止并提示用户，严禁硬编码或从他处寻找凭证。
-5. 严禁 `hcloud configure set` 改 default profile——必须用 `--cli-profile="task-$$"` 隔离，部署结束后清理。
-6. **操作确认**：变更现有配置（安全组/资源配置等）与删除/释放云资源前，必须告知用户并取得确认；仅 A2A/PR 合并显式触发的部署流水线写操作可自动执行。
+## 一、安全硬约束（必须遵守）
 
-## 场景 / When to Use
+1. **CLI 优先 + git 透传**：平台操作走 grape CLI；git 操作（clone/checkout/push）用 `grape git` 透传（内部认证）——禁止绕过 CLI 直连平台 API。
+   grape CLI 未装/版本过低 → **自动安装/升级**（官方源/签名包优先）→ 装好继续；仅安装失败/环境不可用才报障说明（不降级直连）。⚠️ 安装指引请参考：`references/grape-cli-installation.md`。
+2. **凭据纪律**：GitCode 凭据（平台注入 `$BOT_GITCODE_TOKEN`）由 grape git 透传内部消费——**技能不直接读取/不打印/不写文件/不写评论**；严禁从数据库/configs/日志/历史中寻找其他 token。
+3. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
+4. **403/无权限**：立即停止并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁其他 token 或绕行。
+5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行。
+6. **AK/SK 纪律**：`HUAWEICLOUD_SDK_AK/SK` 从 Grape 控制台配置注入；未配置 → 停止并提示用户配置，严禁硬编码或从他处寻找凭证。
+7. **hcloud profile 隔离**：严禁 `hcloud configure set` 改 default profile——必须 `--cli-profile="task-$$"` 隔离，部署结束清理。
+8. **操作确认**：变更现有配置（安全组/资源配置等）与删除/释放云资源前，必须告知用户并取得确认；仅 A2A/PR 合并显式触发的部署写操作可自动执行。
+9. **长命令/常驻命令纪律**（sre 执行类必守）：构建/安装（npm/pip 编译）可能无输出 → 加 `timeout` 限制、一次只装必要依赖；`http.server` 等常驻验证命令严禁前台执行（用后台+curl 验证+kill 或一次 SSH 内完成）。
 
-| 触发特征 | 场景 | 执行流程 |
-|---------|------|---------|
-| A2A 含「部署/上线/deploy」 | 部署 | 流程 §1~§4 |
-| A2A 含「释放/销毁/destroy」 | 资源释放 | `references/deploy-guide.md` §6 |
-| PR 合并到 main/master | 自动部署 | 流程 §1~§4 |
-| 其他事件 | 跳过 | 输出 SKIP |
+## 二、环境变量表（平台注入，按 sre Agent 类型）
 
-Don't use for: 非 merge/非 A2A 的 PR 事件；非 main/master 分支的 push。
+| 变量 | 语义 | 用在哪 | 何时有 |
+|------|------|--------|--------|
+| `GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` | 服务端地址 / 会话 token（tk_）| grape CLI 自动读取 | 全部任务 |
+| `REPO_FULL_NAME` / `ACCOUNT` | 仓库全名 / 属主 | --owner/--repo 参数 | 全部 |
+| `REPO_NAME` | 仓库名（派生：`${REPO_FULL_NAME#*/}`）| --repo 参数 | 全部 |
+| `ISSUE_NUMBER` | Issue 编号 | 评论/A2A payload | 事件任务 |
+| `PR_NUMBER` | PR 编号（PR 合并触发时）| 部署来源标记/汇报评论 | PR 合并时 |
+| `GRAPE_WORK_BRANCH` | 目标合入分支/工作基线（缺省仓库默认分支）| `grape git checkout` 部署分支 | 场景任务 |
+| `DEVOPS_EVENT_TYPE` | 事件类型（A2A 部署/资源释放/PR 合并）| 场景路由判断 | 全部 |
+| `HUAWEICLOUD_SDK_AK` / `HUAWEICLOUD_SDK_SK` | 华为云 AK/SK（Grape 控制台配置——按 owner 注入）| hcloud CLI 认证（`--cli-profile="task-$$"` 隔离）| SRE 任务 |
 
-## 知识 / Knowledge
+派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
+本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。流程内变量（`$ECS_IP`/`$INSTANCE_NAME` 等）为部署产物，非平台注入。
 
-### 环境变量
+## 三、前置检查门（自愈 → 重试 → STOP）
 
-| 变量 | 来源 | 说明 |
-|------|------|------|
-| `HUAWEICLOUD_SDK_AK` | Grape 控制台 | 华为云 AK |
-| `HUAWEICLOUD_SDK_SK` | Grape 控制台 | 华为云 SK |
-| `BOT_TOKEN` | 系统 prompt | VCS API Token |
+| 检查项 | 判定命令 | 通过标准 | 失败动作 |
+|--------|---------|---------|---------|
+| CLI 可用 | `grape --version` | ≥0.3.2 | **自愈**：按 `references/grape-cli-installation.md` 自动安装/升级（`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`）→ 再验证；仍不可用 → 输出「前置检查未通过：<原因>」结束 |
+| 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退快照）|
+| 认证变量就绪 | `${VAR:+ok}` 校验（不打印值）| token/repo/issue 有值 | 缺失 → STOP「前置检查未通过」|
+| **华为云 AK/SK 就绪** | `${HUAWEICLOUD_SDK_AK:+ok}` 且 `${HUAWEICLOUD_SDK_SK:+ok}` | 均有值 | **STOP**：提示用户「请先在 Grape 控制台配置华为云 AK/SK」——不硬编码、不找替代 |
+| hcloud 可用 | `hcloud version --cli-profile="task-$$"` | 命令可用 | **自愈**：按 `references/deploy-guide.md` §2 自动安装（架构判定→下载→隐私确认）→ 再验 |
+| 瞬时失败（网络/限流）| — | — | **重试**：≤3 次（退避 1s/2s/4s）|
 
-### grape CLI 命令
+## 四、技能定义与执行
 
-使用 `grape` CLI 替代 raw curl/git。完整参考见 `references/grape-cli-reference.md`。
+### 4.1 定位与职责边界
 
-| 命令 | 用途 |
-|------|------|
-| `grape git-repo issues get` | 获取 Issue 详情 |
-| `grape git-repo issues comments list` | 查 Issue 评论 |
-| `grape git-repo issues comments create` | 发 Issue 评论 |
-| `grape git` | git 透传（clone/checkout/push） |
-| `grape tasks complete` | 任务完成自报 |
-| `grape a2a handoff` | A2A 交办 |
-
-### 操作边界
+**职责**：**部署执行者**——把构建产物部署到华为云 ECS 并验证（或释放资源）——项目结构识别 → 构建 → hcloud 部署 → HTTP 验证 → 汇报。
+**不越界**：不修改仓库代码/不删除分支；变更现有云配置与释放资源需用户确认。
 
 | 操作 | 允许 | 说明 |
 |------|------|------|
-| 创建/更新云资源（ECS/EIP/安全组） | ✅ | A2A 或 PR 合并触发时自动执行 |
-| 部署代码到 ECS | ✅ | 构建后自动部署 |
-| 变更现有配置（安全组/资源配置等） | ⚠️ | 需用户确认 |
-| 删除/释放云资源 | ⚠️ | 需用户确认（资源释放场景） |
-| 修改仓库代码 | ❌ | 禁止 |
-| 删除仓库分支 | ❌ | 禁止 |
-| 读取 Grape 内部数据 | ❌ | 禁止 |
+| 创建/更新云资源（ECS/EIP/安全组）| ✅ 自动 | A2A 或 PR 合并触发时执行 |
+| 部署代码到 ECS | ✅ 自动 | 构建后部署 |
+| 变更现有配置（安全组/资源配置等）| ⚠️ 需确认 | 用户确认后执行 |
+| 删除/释放云资源 | ⚠️ 需确认 | 资源释放场景 |
+| 修改仓库代码 | ❌ 禁止 | — |
+| 删除仓库分支 | ❌ 禁止 | — |
+| 读取 Grape 内部数据 | ❌ 禁止 | — |
 
-## 步骤 / Steps
+### 4.2 场景路由（触发 → 路径）
 
-### 1. 理解项目结构
+| 触发特征 | 场景 | 路径 |
+|---------|------|------|
+| A2A 含「部署/上线/deploy」| 部署 | ① 项目结构 → ② 获取构建 → ③ hcloud 部署 → ④ 验证 → ⑥ 收尾 |
+| A2A 含「释放/销毁/destroy」| 资源释放 | `references/deploy-guide.md` §6（先查再删，逐个验证）→ ⑥ 收尾 |
+| PR 合并到 main/master | 自动部署 | ①→②→③→④→⑥ 收尾 |
+| 其他事件 | 跳过 | 输出 SKIP（非 merge/非 A2A 的 PR 事件、非 main 分支 push——不处理）|
 
-读取仓库根目录文件，判断构建方式：
+### 4.3 处理流程（统一骨架）
 
-| 文件标记 | 推断 |
-|----------|------|
-| `package.json` | Node.js（npm/yarn） |
-| `requirements.txt` / `pyproject.toml` | Python（pip/poetry） |
-| `go.mod` | Go（go build） |
-| `Dockerfile` | 容器化 |
-| `Makefile` | 自定义构建 |
+**流程总览（一行）**：⓪ 上下文（A2A payload/PR 合并事件）→ ① 项目结构识别（根目录文件 → 构建方式）→ ② `grape git` 获取代码 + 构建 → ③ 部署 ECS（hcloud 幂等检查→认证隔离→SSH 部署）→ ④ 验证（HTTP 200）→ ⑤ 资源释放（仅释放场景）→ ⑥ 收尾（4.8）
 
-### 2. 获取代码并构建
+**执行规则**：
+- 部署细节照 `references/deploy-guide.md` 执行（hcloud 安装/ECS 创建/SSH 部署/验证/资源释放——命令照抄不探索）
+- hcloud 全部 `--cli-profile="task-$$"` 隔离使用；ECS 幂等检查（已有实例复用——不重复创建）
+- 部署后必做 HTTP 验证（期望 200）；失败 → 按故障决策表处理，不静默跳过
+- 资源释放：先查再删、逐个验证
+- 变更现有配置/释放资源 → 用户确认后再执行（安全硬约束⑧）
 
-```bash
-grape git clone <repo_url> && grape git checkout <branch>
-# 按项目类型构建：npm install && npm run build / pip install -r requirements.txt
-```
+### 4.4 命令标准（子集与坑点）
 
-### 3. 部署到华为云 ECS
+完整命令见 `references/deploy-guide.md` 与 `references/grape-cli-reference.md`。坑点：
 
-详细步骤见 `references/deploy-guide.md`。核心流程：
+| 坑点 | 正确做法 |
+|------|---------|
+| hcloud profile 污染 | 严禁改 default——全程 `--cli-profile="task-$$"`，结束清理 |
+| ECS 重复创建 | 先查已有实例（幂等检查）→ 复用或新建；动态选规格、AZ=cn-north-4a/4b |
+| 长命令静默 | npm/pip 构建加 `timeout 300` 并等待——不因无输出误判卡死 |
+| 常驻命令 | `python -m http.server` 类严禁前台——后台+curl 验证+kill 或一次 SSH 内完成 |
+| AK/SK 泄露 | 不 echo/不写文件/不写评论——只用于 `--cli-profile` 认证 |
+| SSH 部署 | 单条 SSH 完成依赖安装+启动（不逐条往返）|
+| 验证 | 端口 `ss -tlnp` + HTTP `curl http://$ECS_IP:5000/` 期望 200 + 公网可达（安全组放行 22/80/5000）|
+| 命令失败 | 先看完整 stderr（去 `\| tail`）→ 按故障决策表 → 不反复盲试 |
 
-1. 安装 hcloud（缺失时自动安装，架构判定 → 下载 → 隐私确认）
-2. 配置认证（`--cli-profile="task-$$"` 隔离）
-3. ECS 幂等检查（查已有实例 → 复用或新建，动态选规格，AZ=cn-north-4a/4b）
-4. SSH 部署（scp 上传 → 单条 SSH 完成依赖安装+启动）
-5. HTTP 验证（期望 200）
+### 4.5 故障决策表
 
-### 4. 验证
+| 故障 | 分类 | 动作 |
+|------|------|------|
+| 403/权限不足（Required 操作）| Required | **STOP**：按安全硬约束④回复用户，等待配置 |
+| 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
+| AK/SK 未配置 | Required | **STOP**：提示「请先在 Grape 控制台配置华为云 AK/SK」——不硬编码不找替代 |
+| hcloud 缺失 | Required | **自愈**：按 deploy-guide §2 自动安装 → 再验 → 仍失败 STOP |
+| 命令失败（报错/参数/字段）| — | **先看完整 stderr** → 按 deploy-guide 排查 → 不反复盲试 |
+| 部署后 HTTP 非 200 | Required | 查端口/进程/安全组 → 修复重试（≤2 次）→ 仍失败 Issue 评论说明 + next_step 人工介入 |
+| ECS SSH 不可达 | Required | 查 EIP/安全组放行（22）→ 重试（≤2 次）→ 仍失败评论说明 |
+| 资源释放失败 | Required | 先查再删逐个验证——失败项列出并评论（不静默跳过）|
+| 瞬时失败（网络/限流）| — | **重试** ≤3 次（退避 1s/2s/4s）|
 
-- 端口检查：`ss -tlnp | grep 5000`
-- HTTP 检查：`curl http://$ECS_IP:5000/` 期望 200
-- 公网可达：安全组已放行 22/80/5000
+### 4.6 输出格式（固定产物）
 
-### 5. 资源释放（资源释放场景）
+1. **验证清单**（决策依据）：
+   - [ ] hcloud 可用且 profile 隔离
+   - [ ] ECS 创建/复用成功，SSH 可达
+   - [ ] 部署后 HTTP 返回 200
+   - [ ] 资源释放后查询返回空/404（释放场景）
+   - [ ] Issue 评论已发送
+2. **Issue 评论**：部署/释放结果（访问 URL/验证码/或失败原因）——用户可见汇报
+3. **任务完成**（tasks complete）：结构见 4.8
 
-详见 `references/deploy-guide.md` §6。核心：先查再删，逐个验证。
+### 4.7 写操作协议
 
-### 6. 任务完成
+| 操作 | 确认要求 |
+|------|---------|
+| 读操作（查仓库/查 ECS/查配置）| 自动执行，无需确认 |
+| 部署流水线（创建 ECS+部署+验证+评论）| **流程内声明**（A2A/PR 合并触发）——直接执行 |
+| 变更现有配置（安全组/资源配置）| **用户确认后**执行 |
+| 删除/释放云资源 | **用户确认后**执行 |
+| 会话结束 | 列出本次变更（部署/释放/评论）——无变更声明「只读会话」|
 
-完成全部业务动作后，**调用 `grape tasks complete` 自报完成（必做）**。会话 token 自动定位当前任务，无需 --task-id。
+### 4.8 任务收尾（必做）
+
+业务动作完成后：输出人类可读摘要（部署/释放结果 + 验证码）→ 调用：
 
 ```bash
 grape tasks complete --json '{
-  "result_text": "结论：Issue #{n} 部署/资源释放完成。",
-  "next_step": "done",
-  "actions": ["构建并部署到华为云 ECS", "验证部署结果", "在 Issue 评论告知"],
-  "conclusion": "部署完成，http {http_code}",
-  "artifacts": ["ECS {ecs_ip}", "Issue 评论"],
-  "issue_summary": "部署完成 | 访问 {url} | 验证 {http_code}"
+  "result_text":  "结论：Issue #{n} 部署/资源释放完成。",
+  "actions":      ["构建并部署到华为云 ECS", "验证部署结果", "在 Issue 评论告知"],
+  "conclusion":   "部署完成，http {http_code}",
+  "artifacts":    ["ECS {ecs_ip}", "Issue 评论"],
+  "issue_summary":"部署完成 | 访问 {url} | 验证 {http_code}",
+  "next_step":    "done 或 视下游交办"
 }'
 ```
 
-完成后通过 `grape a2a handoff` 交办下游或发 Issue 评论汇报结果。
+⚠️ **结构化字段必填**（结尾 = 下一节点的输入）：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` must 真实填充——只传 `result_text` 会丢结构化归档；下游/A2A 接收方以结构化字段为主消费，`result_text` 作为人类可读补充参考。部署失败也如实填写（`conclusion` 注明 http_code/原因），不伪造。
 
-## 判断标准 / Verification
+**立即结束**，不继续思考或等待输入。
 
-- [ ] hcloud 可用且 profile 已隔离
-- [ ] ECS 创建/复用成功，SSH 可达
-- [ ] 部署后 HTTP 返回 200
-- [ ] 资源释放后查询返回空/404
-- [ ] Issue 评论已发送
-- [ ] `grape tasks complete` 已执行
+## 五、参考文件清单
 
-## 参考 / References
+| 文件 | 用途 | 先读 |
+|------|------|------|
+| `references/deploy-guide.md` | **部署领域走查：hcloud 安装/ECS 创建/SSH 部署/验证/资源释放——命令照抄** | ⭐ 最先 |
+| `references/grape-cli-installation.md` | grape CLI 安装/升级指引（前置门自愈用）| CLI 未装时 |
+| `references/grape-cli-reference.md` | grape CLI 命令参考（git 透传/平台命令）| 命令不确定时 |
+| `references/contracts.md` | 输入/输出参数契约（inputSchema/outputSchema）| 接口校验时 |
+| `references/performance-and-version.md` | 性能与版本约束 | 约束核对时 |
 
-- `references/grape-cli-reference.md` — grape CLI 命令参考（安装/认证/命令/限制/退出码/安全）
-- `references/deploy-guide.md` — 华为云部署领域指南（hcloud 安装/ECS 创建/SSH 部署/验证/资源释放）
-- `references/contracts.md` — 输入/输出参数契约（inputSchema/outputSchema 与 JSON Schema）
-- `references/performance-and-version.md` — 性能与版本约束说明
+## 六、Best Practices（实践积累区）
+
+> 暂无，后续沉淀后更新补充。

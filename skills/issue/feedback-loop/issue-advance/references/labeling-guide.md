@@ -14,19 +14,16 @@
 
 ### 1. 确保标签存在且有颜色
 
-如果标签尚未创建，用以下 API 创建（带上颜色参数）：
+如果标签尚未创建，用以下 CLI 创建（带上颜色参数）：
 
 ```bash
-POST /repos/{owner}/{repo}/labels
-name=feature&color=a2eeef
+grape git-repo labels create --owner {owner} --repo {repo} --json '{"name":"feature","color":"a2eeef"}'
 ```
 
 ### 2. 设置标签到 Issue
 
 ```bash
-PATCH /repos/{owner}/{repo}/issues/{number}
-Content-Type: application/json
-{"labels": "feature,triaged"}
+grape git-repo issues update --owner {owner} --repo {repo} --number {number} --json '{"labels":"feature,triaged"}'
 ```
 
-多个标签用逗号分隔。如果标签定义已在仓库中存在，跳过创建步骤，直接 PATCH issue。
+多个标签用逗号分隔。如果标签定义已在仓库中存在，跳过创建步骤，直接 `grape git-repo issues update`。
