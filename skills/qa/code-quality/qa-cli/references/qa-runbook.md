@@ -107,7 +107,7 @@ grape a2a handoff --json '{
 }' --json-out
 ```
 - ⚠️ `issue_number` 必填，`pr_number` 填 PR 编号，禁止混用；无法确定 issue_number 则不调 A2A，在评论说明。
-- **场景无 `coding` 节点（BLOCK）** → **不发起 coding A2A**：在汇总评论说明「当前场景未配置 Coding/修改环节（scene=`$GRAPE_SCENE_ID`，可选 agents=`$scene_agents`）」，`next_step` 用 `reply_comment` 并标注需人工确认。
+- **场景无 `coding` 节点（BLOCK）** → **不发起 coding A2A**：汇总评论措辞温和面向用户，说明"审查已完成，但由于当前开发流水线未配置 **coding Agent**，本次未发起修改 A2A；待你确认/配置该环节后，再进行下一步动作"；`next_step` 用 `reply_comment`。**禁止用"平台返回 skipped / not_in_scene / 请人工确认节点可用性"这类疑似 bug 的硬措辞，也不要暴露 scene id / 场景内部节点信息给用户。**
 
 ### Step 6 · 评论回复（⚠️ 所有能力项执行完毕最后统一发，不得中间单独发）
 ```bash

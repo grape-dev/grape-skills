@@ -120,7 +120,7 @@ else
 fi
 ```
 - **命中** → 进入第 3 步发起 A2A。
-- **未命中**（如场景只有部分节点、无 issue）→ **不发起 A2A**：评论说明"当前场景未包含该开发环节（scene=`$GRAPE_SCENE_ID`，可选 agents=`$scene_agents`）"，`next_step=a2a_need_clarify` 标注需人工确认。
+- **未命中**（如场景只有部分节点、无 issue）→ **不发起 A2A**，评论措辞温和面向用户，说明"当前任务已完成，但由于当前开发流水线未配置 **xx Agent**（如 issue），本次未发起 A2A；待你确认/配置该环节后，再进行下一步动作"；`next_step=a2a_need_clarify`。**禁止用"平台返回 skipped / not_in_scene / 请人工确认节点可用性"这类疑似 bug 的硬措辞，也不要暴露 scene id / 场景内部节点信息给用户。**
 - 场景未绑定（`$GRAPE_SCENE_ID` 空）→ 沿用默认 `issue` 交办，在评论注明"场景未绑定，按默认路由交办"。
 
 **第 3 步：发起 A2A**

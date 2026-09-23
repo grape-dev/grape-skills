@@ -158,7 +158,7 @@ grape a2a handoff --json '{
 }' --json-out
 ```
 - **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（本 PR 关联的真实 Issue 编号），**无法确定则不要调用 A2A**，在最终评论中说明；`pr_number` 有则填、无则不填，**严禁把 PR 编号填入 issue_number**。
-- **场景无 `qa` 节点（BLOCK）** → **不发起 QA A2A**：在评论说明「当前场景未配置 QA 审查环节（scene=`$GRAPE_SCENE_ID`，可选 agents=`$scene_agents`）」，`next_step` 用 `done`。
+- **场景无 `qa` 节点（BLOCK）** → **不发起 QA A2A**：评论措辞温和面向用户，说明"开发已完成，但由于当前开发流水线未配置 **qa Agent**，本次未发起 QA 审查 A2A；待你确认/配置该环节后，再进行下一步动作"；`next_step` 用 `done`。**禁止用"平台返回 skipped / not_in_scene / 请人工确认节点可用性"这类疑似 bug 的硬措辞，也不要暴露 scene id / 场景内部节点信息给用户。**
 - A2A 失败重试 ≤3 次；仍失败 → 评论说明，`next_step` 标注需人工介入。
 
 ### Step 8 · 任务完成流程（必做，任何分支都必须执行到最后）
