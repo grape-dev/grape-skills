@@ -20,6 +20,10 @@ grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NU
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out | jq -r '.base.ref // "main"')}"
 echo "work_branch=$WORK_BRANCH"   # 缺省仓库默认分支，不要写死 main
 ```
+- ⚠️ **`$GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能叫长期分支（`dev`/`weekly-xx`）**或 `feat/issue-N`（N 不一定等于当前 Issue/PR 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
+  - **默认采用 `$GRAPE_WORK_BRANCH` 作为 PR 审查的基准确认**；若该变量未注入，则以 PR 的 `base.ref`（>= 仓库默认分支）为 `$WORK_BRANCH`。
+  - 即使它叫别的 Issue 分支名，也不要因名字含其它 Issue 号就丢弃/改写为 main；仅当 PR 的 `base.ref` 明确指向其它分支（stacked PR 依赖）时以 PR base 为准。
+  - 优先级：`$GRAPE_WORK_BRANCH`（权威）> PR `base.ref` > 仓库默认分支 > `main` 探测。
 - 按 `references/pr-config-check.md` 检查，不通过项记录到 `review_comments`（暂不评论）。
 - 有关联 Issue → `grape git-repo issues comments create ... --json '{"body":"[$AGENT_NAME] 📌 关联 PR #'"$PR_NUMBER"'"}'`；对应 Issue 是 bug → 更新标签 `bug,triaged`。
 

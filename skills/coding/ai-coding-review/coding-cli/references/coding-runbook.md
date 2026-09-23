@@ -23,6 +23,11 @@ echo "work_branch=$WORK_BRANCH"   # 后续建 PR 的 base、分支创建/切换�
 grape git status
 ```
 
+- ⚠️ **`$GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能是长期分支（`dev`/`weekly-xx`），**也可能叫 `feat/issue-N`（N 可等于或不等于当前 Issue 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
+  - **默认采用服务端注入值作为 `$WORK_BRANCH`**，即使它叫别的 Issue 分支名（如 `feat/issue-2`），也不要因名字含其它 Issue 号就丢弃/改写为 main。
+  - 仅当场景/基线明确指向当前 PR 应以其它分支为 base 时（stacked PR 依赖、或基线确认无用）才改，并在 PR body/评论说明。
+  - 优先级：`$GRAPE_WORK_BRANCH`（权威）> 仓库默认分支 > `main` 探测（不存在则 `master`）。
+
 - **worktree 已就绪（默认路径）**：当前已在 `feat/issue-{N}` → 直接使用，进入 ③。
 - **worktree 未就绪（降级路径）**：目录无 `.git` / 不在正确分支才按下面处理，**不要 clone 成子目录、不要另造分支名**：
   ```bash

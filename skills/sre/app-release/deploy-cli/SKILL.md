@@ -57,6 +57,10 @@ tools:
 | `GRAPE_WORK_BRANCH` | 目标合入分支（缺省取仓库默认分支，如 main/master） | 入口判定与获取代码的分支基准；runbook 解析为 `$WORK_BRANCH` |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 入口判定 |
 
+> ⚠️ **`GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能叫长期分支（`dev`/`weekly-xx`）**或 `feat/issue-N`（N 不一定等于当前 Issue 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
+> - **默认采用服务端注入值作为拉取/部署的代码分支基准**，即使它叫别的 Issue 分支名，也不要因名字含其它 Issue 号就丢弃/改写为 main。
+> - 优先级：`GRAPE_WORK_BRANCH`（权威）> 仓库默认分支 > `main` 探测（不存在则 `master`）。
+
 > ⚠️ token/URL/华为云 AK-SK 为敏感信息：**不要 printenv/写日志/写评论/写文件**。
 
 ## 评论前缀规范

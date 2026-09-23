@@ -34,6 +34,10 @@ grape knowledge stats --repo "$REPO_FULL_NAME" --json-out
 grape knowledge list --repo "$REPO_FULL_NAME" --source agent --json-out
 grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
 ```
+- ⚠️ **`$GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能是长期分支（`dev`/`weekly-xx`），**也可能叫 `feat/issue-N`（N 不一定等于当前 Issue 编号）**——它是场景配置的基线名，**不是"当前 Issue 的专属分支"**。
+  - **即使它叫其它 Issue 分支名（如 `feat/issue-2`），也默认采用服务端注入值作为目标开发分支，不要因名字含别的 Issue 号就丢弃/改写成 main**。
+  - 仅在有明确证据（场景/基线明确指向 main，且该分支与当前需求无关）时才改，并评论/Spec 说明原因。
+  - 优先级：`$GRAPE_WORK_BRANCH`（权威）> 仓库默认分支 > `main` 探测（不存在则 `master`）。
 - `meta.degraded=false` 且 `files` 非空 → 基线可用，基于它分析，不再逐文件探索。
 - 无基线/`[degraded]` → 降级：`grape git-repo repo` / `grape git-repo tree --depth single` / `contents README --raw`。
 - ⚠️ **首次必做**（建立分析基础）；后续事件按需——若已掌握足够项目上下文、且本次是简单追问/澄清，可由 agent 自行判断是否需要重新拉取（如项目可能更新或评论需基于新信息时再取）。

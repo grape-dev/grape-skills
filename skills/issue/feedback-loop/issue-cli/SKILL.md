@@ -50,6 +50,11 @@ tools:
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | `--number "$ISSUE_NUMBER"` / A2A `issue_number` |
 | `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空） | A2A `pr_number`（无则不填） |
 | `GRAPE_WORK_BRANCH` | 目标合入分支 / 工作基线（缺省则取仓库默认分支，如 main/master） | **贯穿全流程的开发基准**：runbook Step 2 ① 解析为 `$WORK_BRANCH`；判断"需求是否已实现"、深度分析范围预估、Spec 基准、A2A 交接给 coding 的目标分支 |
+
+> ⚠️ **`GRAPE_WORK_BRANCH` 语义（重要）**：它是**整个仓库/场景的开发基线分支**（可能是长期分支如 `dev`、`weekly-xx`，**也可能叫 `feat/issue-N`，N 不一定等于当前 Issue 编号**——它是场景配置的基线名，不是"当前 Issue 的专属分支"）。
+> - **即使它叫别的 Issue 分支（如 `feat/issue-2`），也视为当前 Issue 的目标开发分支**，默认采用服务端注入值，**不要因名字含其它 Issue 号就丢弃/改写成 main**。
+> - 仅当有明确证据（如场景/项目基线明确指出当前需求应以 main 为基准、且 `GRAPE_WORK_BRANCH` 与该需求无关）才可改用别的分支，并在评论/Spec 中说明原因。
+> - 判断优先级：`GRAPE_WORK_BRANCH`（场景注入，权威）> 仓库默认分支（`git-repo repo` 的 `default_branch`）> `main` 探测（不存在则 `master`）。
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标 |
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[issue agent]` 前缀） |
 | `DEVOPS_EVENT_TYPE` | 事件类型（如 `issue_updated`） | 判断入口/是否需要处理 |

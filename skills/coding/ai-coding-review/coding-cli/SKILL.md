@@ -70,6 +70,11 @@ tools:
 | `BOT_USERNAME` | Bot 在 GitCode 的 VCS 用户名 | `grape git config user.name` 的 git 身份（见 Prerequisites 4 / runbook Step 0）；Issue 分配 `assignee` 也用它 |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要处理 |
 
+> ⚠️ **`GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能是长期分支（`dev`/`weekly-xx`），**也可能叫 `feat/issue-N`（N 不一定等于当前 Issue 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
+> - **默认采用服务端注入值作为 PR base / 开发分支基准**，即使它叫别的 Issue 分支（如 `feat/issue-2`），也不要因名字含其它 Issue 号就丢弃/改写为 main。
+> - 仅当场景/基线明确指向其它 base（stacked PR 依赖等）才改，并在 PR body/评论说明。
+> - 优先级：`GRAPE_WORK_BRANCH`（权威）> 仓库默认分支（`git-repo repo` 的 `default_branch`）> `main` 探测（不存在则 `master`）。
+
 > ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
 
 ## 定位

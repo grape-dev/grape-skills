@@ -56,6 +56,11 @@ tools:
 | `AGENT_NAME` | Agent 显示名 | 评论 body 前缀 `[$AGENT_NAME]`（构造 `--json` 时用双引号展开） |
 | `DEVOPS_EVENT_TYPE` | 事件类型（如 `pull_request_opened`） | 判断入口/是否执行配置检查 |
 
+> ⚠️ **`GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能是长期分支（`dev`/`weekly-xx`）**或 `feat/issue-N`（N 不一定等于当前 Issue/PR 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
+> - **默认采用服务端注入值作为 PR 审查的基准确认**；未注入时以 PR 的 `base.ref`（>= 仓库默认分支）为 `$WORK_BRANCH`。
+> - 即使它叫别的 Issue 分支名，也不要因名字含其它 Issue 号就丢弃/改写为 main；仅当 PR `base.ref` 明确指向其它分支（stacked PR 依赖）时以 PR base 为准。
+> - 优先级：`GRAPE_WORK_BRANCH`（权威）> PR `base.ref` > 仓库默认分支 > `main` 探测。
+
 > ⚠️ token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**。
 
 ## 核心原则
