@@ -40,6 +40,22 @@ grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
 
 - 读 `references/issue-developability-analysis.md`，执行四维分析（需求完整性 → 技术可行性 → 依赖就绪性 → 范围确定性）。
 - 输出评级：`ready` / `almost-ready` / `needs-discussion` / `not-feasible`。
+- 分析所需信息全部用下面命令获取（**本节点需要，命令就在本节点**；不 help 探索、不 curl）：
+
+```bash
+# 需求/上下文复核（Step 1 已取过可跳过）：
+grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+# 仓库标签底子（判断需求主题/历史标签习惯）：
+grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+# 已有 PR / 关闭历史（判断是否已有人做过）：
+grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --json-out
+# 仓库结构（找参考实现/项目模式）：
+grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
+# 读参考实现文件（返回 Base64——解码后阅读）：
+grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path "{参考文件路径}" --ref "分支名（默认 main）" --json-out
+# 近提交（判断项目活跃度/最近模式）：
+grape git-repo commits --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 10 --json-out
+```
 
 ## Step 4 · 事件意图（按 SKILL.md 五·路由表选路径）
 
@@ -98,6 +114,8 @@ grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NU
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"$ACCOUNT/$REPO_NAME","account":"{user}","issue_number":$ISSUE_NUMBER,"pr_number":$PR_NUMBER,"context":"{评级 + Spec 摘要 + Spec 评论位置}"}}'
 # A2A 失败（非 2xx/超时）→ 重试 ≤3 次 → 仍失败：评论说明 + next_step 标注人工介入
 ```
+
+> **交办目标选择**：默认 `coding`（开发/修改）。**评论含「部署/发布/本地部署验证」（路径 G——见 SKILL 五·路由表）→ 交办 `sre`**，payload context 写明部署方式偏好（如「本地部署验证——不用云资源」）；用户明确要求上云（写清 OBS/ECS）才带云部署语境。
 
 ## Step 9 · 关闭建议 / 里程碑（按需）
 
