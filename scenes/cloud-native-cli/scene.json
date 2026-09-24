@@ -13,6 +13,26 @@
     "cli"
   ],
   "author": "grape-team",
+  "custom_fields": [
+    {
+      "name": "DEFAULT_SERVICE_NAME",
+      "is_secret": false,
+      "scope": ["coding"],
+      "default_value": "core-svc"
+    },
+    {
+      "name": "DEPLOY_TARGET_URL",
+      "is_secret": false,
+      "scope": ["sre"],
+      "default_value": ""
+    },
+    {
+      "name": "DEPLOY_CLUSTER_REGION",
+      "is_secret": false,
+      "scope": ["sre"],
+      "default_value": "cn-north-4"
+    }
+  ],
   "nodes": [
     {
       "id": "vod",

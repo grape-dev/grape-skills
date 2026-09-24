@@ -9,3 +9,6 @@ __pycache__/
 *.pyc
 .idea/
 .vscode/
+
+# --- 本地临时方案/文档（不跟踪） ---
+temp/
