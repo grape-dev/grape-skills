@@ -13,24 +13,27 @@
     "cli"
   ],
   "author": "grape-team",
-  "custom_fields": [
+"custom_fields": [
     {
       "name": "DEFAULT_SERVICE_NAME",
       "is_secret": false,
       "scope": ["coding"],
-      "default_value": "core-svc"
+      "default_value": "core-svc",
+      "description": "默认微服务名，coding-cli 生成/改造服务时使用"
     },
     {
       "name": "DEPLOY_TARGET_URL",
       "is_secret": false,
       "scope": ["sre"],
-      "default_value": ""
+      "default_value": "",
+      "description": "部署目标地址（如服务对外访问 URL），deploy-cli 部署后验证用"
     },
     {
       "name": "DEPLOY_CLUSTER_REGION",
       "is_secret": false,
       "scope": ["sre"],
-      "default_value": "cn-north-4"
+      "default_value": "cn-north-4",
+      "description": "部署目标云区域（如 cn-north-4），deploy-cli 部署时使用"
     }
   ],
   "nodes": [
