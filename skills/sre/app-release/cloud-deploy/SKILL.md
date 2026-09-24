@@ -91,7 +91,7 @@ tools:
 
 ### 4.4 命令标准（子集与坑点）
 
-完整命令见 `references/deploy-guide.md` 与 `references/grape-cli-reference.md`。坑点：
+完整命令见 `references/cloud-deploy-runbook.md`（执行走查表）与 `references/grape-cli-reference.md`（命令参考）；云资源操作见 `references/deploy-guide.md`。坑点：
 
 | 坑点 | 正确做法 |
 |------|---------|
@@ -162,7 +162,8 @@ grape tasks complete --json '{
 
 | 文件 | 用途 | 先读 |
 |------|------|------|
-| `references/deploy-guide.md` | **部署领域走查：hcloud 安装/ECS 创建/SSH 部署/验证/资源释放——命令照抄** | ⭐ 最先 |
+| `references/cloud-deploy-runbook.md` | **执行走查表：Step 就绪→场景 A/B/C 命令→收尾→错误排查——平台交互命令照抄** | ⭐ 最先 |
+| `references/deploy-guide.md` | **部署领域手册：hcloud 安装/ECS 创建/SSH 部署/验证/资源释放（云资源操作照抄）** | runbook A4/A5 引用时 |
 | `references/grape-cli-installation.md` | grape CLI 安装/升级指引（前置门自愈用）| CLI 未装时 |
 | `references/grape-cli-reference.md` | grape CLI 命令参考（git 透传/平台命令）| 命令不确定时 |
 | `references/contracts.md` | 输入/输出参数契约（inputSchema/outputSchema）| 接口校验时 |

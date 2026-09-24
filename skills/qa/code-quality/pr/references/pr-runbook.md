@@ -83,15 +83,30 @@ grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_
 | Dockerfile | FROM latest、ADD 替代 COPY、root 运行、多余端口暴露 |
 | Helm Chart | values 敏感默认值、RBAC 过度、镜像拉取策略不当 |
 
-## 能力四 · A2A 通知 coding（存在 Critical/Required 问题时——必须执行）
+## 能力四 · A2A 交办（按审查结果分流——必做判断）
+
+> **决策规则**（根据前序审查结论 + 当前事件判断，三分支选一；不得跳过——合并验证的 sre 交办是固定收尾）：
+> - **分支 A（有问题）**：发现 Critical/Required 级问题 → A2A 交办 `coding` 修复
+> - **分支 B（通过 + 已合并）**：无 Critical/Required 且当前事件为 `pull_request_merged`（PR 合并验证）→ **A2A 交办 `sre` 部署**——不得以「无问题」为理由省略
+> - **分支 C（通过 + 未合并）**：无问题但 PR 尚未合并（`a2a_event` 首查场景）→ 不交办（下一轮 `pull_request_merged` 事件再交 sre）
 
 ```bash
-# ⚠️ 防重复：先查 pipeline，已含 coding:a2a_event 则不重复 A2A，只发评论
+# ⚠️ 防重复（分支 A/B 都要）：先查 pipeline，已含目标 agent（coding:a2a_event /
+#   sre:a2a_event status≠failed）则不重复 A2A，只发评论
 grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
-# 交办（issue_number 必填——无法确定则不调用，最终评论说明；pr_number 有则填，严禁混用）
+
+# ── 分支 A：交办 coding（有问题时；issue_number 必填——无法确定则不调用，
+#    最终评论说明；pr_number 有则填，严禁混用）──
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"{user}","issue_number":'"$ISSUE_NUMBER"',"pr_number":'"$PR_NUMBER"',"context":"PR #'"$PR_NUMBER"' 审查发现代码需要修改：{REVIEW_SUMMARY}"}}'
-# A2A 失败 → 重试 ≤3 次 → 仍失败：最终评论说明 + next_step 人工介入
 # 返回后：将 coding 优化结论合并进最终审查评论
+
+# ── 分支 B：交办 sre（通过 + pull_request_merged；构造 payload 用 @file 避免转义）──
+cat > /tmp/a2a-sre-payload.json << 'EOF'
+{"agent":"sre","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"{user}","issue_number":'"$ISSUE_NUMBER"',"pr_number":'"$PR_NUMBER"',"context":"PR #'"$PR_NUMBER"' 已合并，QA 审查通过，交办部署验证"}}
+EOF
+grape a2a handoff --json @/tmp/a2a-sre-payload.json --json-out
+
+# A2A 失败 → 重试 ≤3 次 → 仍失败：最终评论说明 + next_step 人工介入
 ```
 
 ## 能力五 · 统一总结评论（必做——所有能力项执行完毕后最后执行；不得中间单独发评论）
@@ -101,6 +116,10 @@ grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$ACCOUNT/
 # body 模板见 SKILL.md 4.6 输出格式：
 # [QA Agent] 审查报告 + 配置检查 + 代码审查（结论 ✅/⚠️/❌ + 问题表）+ 安全扫描 + 合并检查
 # 全部通过 → "[QA Agent] 审查通过，所有检查项均正常。"
+# ⚠️ 首查通过且 PR 未合并（无 pull_request_merged 事件）→ body 末尾【必须】追加醒目提醒：
+#   "## ⚠️ 请合并本 PR
+#    > 审查已通过，但流水线需要 PR 合并才能继续（合并后将自动触发 SRE 部署验证）。
+#    > 请维护者操作：在 GitCode 页面点击【Merge】合并本 PR。"
 grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json @/tmp/review-body.json
 ```
@@ -114,11 +133,11 @@ grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --nu
 ```bash
 grape tasks complete --json '{
   "result_text":  "结论：PR #'"$PR_NUMBER"' 审查完毕（{结论}）",
-  "actions":      ["配置检查: {通过/问题项}", "变更检视: {新变更/SHA 未变跳过}", "常规审查: {结论}", "Skill/IaC 审查: {如执行}", "评论: [QA Agent] 总结评论", "A2A: coding/无"],
-  "conclusion":   "{pass / needs_changes / needs_major_changes}，{已 A2A coding / 无需修改}",
-  "artifacts":    ["PR #'"$PR_NUMBER"' 总结评论", "A2A handoff（如有）", ".sha 断点更新"],
-  "issue_summary":"{审查结论摘要——结论/问题级别/去向 一句话}",
-  "next_step":    "a2a_coding 或 等待人工决策"
+  "actions":      ["配置检查: {通过/问题项}", "变更检视: {新变更/SHA 未变跳过}", "常规审查: {结论}", "Skill/IaC 审查: {如执行}", "评论: [QA Agent] 总结评论", "A2A: coding/sre/无"],
+    "conclusion":   "{pass / needs_changes / needs_major_changes}，{已 A2A coding / 已 A2A sre / 无需修改}",
+    "artifacts":    ["PR #'"$PR_NUMBER"' 总结评论", "A2A handoff（如有）", ".sha 断点更新"],
+    "issue_summary":"{审查结论摘要——结论/问题级别/去向 一句话}",
+    "next_step":    "a2a_sre（合并验证通过时）/ a2a_coding（有问题时）/ 等待人工决策"
 }'
 ```
 

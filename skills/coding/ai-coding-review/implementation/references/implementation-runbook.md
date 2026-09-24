@@ -96,6 +96,8 @@ grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --numb
 ```
 
 ### B2 · 制定修改方案（已有 PR——只需修改问题点，不需需求文档）
+- 方案内容：**问题点清单 → 每个问题对应修改策略**（依据 B1 的审查反馈逐条映射；涉及文件/改动方式/验证方式）
+- 提交粒度：每个问题一个原子提交（commit message 注明修复的 issue 编号——见 B3）
 
 ### B3 · 实施修改并推送
 ```bash

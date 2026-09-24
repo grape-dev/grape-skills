@@ -84,6 +84,7 @@ tools:
 | 请求关闭 Issue | 路径 D：验证已实现（commits/pulls）→ 关闭 + tasks close；未实现 → 回复进展 |
 | 质疑分配 / Spec 修改 / 确认 Spec | 路径 E：核对 CODEOWNERS / Spec 版本 +1 重发布 / A2A 通知 coding |
 | 依赖不清晰（需求边界无法确定）| 路径 F：A2A 交办 vod（需求引导收敛后回 issue 流程）|
+| 要求部署 / 发布 / 本地部署验证（评论含「部署」「发布」「sre」等语义）| 路径 G：A2A 交办 sre（payload context 写明部署方式偏好——见 runbook Step 8 备注）|
 
 > 所有路径共用统一流程骨架（见六）；具体命令见 `references/issue-runbook.md` 对应小节（照抄执行）。
 

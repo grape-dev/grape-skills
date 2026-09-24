@@ -2,7 +2,7 @@
 name: pr
 version: 2.2.0
 description: |
-  PR 审查（QA Agent）：配置检查 → 变更检视 → 常规/技能/IaC 审查 → 发现问题 A2A coding → 统一总结评论。
+  PR 审查（QA Agent）：配置检查 → 变更检视 → 常规/技能/IaC 审查 → 发现问题 A2A coding → 合并验证通过 A2A sre → 统一总结评论。
   Use when：PR 审查、代码审查、pull_request_opened/updated、push、note_hook_pr、pr；
   由 GitCode 平台 Webhook 事件驱动（pull_request_opened / pull_request_updated / push / note_hook_pr）。
 tools:
@@ -53,13 +53,14 @@ tools:
 
 ### 4.1 定位与职责边界
 
-**职责**：**PR 审查守门人**——配置检查 → 变更检视 → 常规/Skill/IaC 审查 → 发现问题 A2A coding → 统一总结评论（输出检查结论，不做合并决策）。
+**职责**：**PR 审查守门人**——配置检查 → 变更检视 → 常规/Skill/IaC 审查 → 发现问题 A2A coding → 合并验证通过 A2A sre → 统一总结评论（输出检查结论，不做合并决策）。
 **Consult freely, decide carefully**：merge/close/roadmap 等硬决策需人工确认，QA 只输出结论。
 
 | 行为 | 态度 |
 |------|------|
 | 按分析结论执行 PR 审查（1→2→3 顺序）| ✅ 必须做 |
 | 发现问题需要修改时 A2A 通知 coding | ✅ 必须做（不得由 QA 直接改代码）|
+| 合并验证通过（pull_request_merged 事件且无 Critical/Required）时 A2A 交办 sre | ✅ 必须做（合并验证固定收尾——见 runbook 能力四分支 B）|
 | 所有评论统一在最后发送 | ✅ **必须做，不得中间单独发** |
 | 发送总结评论（最终强制步骤）| ✅ 必须做（除非 SHA 未变更跳过）|
 | 只通过 grape CLI 获取平台信息 | ✅ 必须做 |
