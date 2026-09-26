@@ -110,6 +110,38 @@ ECS_IP=$(hc ECS ListServersDetails --cli-region=cn-north-4 2>/dev/null \
 
 ## 4. SSH 部署
 
+### 4.0 关联仓库部署（多仓库场景）
+
+当 `$GRAPE_LINKED_REPOS` 非空时，需要对每个关联仓库分别构建并部署到同一 ECS：
+
+```bash
+# 解析关联仓库 worktree 列表（平台自动初始化）
+if [ -n "$GRAPE_LINKED_WORKTREES" ]; then
+  echo "$GRAPE_LINKED_WORKTREES" | python3 -c "
+import json,sys
+for w in json.load(sys.stdin):
+    print(f\"{w['repo_key']}\t{w['branch']}\t{w['dir']}\")
+" | while IFS=$'\t' read -r rk br dir; do
+    REPO_SHORT="${rk#gitcode:}"
+    REPO_NAME="${REPO_SHORT#*/}"
+    echo "=== 部署关联仓库: $REPO_SHORT ==="
+    cd "$dir" 2>/dev/null || continue
+    # 构建按项目类型执行（同主仓库 §4.2）
+    # 上传到 ECS 独立目录
+    ssh -o StrictHostKeyChecking=no root@"$ECS_IP" "mkdir -p /opt/$REPO_NAME"
+    scp -o StrictHostKeyChecking=no -r ./* root@"$ECS_IP":/opt/$REPO_NAME/
+    # SSH 启动服务（不同端口，避免与主仓库冲突）
+    ssh -o StrictHostKeyChecking=no root@"$ECS_IP" 'bash -s' << LINKED_EOF
+cd /opt/$REPO_NAME
+# 按项目类型启动（示例：Java 后端用 8080 端口）
+# mvn spring-boot:run -Dserver.port=8080 或 nohup java -jar target/*.jar --server.port=8080 &
+LINKED_EOF
+done
+fi
+```
+
+**关键**：每个关联仓库部署到 `/opt/<repo_name>` 独立目录，使用不同端口，避免与主仓库冲突。
+
 ### 4.1 上传代码
 
 ```bash

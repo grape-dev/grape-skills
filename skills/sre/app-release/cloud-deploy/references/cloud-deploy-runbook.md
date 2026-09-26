@@ -29,6 +29,7 @@ git checkout "$GRAPE_WORK_BRANCH" 2>&1 || git checkout main
 #   → 构建通过后按 Step 0 判断：任务需要云资源（部署到 ECS/OBS 等）→ AK/SK 已配置 → A5；
 #     任务需要云资源但 AK/SK 未配置 → STOP（按 Step 0 提示配置——不找替代）
 # A5 云资源部署（仅当：AK/SK 已配置 且 需求明确要求）→ deploy-guide.md：hcloud 安装→profile 隔离→幂等检查→建 ECS→SSH 上传→启动→验证
+# A5.1 关联仓库部署（当 $GRAPE_LINKED_REPOS 非空时）→ deploy-guide.md §4.0：遍历关联仓库 worktree→构建→部署到同 ECS 不同目录/端口→验证
 # A6 发验证结论评论（唯一通道——禁止 curl）：
 grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[SRE Agent] 部署验证结论：{验证清单表格 + 结论 / 阻塞原因 + 恢复路径}"}' --json-out
