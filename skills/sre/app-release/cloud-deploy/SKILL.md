@@ -37,6 +37,8 @@ tools:
 | `GRAPE_WORK_BRANCH` | 目标合入分支/工作基线（缺省仓库默认分支）| `grape git checkout` 部署分支 | 场景任务 |
 | `DEVOPS_EVENT_TYPE` | 事件类型（A2A 部署/资源释放/PR 合并）| 场景路由判断 | 全部 |
 | `HUAWEICLOUD_SDK_AK` / `HUAWEICLOUD_SDK_SK` | 华为云 AK/SK（Grape 控制台配置——按 owner 注入）| hcloud CLI 认证（`--cli-profile="task-$$"` 隔离）| SRE 任务 |
+| `GRAPE_LINKED_REPOS` | 关联仓库列表 JSON（场景高级选项配置）| 多仓库构建部署（见 §4.9） | 场景配置了关联仓库时 |
+| `GRAPE_LINKED_WORKTREES` | 关联仓库 worktree 路径列表 JSON（平台自动初始化）| 读取关联仓库代码 | SRE/coding 任务且有 linked_repos 时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
 本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。流程内变量（`$ECS_IP`/`$INSTANCE_NAME` 等）为部署产物，非平台注入。
@@ -81,6 +83,8 @@ tools:
 ### 4.3 处理流程（统一骨架）
 
 **流程总览（一行）**：⓪ 上下文（A2A payload/PR 合并事件）→ ① 项目结构识别（根目录文件 → 构建方式）→ ② `grape git` 获取代码 + 构建 → ③ 部署 ECS（hcloud 幂等检查→认证隔离→SSH 部署）→ ④ 验证（HTTP 200）→ ⑤ 资源释放（仅释放场景）→ ⑥ 收尾（4.8）
+
+**关联仓库（多仓库构建部署）**：当 `$GRAPE_LINKED_REPOS` 非空时，表示本需求涉及多个关联仓库（如前端+后端）。平台会自动为每个关联仓库初始化 worktree（`$GRAPE_LINKED_WORKTREES`）。SRE Agent 需要对每个关联仓库分别构建并部署到同一 ECS（或不同端口），详见 §4.9。
 
 **执行规则**：
 - 部署细节照 `references/deploy-guide.md` 执行（hcloud 安装/ECS 创建/SSH 部署/验证/资源释放——命令照抄不探索）
@@ -157,6 +161,62 @@ grape tasks complete --json '{
 ⚠️ **结构化字段必填**（结尾 = 下一节点的输入）：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` must 真实填充——只传 `result_text` 会丢结构化归档；下游/A2A 接收方以结构化字段为主消费，`result_text` 作为人类可读补充参考。部署失败也如实填写（`conclusion` 注明 http_code/原因），不伪造。
 
 **立即结束**，不继续思考或等待输入。
+
+### 4.9 关联仓库多仓库构建部署
+
+当场景配置了关联仓库（`$GRAPE_LINKED_REPOS` 非空）时，SRE Agent 需要对主仓库和每个关联仓库分别构建并部署。
+
+#### 环境变量
+
+| 变量 | 格式 | 说明 |
+|------|------|------|
+| `GRAPE_LINKED_REPOS` | `[{"repo_key":"gitcode:owner/repo","branch":"main"},...]` | 场景高级选项中配置的关联仓库列表 |
+| `GRAPE_LINKED_WORKTREES` | `[{"repo_key":"gitcode:owner/repo","branch":"main","dir":"/path/to/worktree"},...]` | 平台自动初始化的 worktree 路径 |
+
+> 如果 `GRAPE_LINKED_WORKTREES` 为空（worker 端未自动初始化），SRE Agent 需自行 `grape git clone` 每个关联仓库到临时目录。
+
+#### 构建部署流程
+
+1. **读取关联仓库列表**：解析 `$GRAPE_LINKED_REPOS`（或 `$GRAPE_LINKED_WORKTREES` 获取 worktree 目录）
+2. **主仓库构建部署**：按 §4.3 正常流程构建主仓库并部署到 ECS
+3. **关联仓库构建部署**：对每个关联仓库：
+   - 读取 worktree 目录（`$GRAPE_LINKED_WORKTREES` 中的 `dir` 字段）或 clone 到 `/tmp/deploy-linked-<repo_name>`
+   - 识别项目类型并构建（同 §4.3 ①②）
+   - 部署到同一 ECS 的不同路径（如 `/opt/<repo_name>`）或不同端口
+4. **统一验证**：所有仓库部署完成后，逐个验证 HTTP 可达性
+
+#### 示例（双仓库：前端 + 后端）
+
+```bash
+# 解析关联仓库 worktree 列表
+LINKED_WORKTREES="$GRAPE_LINKED_WORKTREES"
+if [ -n "$LINKED_WORKTREES" ]; then
+  echo "$LINKED_WORKTREES" | python3 -c "
+import json,sys
+for w in json.load(sys.stdin):
+    print(f\"{w['repo_key']} {w['branch']} {w['dir']}\")
+" | while read rk br dir; do
+    REPO_SHORT="${rk#gitcode:}"
+    REPO_NAME="${REPO_SHORT#*/}"
+    echo "=== 构建关联仓库: $REPO_SHORT (branch=$br) ==="
+    cd "$dir" 2>/dev/null || { echo "worktree 不存在，clone"; grape git clone "https://gitcode.com/$REPO_SHORT.git" /tmp/deploy-linked-$REPO_NAME && cd /tmp/deploy-linked-$REPO_NAME; }
+    # 识别项目类型并构建（同主仓库流程）
+    # ... npm install && npm run build / pip install / mvn package 等
+    # 部署到 ECS 的 /opt/$REPO_NAME 目录
+    ssh -o StrictHostKeyChecking=no root@\"$ECS_IP\" \"mkdir -p /opt/$REPO_NAME\"
+    scp -o StrictHostKeyChecking=no -r ./* root@\"$ECS_IP\":/opt/$REPO_NAME/
+    # 按项目类型启动服务（不同端口）
+  done
+fi
+```
+
+#### 关键约束
+
+- 每个关联仓库独立构建，不混淆构建产物
+- 部署到同一 ECS 不同目录/端口，避免冲突
+- 前后端项目需确认端口不冲突（如前端 80/3000，后端 5000/8080）
+- 验证时逐个仓库检查 HTTP 可达性
+- 收尾时 `actions[]` 中分别列出每个仓库的构建部署结果
 
 ## 五、参考文件清单
 
