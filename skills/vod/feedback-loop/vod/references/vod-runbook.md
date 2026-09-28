@@ -10,9 +10,7 @@
 
 ```bash
 grape refresh                        # 契约刷新（前置门②）——失败重试 ≤2 次后继续（回退内置快照）
-grape tasks current --json-out
-# 事件带 seq 时读前序 A2A payload（场景 A 必做）：
-grape events detail --seq {seq} --json-out
+grape tasks current --json-out       # 前序 A2A payload/上下文在这里（平台不注入 $SEQ——不依赖它）
 # 场景 B：读 Issue 全貌
 grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
@@ -24,7 +22,7 @@ grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMB
 ## 场景 A · 开发者声音引导建 Issue（vod_signal / 飞书消息）
 
 ### A1 · 项目知识基线（必须最先）
-- 知识基线由服务端在 prompt「项目知识基线」章节内联注入（或 `grape knowledge context --repo "$ACCOUNT/$REPO_NAME" --agent_type vod --json-out`）
+- 知识基线由服务端在 prompt「项目知识基线」章节内联注入（主路径——无需命令；Agent 不自取/不自行生成）
 - 标注「无基线」/`[degraded]` → 降级：README + `grape git-repo` 命令
 
 ### A2 · 项目历史全貌（必做——防重复/重复反馈聚类）
@@ -129,9 +127,8 @@ grape tasks complete --json '{
 | `unknown request field(s): ...` | `--json` 有契约不允许字段 → `grape <group> <verb> --help` 看 Body fields 删多余 |
 | `issues create` 失败 | 核对 title/description 字段（description 用模板结构）；长 body 用 `--json @file` |
 | `issues update` 失败 | `body` 字段收敛用 `{"state":"open","body":...}`——不传 `labels`（Issue Agent 职责）|
-| `events detail --seq` 返回空 | seq 缺失/前序事件不存在 → 用 `grape events list`（如有）定位或按无前序处理 |
 | `comments create` 失败（长 body 转义）| 改用 `--json @file`（body 先写文件）|
 | 401 凭据失效 | 说明「凭据已失效」即可，不换 token（安全硬约束⑤）|
 | 403 账户/平台管理类 | 说明需管理员配置/`grape_` 级凭据，本技能不涉及——不绕行 |
-| `knowledge context` 返回空/degraded | 降级 README + git-repo 分析并标注 `[degraded]`，不阻塞 |
+| prompt 内联基线缺失/`[degraded]` | 降级 README + git-repo 分析并标注 `[degraded]`，不阻塞 |
 | 报「契约过期/命令不识别」| 先 `grape refresh` 再重试（前置门②）|

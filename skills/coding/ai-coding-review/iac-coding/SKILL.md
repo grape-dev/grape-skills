@@ -1,195 +1,176 @@
 ---
 name: iac-coding
-version: 2.0.0
+version: 2.2.0
 description: |
-  IaC 代码实现与 PR 创建/优化。通过 A2A 协议被 Issue Agent 调用时执行新开发。
-  负责编码、提交、创建 PR 及自我审查。调用 TF 生成器生成 Terraform 配置，
-  通过华为云资源查询能力验证资源规格可用性，通过 GitCode 推送能力创建 MR。
+  IaC 代码实现与 PR 创建（iac-coding）：接收 IaC Issue Agent 的 A2A 指令，完成 Terraform 配置实现（含资源规格查询验证）、自审查、PR 创建，A2A 触发 QA 审查；代码优化场景按审查意见修改。
+  Use when：Terraform 开发、IaC 编码、tf 配置生成、PR 创建、代码优化、iac-coding。
 tools:
-  - git
-  - curl
-requires:
-tags:
-  - implementation
-  - pr-management
-  - development
+  - grape
+  - bash
 ---
 
-## 概述
+# IaC 代码实现与 PR 创建（iac-coding v2.2 · grape CLI）
 
-接收 issue skill 的 A2A 指令后，完成代码开发、自我审查、PR 创建，并通过 A2A 触发 QA 审查。
+## 一、安全硬约束（必须遵守）
 
-## 前置条件
+1. **CLI 优先**：凡 grape CLI 能做的走 CLI，禁止绕过 CLI 直连平台 API（curl/python httpx 等）。
+   CLI 未装/版本过低 → **自动安装/升级**（官方源/签名包优先）→ 装好继续；仅当安装失败/环境不可用时才报障说明（不降级直连）。⚠️ 安装指引请参考：`references/grape-cli-installation.md`。
+2. **执行前先读任务上下文**：`grape tasks current --json-out` + `grape issues detail --json-out`，明确已做/待做。
+3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）；token 不写文件/日志/评论，不 printenv 打印。
+4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
+5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
+6. **AK/SK 纪律**：`HUAWEICLOUD_SDK_AK/SK` 从 Grape 控制台配置注入；未配置 → 前置门 STOP 提示配置，**严禁从其他位置寻找凭证**；AK/SK 不得硬编码到任何 .tf 文件（一律环境变量映射 `HW_ACCESS_KEY`/`HW_SECRET_KEY`）。
+7. **terraform 边界**：编码只执行到 `terraform plan`（只读预览）——**禁止 terraform apply / destroy**（部署是 SRE 职责）。
+8. **长命令/常驻命令纪律**：terraform init/plan 等可能长耗时 → 加 `timeout` 限制、一次只装必要依赖；常驻/服务命令严禁前台执行（后台 + 验证 + kill 或交 SRE）。
 
-- 已安装 git 和 curl
-- 已配置 `$BOT_TOKEN` 环境变量
-- Issue 的 git worktree 分支已就绪（feat/issue-{issue_number}）
-- Grape 平台 A2A 服务可用
-- 华为云凭证已通过 Grape 控制台注入（`HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`）
+## 二、环境变量表（平台注入，按 iac-coding Agent 类型）
 
-## 安全硬约束（必须遵守）
+| 变量 | 语义 | 用在哪 | 何时有 |
+|------|------|--------|--------|
+| `GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` | 服务端地址 / 会话 token（tk_）| grape CLI 自动读取 | 全部任务 |
+| `REPO_FULL_NAME` / `ACCOUNT` | 仓库全名 / 属主 | CLI 的 --owner/--repo 参数 | 全部 |
+| `REPO_NAME` | 仓库名（派生：`${REPO_FULL_NAME#*/}`）| --repo 参数 | 全部 |
+| `ISSUE_NUMBER` | Issue 编号 | A2A payload / 分支名 feat/issue-{n} | 全部 |
+| `PR_NUMBER` | PR 编号（代码优化场景有）| A2A payload | 有 PR 时 |
+| `GRAPE_WORK_BRANCH` | 场景工作基线分支 | checkout 基座 | 场景任务 |
+| `HUAWEICLOUD_SDK_AK/SK` | 华为云凭据（资源规格查询/plan 凭证）| hcloud/obsutil 查询 + terraform 凭证映射 | 注入时 |
 
-1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
-2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
-4. token 不得写入任何文件/日志/评论。
-5. 调用 VCS API 一律以 `references/vcs-api-reference.md` 为准，严禁根据经验/记忆/猜测自行拼写 API 路径。
-6. 长命令执行会静默，加 timeout 限制并一次只装必要依赖。
-7. 禁止前台运行长驻/服务类命令，改用后台启动+验证+关闭模式。
-8. 华为云 AK/SK 不得硬编码到任何 .tf 文件，一律走环境变量（Grape 控制台注入 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK` → 映射为 `HW_ACCESS_KEY`/`HW_SECRET_KEY`）。
+派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
+本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。
 
-## 参考文件
+## 三、前置检查门（自愈 → 重试 → STOP）
 
-- 本地参考：`references/vcs-api-reference.md`
-- 本地参考：`references/code-review-checklist.md`
-- 本地参考：`references/huaweicloud-tf-conventions.md`（华为云 TF 编码规范、凭证设置约定、cn-north-4 避坑指南）
-- 外部技能参考：TF 生成器的 reference/ 目录（guardrails.md、terraform-generation-guide.md、validation-workflow.md、56个服务best-practice模板），需从 multica-squad 仓获取
+| 检查项 | 判定命令 | 通过标准 | 失败动作 |
+|--------|---------|---------|---------|
+| CLI 可用 | `grape --version` | ≥0.3.2 | **自愈**：按 `references/grape-cli-installation.md` 自动安装/升级（`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`）→ 装好再验；仍不可用 → 结束任务并说明 |
+| 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退内置快照）|
+| 任务上下文 | `grape tasks current` + `grape issues detail` | 拿到任务与上下文 | 定位不到 → STOP（不执行写操作）|
+| terraform 可用 | `terraform version` | ≥1.7.5 且 ≤1.10.5 | **自愈**：按官方源安装 → 再验；仍不可用 → 报告阻塞 |
+| 华为云凭据（资源规格查询前）| `${HUAWEICLOUD_SDK_AK:+ok}` 校验 | 有值 | **STOP**：提示「请在 Grape 控制台配置华为云 AK/SK 后重试」——不寻找不借用（资源规格查询是 TF 生成前置——见 4.3）|
+| 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
-## 工作流
+## 四、技能定义与执行
 
-### 1. 场景识别
-根据 A2A context 特征判断执行场景：
+### 4.1 定位与职责边界
 
-| A2A context 特征 | 场景 | 执行流程 |
-|-----------------|------|---------|
-| 含「PR 审查反馈」「审查发现问题」「需要修改」「优化」 | 代码优化 | 根据审查意见修改代码 |
-| 含「启动开发」「实现」「feature」「bug」 | 新开发（从 issue skill） | 开发 -> PR -> A2A 通知 QA 审查 |
-| 其他 | 不做处理，结束 | - |
-
-### 2. 开发
-
-#### 2.1 资源规格查询验证（生成 TF 前必须执行）
-生成 Terraform 配置前，**必须先查询目标区域的资源规格可用性**，查询结果作为 TF 配置的验证依据：
-
-- ECS flavor：通过华为云计算资源查询能力执行 `list_flavors.py --region <region> --availability_zone <az>`，确认所选 flavor 在目标区域可用
-- 镜像：通过华为云计算资源查询能力执行 `list_images.py --region <region> --imagetype gold --platform <os>`，获取镜像精确名称（含版本号）
-- 可用区：通过华为云计算资源查询能力查询可用区列表，由用户/Issue 确认具体可用区
-- VPC/子网/安全组：通过华为云网络资源查询能力查询现有网络资源，避免 CIDR 冲突
-- OBS bucket：通过华为云存储资源查询能力查询桶名是否已被占用
-
-⚠️ **禁止跳过查询直接写 TF 配置——未验证的规格可能导致 terraform plan 失败或 apply 时报错。**
-⚠️ **查询失败时不允许"降级继续"——必须修复查询环境后重试，或报告问题等待解决。**
-
-#### 2.2 TF 配置生成
-- 所有 TF 代码和脚本文件统一放在仓库的 `iac/` 子目录下，不得放在仓库根目录或其他目录
-- 如仓库中不存在 `iac/` 目录，新建该目录
-- 调用 TF 生成器生成 TF 配置，遵循以下规范：
-  - 生成器工作流：需求理解 → 资源规划 → 规格验证 → TF生成 → 校验（参考 generator 的 SKILL.md）
-  - 编码规范：遵循 `references/huaweicloud-tf-conventions.md`（目录结构、凭证映射、cn-north-4 避坑、provider 版本约束、OBS backend 配置）
-  - best-practice 模板：参考 generator 的 `reference/<service>-best-practices/` 目录中的模板
-- ⚠️ grape 环境约束：生成器原版工作流包含 terraform apply，但在 grape A2A 流程中 **coding agent 只执行到 terraform plan，terraform apply 由 SRE Agent 执行**
-
-#### 2.3 校验
-- 按方案执行 terraform fmt → terraform init → terraform validate → terraform plan -out=tfplan
-  - `terraform plan` 只预览变更不创建资源，用于提前发现镜像/flavor/provider/API 等问题
-  - ⚠️ 到 plan 为止，**不执行 terraform apply / terraform destroy**
-- 凭证映射（Grape 控制台注入 → Terraform 期望）：
-  ```bash
-  export HW_ACCESS_KEY="${HUAWEICLOUD_SDK_AK}"
-  export HW_SECRET_KEY="${HUAWEICLOUD_SDK_SK}"
-  export HW_REGION="cn-north-4"
-  export AWS_ACCESS_KEY_ID="$HW_ACCESS_KEY"
-  export AWS_SECRET_ACCESS_KEY="$HW_SECRET_KEY"
-  export AWS_DEFAULT_REGION="cn-north-4"
-  ```
-
-### 3. 自审查
-参考 `references/code-review-checklist.md` 逐项检查。
-
-### 4. 提交 PR
-- 通过 GitCode 推送能力推送特性分支到远端并创建 MR
-- MR body 四段齐全：变更说明、资源清单、文件变更、后续步骤
-- 遵循 Conventional Commits
-
-### 5. A2A 通知审查
-创建 PR 后通过 A2A 通知 QA Agent 进行代码审查。
-
-### 原始职责内化
-- 开工前按模块关键词搜索历史 Issue/PR，了解常见问题模式，避免重复踩坑
-
-## 声明
-
-### 输入参数（inputSchema）
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| repo_full_name | string | 是 | 仓库全名（owner/repo） |
-| issue_number | integer | 是 | 关联 Issue 编号 |
-| branch | string | 是 | 工作分支（feat/issue-{N}） |
-| context | string | 是 | A2A 传入的开发指令和上下文摘要 |
-| pipeline | array | 否 | 当前 Issue 的 A2A pipeline 事件列表 |
-
-非法输入（缺失必填项、分支不存在、worktree 未就绪）时立即终止并输出结构化错误，不降级执行。
-
-### 输出格式（outputSchema）
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| pr_number | integer | 创建的 MR 编号 |
-| pr_url | string | MR 的 GitCode URL |
-| mr_body | object | 四段结构：变更说明、资源清单、文件变更、后续步骤 |
-| plan_summary | string | terraform plan 摘要（create/update/destroy 资源数） |
-| self_review_passed | boolean | 自审查是否通过 |
-| a2a_dispatched | boolean | 是否已 A2A 通知 QA Agent |
-
-### 读写语义
-
-| 操作类型 | 行为 | 示例 |
-|----------|------|------|
-| 读操作 | 自动执行 | GET Issue/PR 信息、GET PR diff、搜索历史 Issue/PR、terraform plan（只读预览） |
-| 写操作 | A2A 流水线自动执行（非交互式流水线设计，无需用户逐次确认） | git push、POST 创建 MR、POST A2A、terraform fmt/init/validate |
-| 删除操作 | 禁止 | 不执行 terraform apply/destroy、不删除文件、不合并 PR |
-
-### 性能预算
-
-| 指标 | 预算 | 说明 |
-|------|------|------|
-| Skill 加载时延 | < 3s | 纯文档型 skill，无加载期脚本 |
-| 开发执行时延 | P95 ≤ 10 min | 含 TF 生成 + fmt/init/validate/plan + git push + MR 创建（不含云侧资源创建时延） |
-| terraform init | ≤ 3 min | 镜像源生效时 |
-| LLM token 消耗 | ≤ 12000 tokens/次 | 含参考文件按需加载 |
-| API 调用次数 | ≤ 15 次/次执行 | VCS API + A2A |
-
-### 兼容性声明
-
-| 依赖 | 版本要求 | 说明 |
-|------|----------|------|
-| terraform | >= 1.7.5, <= 1.10.5 | OBS backend 兼容窗口 |
-| git | >= 2.20 | 基础 git 操作 |
-| curl | >= 7.60 | VCS API 调用 |
-| VCS API | v5 | 所有 API 调用基于 v5 端点 |
-| Grape A2A | >= 1.0 | A2A payload 结构遵循 Grape 平台约定 |
-| TF 生成器 | >= 1.0 | TF 配置生成（声明在 requires 中） |
-| 版本演进策略 | — | 本 Skill 版本号在 frontmatter 中声明；新旧版本差异通过版本号识别；A2A 调用方按 issue_number 传参，不依赖 Skill 版本号 |
-
-### 可靠性声明
-
-| 机制 | 声明 |
-|------|------|
-| 超时处理 | terraform 命令默认 300s 超时；git push 默认 60s 超时；API 调用 30s 超时；超时后重试 1 次，仍失败则报告错误 |
-| 重试幂等 | terraform plan 可安全重跑（只读）；git push 失败重试不产生重复提交（幂等）；MR 创建前检查是否已有同分支的 open MR，避免重复创建 |
-| 失败降级 | terraform init/validate/plan 任一步骤失败 → 不创建 PR，在 Issue 评论报告失败原因和修复建议；git push 失败 → 检查分支状态后重试 1 次；A2A 失败 → 在 Issue 评论标注「待人工通知 QA Agent」 |
-| 资源清理 | terraform plan 产生的 tfplan 文件为中间产物，PR 创建后可删除；不创建临时云资源；不修改 .terraform/ 目录以外的系统文件；worktree 由平台管理，Skill 不负责清理 |
-
-## 硬规则
+**职责**：把 IaC Issue 的实现需求变成**可审查的 PR**——资源规格查询验证 → TF 配置生成（iac/ 目录）→ fmt/init/validate/plan 校验 → 自审查 → PR 创建 → A2A 通知 QA。
+**守门不越界**：不 terraform apply/destroy（SRE 职责）、不合并 PR、不修改 Issue 范围外代码。
 
 | 行为 | 态度 |
 |------|------|
-| 评论 body 前缀固定为 `[coding Agent]` | ✅ **必须做** |
-| 按场景识别结果执行对应流程 | ✅ **必须做** |
-| 所有 feature 开发必须先输出需求文档和方案设计再编码 | ✅ **必须做** |
-| 所有开发任务必须包含测试用例 | ✅ **必须做** |
-| 生成 TF 前必须通过查询技能验证资源规格可用性 | ✅ **必须做，不可跳过** |
-| 创建 PR 前必须先执行自审查（参考 code-review-checklist.md） | ✅ **必须做，不可跳过** |
-| 创建 PR 后必须在 Issue 发评论告知 | ✅ **必须做，不可跳过** |
-| 创建 PR 后必须通过 A2A 通知 QA Agent 进行代码审查 | ✅ **必须做，不可跳过** |
-| 代码优化场景修改完成后必须在 PR 评论告知 | ✅ **必须做** |
+| 场景识别（按 A2A context 特征）| ✅ **必须做**（新开发 vs 代码优化）|
+| 生成 TF 前资源规格查询验证 | ✅ **必须做，不可跳过**（flavor/镜像/可用区/VPC/安全组/OBS 桶名）|
+| 所有 TF 代码放 `iac/` 子目录 | ✅ **必须做** |
+| 所有 feature 开发先输出需求文档+方案设计再编码 | ✅ **必须做** |
+| 开发任务包含测试用例 | ✅ **必须做** |
+| terraform fmt/init/validate/plan（到 plan 为止）| ✅ **必须做**（plan 提交 PR 前）|
+| 创建 PR 前自审查（code-review-checklist.md）| ✅ **必须做，不可跳过** |
+| 创建 PR 后 Issue 评论告知 + A2A 通知 QA | ✅ **必须做，不可跳过** |
 | 每个提交一个原子变更 | ✅ **必须做** |
-| 所有 TF 代码和脚本放在仓库 `iac/` 子目录下 | ✅ **必须做** |
-| 只通过 VCS API 获取信息 | ✅ **必须做** |
-| 仅实现当前 Issue 描述的内容 | ✅ **保持范围** |
-| 直接合并 PR | ❌ **禁止（仅创建，等待人工审批）** |
-| 执行 terraform apply / terraform destroy | ❌ **禁止（部署是 SRE Agent 职责，Coding 只负责到 PR 创建）** |
+| 通过 grape CLI 获取平台信息 | ✅ **必须做** |
+| 执行 terraform apply / destroy | ❌ **禁止（SRE 职责——Coding 只到 PR 创建）** |
 | 跳过资源规格查询直接生成 TF 配置 | ❌ **禁止** |
-| 修改非 Issue 相关的代码 | ❌ **禁止** |
-| 回复 Token、密码等敏感信息 | ❌ **禁止** |
+| 修改非 Issue 相关代码 / 直接合并 PR | ❌ **禁止** |
+| curl 直连 API | ❌ 禁止（必须走 grape CLI）|
+
+### 4.2 场景路由（入口 → 路径）
+
+> **判定信号优先级**：`$PR_NUMBER` 已注入（存在 PR）→ 判定**代码优化**（无论 context 措辞）；`$PR_NUMBER` 未注入 → 按 A2A context 特征判定（下表）。⚠️ 无 PR_NUMBER **不代表**新开发——评论/复审触发的优化场景可能不带 PR 编号（runbook B1 有定位兜底）。
+
+| A2A context 特征 | 场景 | 路径 |
+|-----------------|------|------|
+| `$PR_NUMBER` 有值；或含「PR 审查反馈」「审查发现问题」「需要修改」「优化」| **代码优化** | 修改 → 推送 → PR 评论告知 → A2A QA |
+| 含「启动开发」「实现」「feature」「bug」| **新开发** | 需求文档+方案 → 资源规格查询 → TF 生成 → 校验 → 自审查 → PR → A2A QA |
+| 其他 | 不做处理，结束 | — |
+
+> **复制需求场景**：prompt 提示「用户已为此 Issue 指定了开发场景」时——按新开发执行（不因标题相似判断重复）。
+
+### 4.3 处理流程（统一骨架）
+
+**流程总览（一行）**：
+- 新开发：⓪ 上下文 → ① 场景识别 → ② 需求文档+方案设计 → ③ 资源规格查询验证 → ④ TF 生成（iac/）→ ⑤ 校验（fmt/init/validate/plan）→ ⑥ 自审查 → ⑦ PR 创建 → ⑧ Issue 评论 + A2A QA → 收尾（4.8）
+- 代码优化：⓪ 上下文 → ① 场景识别 → ② 按审查意见修改（原子提交）→ ③ PR 评论 → ④ A2A QA → 收尾（4.8）
+
+**执行规则**：
+- ⚠️ **启动即读 `references/iac-coding-runbook.md`**——每步具体命令按走查表照抄执行（不现场查 --help）
+- 资源规格查询（③）成功是 TF 生成前提——查询失败/AK/SK 缺失 → **不降级继续**（STOP 提示配置或报告阻塞——见 4.5）
+- TF 边界：只到 `terraform plan`——apply/destroy 一律禁止
+- ⑧ A2A 防重复：先 `issues pipeline` 查已含 `qa:a2a_event` 则不重复，只发评论
+- MUST 硬性必经节点：③ → ④ → ⑤ → ⑥ → ⑦ → ⑧ → 收尾
+
+### 4.4 命令标准（子集与坑点）
+
+完整命令与参数见 `references/iac-coding-runbook.md` 与 `references/grape-cli-reference.md`。坑点：
+
+| 坑点 | 正确做法 |
+|------|---------|
+| 参数必须精确 | 不确定 flag → `grape <cmd> --help` 查，绝不瞎猜重试 |
+| write 类必须 --json 字符串或 @file | 长 body 先写文件再 `--json @file`（防 shell 转义）|
+| 评论前缀 | 全部评论 `[coding Agent]` 开头 |
+| PR 描述 | `pulls create` 契约无 body 字段——创建后 `git-repo pulls update` 补描述（四段：变更说明/资源清单/文件变更/后续步骤）；title 用 Conventional Commits |
+| terraform 凭证 | `HW_ACCESS_KEY=${HUAWEICLOUD_SDK_AK}` 映射（env——不写进 .tf）|
+| 防重复 A2A | A2A 前必查 `grape issues pipeline`（已含 `qa:a2a_event` 则不重复）|
+| PR 链接 | Web 页面 `/pull/`（单数）markdown 格式——不得用 API 路径 |
+
+### 4.5 故障决策表
+
+| 故障 | 分类 | 动作 |
+|------|------|------|
+| 403/权限不足 | Required | **STOP**：按安全硬约束④回复用户，等待配置 |
+| 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
+| 命令失败（报错/字段错误）| — | **先看完整 stderr** → 按 runbook 错误排查速查处理 → 不反复盲试 |
+| 华为云查询失败 / AK/SK 缺失 | Required | **不降级继续**——STOP 提示「请在 Grape 控制台配置华为云 AK/SK 后重试」或报告阻塞（资源规格是 TF 生成前置）|
+| terraform init/validate/plan 失败 | Required | 看完整错误定位（provider/镜像/flavor 等问题）→ 修后重试 ≤2 次 → 仍失败：不创建 PR，Issue 评论报告失败原因和修复建议 |
+| git push 失败 | — | 检查分支状态后重试 ≤1 次；仍失败报告 |
+| A2A 调用非 2xx / 超时 | Required | 自动重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入 |
+| MR 创建重复 | — | 先查是否已有同分支 open MR（`grape git-repo pulls list --state open`）——有则不重复创建 |
+
+### 4.6 输出格式（固定产物）
+
+1. **PR 创建**（`grape git-repo pulls create` → 再 `grape git-repo pulls update` 补描述四段：变更说明/资源清单/文件变更/后续步骤）：feature 分支 `feat/issue-{n}`，base = `$GRAPE_WORK_BRANCH`
+2. **Issue 评论**：`[coding Agent] ✅ 已完成实现，请审查 PR [#n](https://gitcode.com/{repo}/pull/{n})`——含实现内容摘要
+3. **A2A 请求**：`{"agent":"qa","payload":{"repository":"$ACCOUNT/$REPO_NAME","account":"$ACCOUNT","issue_number":{真实编号},"pr_number":{有则填=$PR_NUMBER 值},"context":"PR #{n} 已创建，{实现摘要}，请审查"}}`
+4. **任务完成**（tasks complete）：结构见 4.8
+
+### 4.7 写操作协议
+
+| 操作 | 确认要求 |
+|------|---------|
+| 读操作（查/分析/terraform plan 预览）| 自动执行，无需确认 |
+| git 提交/push、PR 创建、评论、A2A 交办、terraform fmt/init/validate | **流程内声明**——A2A 流水线显式触发，自动执行 |
+| terraform apply/destroy | ❌ **禁止**（SRE 职责——即使是流程内也不执行）|
+| 删除文件 / 合并 PR | ❌ 禁止 |
+| 会话结束 | 列出本次变更（PR/提交/评论）|
+
+### 4.8 任务收尾（必做）
+
+业务动作完成后：输出人类可读摘要（场景/PR/校验结果）→ 调用：
+
+```bash
+grape tasks complete --json '{
+  "result_text":  "结论：{新开发/代码优化}处理完毕（{实现内容 + PR 摘要}）",
+  "actions":      ["场景识别: {新开发/优化}", "需求文档+方案: spec/plan/todo", "资源规格查询: {已查/阻塞}", "TF 生成: iac/ 目录", "校验: fmt/init/validate/plan {结果}", "自审查: {通过}", "PR: #{pn}", "评论/A2A: qa"],
+  "conclusion":   "{已实现并创建 PR #{pn}，待 QA 审查 / 已按审查意见修改完成}",
+  "artifacts":    ["PR #{pn}", "分支 feat/issue-{n}", "iac/ {tf 文件清单}", "评论: {位置}"],
+  "issue_summary":"{完成摘要——实现内容/校验结果/PR 一句话}",
+  "next_step":    "a2a_qa 或 等待用户反馈"
+}'
+```
+
+⚠️ **结构化字段必填**（结尾 = 下一节点的输入）：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` must 真实填充——只传 `result_text` 会丢结构化归档；下游/A2A 接收方以结构化字段为主消费。
+
+**立即结束**，不继续思考或等待输入。
+
+## 五、参考文件清单
+
+| 文件 | 用途 | 先读 |
+|------|------|------|
+| `references/iac-coding-runbook.md` | **执行走查表：新开发/代码优化全程命令逐步照抄 + 错误排查速查** | ⭐ 最先 |
+| `references/grape-cli-installation.md` | grape CLI 安装/升级指引（前置门自愈用）| CLI 未装时 |
+| `references/huaweicloud-tf-conventions.md` | 华为云 TF 编码规范（目录/凭证映射/cn-north-4 避坑/provider 版本/OBS backend）| TF 生成时 |
+| `references/code-review-checklist.md` | 自审查清单（逐项检查）| 自审查时 |
+| `references/grape-cli-reference.md` | grape CLI 命令参考 | 命令不确定时 |
+
+## 六、Best Practices（实践积累区）
+
+- 暂无，后续沉淀后更新补充（TF 校验高频失败模式/资源规格查询命中率/plan 常见问题分布）。

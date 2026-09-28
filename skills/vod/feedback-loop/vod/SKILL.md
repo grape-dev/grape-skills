@@ -16,7 +16,7 @@ tools:
 
 1. **CLI 优先**：凡 grape CLI 能做的走 CLI，禁止绕过 CLI 直连平台 API（curl/python httpx 等）。
    CLI 未装/版本过低 → **自动安装/升级**（官方源/签名包优先）→ 装好继续；仅当安装失败/环境不可用时才报障说明（不降级直连）。⚠️ 安装指引请参考：`references/grape-cli-installation.md`。
-2. **执行前先读任务上下文**：`grape tasks current --json-out` + `grape issues detail --json-out`（+ `grape events detail --seq` 读前序 A2A payload），明确已做/待做。
+2. **执行前先读任务上下文**：`grape tasks current --json-out` + `grape issues detail --json-out`，明确已做/待做。
 3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）；
    token 不写文件/日志/评论，不 printenv 打印。
 4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，
@@ -44,8 +44,8 @@ tools:
 |--------|---------|---------|---------|
 | CLI 可用 | `grape --version` | ≥0.3.2 | **自愈**：按 `references/grape-cli-installation.md` 自动安装/升级（`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`）→ 装好再验证一次；仍不可用 → 输出「前置检查未通过：<原因>」并结束任务 |
 | 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退内置快照），执行中留意命令"不识别"时再 refresh |
-| 任务上下文 | `grape tasks current --json-out` + `grape issues detail --json-out` / `grape events detail --seq` | 拿到任务与上下文 | ISSUE/SEQ 缺失 → 用 `git-repo issues get`/`events list` 定位；定位不到 → STOP（不执行写操作）|
-| 项目知识基线 | prompt 内联注入或 `grape knowledge context --repo … --agent_type vod --json-out` | 返回基线摘要 | 「无基线」/`[degraded]` → 降级分析（README + git-repo），不阻塞 |
+| 任务上下文 | `grape tasks current --json-out` + `grape issues detail` | 拿到任务与上下文 | ISSUE 缺失 → 用 `git-repo issues get`/`issues list` 定位；定位不到 → STOP（不执行写操作）|
+| 项目知识基线 | prompt 内联注入（主路径——基线由平台服务端维护，Agent 不自取/不自行生成）| 返回基线摘要 | 「无基线」/`[degraded]` → 降级分析（README + git-repo），不阻塞 |
 | 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
 > 本技能无外部凭据类前置——token 由平台注入，不要求用户配置任何东西。

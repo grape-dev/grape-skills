@@ -96,14 +96,12 @@ cn-north-4 仅支持 `n1` / `x1` / `arm` 类型 RDS flavor，不支持 `c2` 类�
 
 ### OBS SigV4 日期格式
 
-如必须用 curl 签名（不推荐），日期格式必须无连字符：
+OBS 签名一律由 obsutil 自动处理（不使用 curl 签名）：
 
 ```bash
-# 正确（无连字符）
-date -u +"%Y%m%dT%H%M%SZ"        # 20260820T154154Z
-
-# 错误（含连字符，OBS 返回 HTTP 400）
+# ❌ 错误：人为拼日期（含连字符，OBS 返回 HTTP 400）
 date -u +"%Y-%m-%dT%H:%M:%SZ"
+# ✅ 正确：不手写 SigV4——obsutil 自动处理签名（见上表用 obsutil 而非 curl）
 ```
 
 ### 安全组规则编码规范

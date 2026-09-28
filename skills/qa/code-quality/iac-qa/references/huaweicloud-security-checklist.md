@@ -57,9 +57,9 @@ export AWS_DEFAULT_REGION="cn-north-4"
 - [ ] RDS 存储类型使用可用类型（CLOUDSSD / LOCALSSD / ESSD），非 ULTRAHIGH
 - [ ] 如 PR 引入新的资源规格，确认已通过 ListFlavors / ListStorageTypes API 验证可用性
 
-## 部署验证清单对照
+## 可执行校验（只到 plan——硬约束⑦ 禁止 apply/destroy）
 
-审查 PR 时核对以下部署验证项是否齐全：
+审查 PR 时执行以下校验（QA 只到 plan；apply 及部署后验证属 SRE 职责，见 iac-sre）：
 
 - [ ] `terraform version` 在 1.7.5 ~ 1.10.5 区间内
 - [ ] `terraform fmt -check -recursive` PASS
@@ -67,13 +67,8 @@ export AWS_DEFAULT_REGION="cn-north-4"
 - [ ] `terraform init` PASS（OBS backend 配置成功，provider 下载成功）
 - [ ] `terraform plan` PASS（⚠️ 不加 -backend=false，使用真实 OBS backend 验证 state 读写；plan 还会调用 provider API 验证镜像/flavor/规格是否存在）
 - [ ] plan 输出中无报错（如镜像不存在、RDS flavor 不可用、provider 不兼容等）
-- [ ] `terraform apply` PASS（全部资源创建成功，**无 errored.tfstate 文件生成**）
-- [ ] 工作目录下**不存在** `errored.tfstate` 文件（存在则说明 state 写入 OBS 失败，需排查 TF 版本和 backend 配置）
-- [ ] `terraform output -json` 获取完整资源清单
-- [ ] inventory.json 已上传到 OBS 并验证可读
-- [ ] ECS 实例状态为 ACTIVE（运行中），EIP 已绑定
-- [ ] RDS 实例状态为可用
-- [ ] OBS bucket 创建成功
+
+**SRE 部署后验证项（QA 不执行不检查——apply 后产物）：** errored.tfstate 不存在、`terraform output -json` 资源清单、inventory.json 上传 OBS、ECS ACTIVE、RDS 可用、OBS bucket 创建成功。
 
 **不在验证范围内（应用层，SRE/QA 不检查）：**
 - ~~ECS 公网 80 端口可访问~~（应用是否启动是应用层问题）
