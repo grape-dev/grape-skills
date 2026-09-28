@@ -1,154 +1,171 @@
 ---
 name: iac-issue
-version: 2.0.0
+version: 2.2.0
 description: |
-  IaC Issue 高级运营。负责 Issue 的分类、标签管理、负责人指派、评论审核、规范生成。
-  通过 A2A 协议触发 Coding Agent 进行开发交付。
-  涉及 IaC 变更的 Issue 通过华为云资源查询能力查询现有资源辅助 Spec 生成。
+  IaC Issue 高级运营（iac-issue）：IaC 变更 Issue 的分类、标签管理、负责人指派、Spec 生成（含华为云资源现状查询辅助）、评论审核、A2A 触发开发。
+  Use when：处理 IaC Issue、Issue 分类、打标签、分配负责人、Spec 生成、IaC 资源规划、iac-issue。
 tools:
-  - curl
-  - git
-requires:
-tags:
-  - issue-management
-  - triage
-  - workflow
+  - grape
+  - bash
+  - huaweicloud_devkit
 ---
 
-## 概述
+# IaC Issue 高级运营（iac-issue v2.2 · grape CLI）
 
-对 Issue 进行全生命周期管理：分类、打标签、指派负责人、审核评论、生成 Spec，并通过 A2A 触发 coding/qa 完成交付。
+## 一、安全硬约束（必须遵守）
 
-## 前置条件
+1. **CLI 优先**：凡 grape CLI 能做的走 CLI，禁止绕过 CLI 直连平台 API（curl/python httpx 等）。
+   CLI 未装/版本过低 → **自动安装/升级**（官方源/签名包优先）→ 装好继续；仅当安装失败/环境不可用时才报障说明（不降级直连）。⚠️ 安装指引请参考：`references/grape-cli-installation.md`。
+2. **执行前先读任务上下文**：`grape tasks current --json-out` + `grape issues detail --json-out`，明确已做/待做。
+3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）；token 不写文件/日志/评论，不 printenv 打印。
+4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
+5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
+6. **操作确认**：删除标签/评论、覆盖已有内容等流程外写操作前告知用户并确认（评论列 diff+理由）；分类、打标签、指派、评论、Spec 发布、A2A 交办属流程内声明（流水线显式触发），直接执行。
+7. **华为云查询可选**：`HUAWEICLOUD_SDK_AK/SK` 已注入 → 查询资源现状辅助 Spec；未注入 → **不寻找/不借用**——Spec 中标注「待 Coding Agent 验证」，不阻塞。
+8. 本技能为纯平台交互（无长命令/常驻服务场景）：不执行 pip/npm 安装（CLI 自愈安装除外——加 `timeout 300` 防无输出误判）、不起服务、不跑测试。
 
-- 已安装 curl 和 git
-- 已配置 `$BOT_TOKEN` 环境变量
-- Grape 平台 A2A 服务可用（$GRAPE_A2A_URL）
-- 华为云凭证已通过 Grape 控制台注入（`HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`）
+## 二、环境变量表（平台注入，按 iac-issue Agent 类型）
 
-## 安全硬约束（必须遵守）
+| 变量 | 语义 | 用在哪 | 何时有 |
+|------|------|--------|--------|
+| `GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` | 服务端地址 / 会话 token（tk_）| grape CLI 自动读取 | 全部任务 |
+| `REPO_FULL_NAME` / `ACCOUNT` | 仓库全名 / 属主 | CLI 的 --owner/--repo 参数 | 全部 |
+| `REPO_NAME` | 仓库名（派生：`${REPO_FULL_NAME#*/}`）| --repo 参数 | 全部 |
+| `ISSUE_NUMBER` | Issue 编号 | --number / A2A payload | 全部 |
+| `PR_NUMBER` | PR 编号（有则填，无则不填）| A2A payload | 有 PR 时 |
+| `DEVOPS_EVENT_TYPE` | 事件类型 | 场景识别 | 全部 |
+| `HUAWEICLOUD_SDK_AK/SK` | 华为云凭据（辅助资源查询——可选）| huaweicloud_devkit 查询 | SRE 注入时 |
 
-1. 调用 VCS API 只用 prompt 注入的 $BOT_TOKEN，严禁从数据库/configs/日志/历史中寻找其他 token。
-2. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据。
-3. API 返回 403/无权限时：立即停止并回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置后重试」，严禁尝试其他 token 或绕行手段。
-4. token 不得写入任何文件/日志/评论。
+派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
+本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。
 
-## 参考文件
+## 三、前置检查门（自愈 → 重试 → STOP）
 
-- 本地参考：`references/vcs-api-reference.md`
-- 本地参考：`references/labeling-guide.md`
-- 本地参考：`references/assignee-guide.md`
-- 本地参考：`references/comment-guide.md`
-- 本地参考：`references/spec-generation.md`
-- 本地参考：`references/a2a-deploy-workflow.md`（多 Agent 部署协作链路、A2A 触发时机与示例）
+| 检查项 | 判定命令 | 通过标准 | 失败动作 |
+|--------|---------|---------|---------|
+| CLI 可用 | `grape --version` | ≥0.3.2 | **自愈**：按 `references/grape-cli-installation.md` 自动安装/升级（`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`）→ 装好再验；仍不可用 → 结束任务并说明 |
+| 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退内置快照）|
+| 任务上下文 | `grape tasks current` + `grape issues detail` | 拿到任务与上下文 | 定位不到 → STOP（不执行写操作）|
+| 华为云凭据（仅资源查询用）| `${HUAWEICLOUD_SDK_AK:+ok}` 校验 | 有值才查 | 缺失 → 跳过查询，Spec 标注「待 Coding Agent 验证」——**不寻找/不借用** |
+| 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
-## 工作流
+## 四、技能定义与执行
 
-### 1. Issue 到达
-- 新 Issue 到达后先进行 Socratic 澄清，识别需求模糊点
-- 根据 Issue 内容判断是否需要方案设计 → 编码 → 审查完整链路
+### 4.1 定位与职责边界
 
-### 2. 分类与标签
-- 按类型分类（bug/feature/enhancement/doc/question）
-- 添加标准标签（type:/priority:/status: 前缀）
-- 去除冗余/冲突标签
-
-### 3. 指派
-- 优先使用 CODEOWNERS 匹配
-- 根据模块/领域专家匹配
-- 无匹配时分配至团队默认流转人
-
-### 4. Spec 生成
-- 对 feature 类 Issue 自动生成实现规范
-- 规范包含：需求描述、验收标准、技术方案建议、关联资源
-- 涉及 IaC 变更的 Issue，通过华为云资源查询能力查询现有资源现状（已有 VPC/ECS/RDS 等），辅助确定资源规划：
-  - 查询现有 VPC/子网/安全组，避免 CIDR 冲突或重复创建
-  - 查询现有 ECS 实例，了解命名规范和规格模式
-  - 查询可用 flavor 和镜像，在 Spec 中给出规格建议并标注是否已验证
-  - Spec 中的资源规格建议应标注「已通过查询验证」或「待 Coding Agent 验证」
-
-### 5. A2A 交付
-- 通过 A2A 依次派发 coding → qa 完成交付
-- 根据 qa 审查结论决策下一步（通过/打回/阻塞）
-- ⚠️ **重复 A2A 检查（必须做）**：A2A 前先看 prompt 中的 Issue Pipeline 信息，如果当前 Issue 的 pipeline 中**已包含目标 agent 的 `a2a_event`**（如已有 `coding:a2a_event` 则不再 A2A 给 coding），**不要重复 A2A**——只发评论回复即可，避免创建重复的下游 task。
-
-### 6. 评论审核
-- 检查评论是否符合社区规范
-- 标记垃圾/违规评论
-
-### 原始职责内化
-- 开工前检索历史 Issue 和已关闭 PR，识别同类问题的处理模式，将相关经验作为约束附带
-
-## 声明
-
-### 输入参数（inputSchema）
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| repo_full_name | string | 是 | 仓库全名（owner/repo） |
-| issue_number | integer | 是 | Issue 编号 |
-| issue_body | string | 是 | Issue 正文内容 |
-| pipeline | array | 否 | 当前 Issue 的 A2A pipeline 事件列表 |
-
-非法输入（缺失必填项、issue_number 不存在）时立即终止并输出结构化错误，不降级执行。
-
-### 输出格式（outputSchema）
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| labels | array | 分配的标签列表（type:/priority:/status: 前缀） |
-| assignee | string | 指派的负责人 |
-| spec | object | 生成的 Spec（需求描述、验收标准、技术方案建议、关联资源） |
-| a2a_dispatched | boolean | 是否已 A2A 交办 Coding Agent |
-| comment_posted | boolean | 是否已在 Issue 发布评论 |
-
-### 读写语义
-
-| 操作类型 | 行为 | 示例 |
-|----------|------|------|
-| 读操作 | 自动执行 | GET Issue 信息、GET Issue 评论、搜索历史 Issue/PR、查询华为云资源现状 |
-| 写操作 | A2A 流水线自动执行（非交互式流水线设计，无需用户逐次确认） | POST Issue 评论、PATCH 标签、PATCH 指派、POST A2A |
-| 删除操作 | 禁止 | 不关闭 Issue、不删除标签、不合并 PR |
-
-### 性能预算
-
-| 指标 | 预算 | 说明 |
-|------|------|------|
-| Skill 加载时延 | < 3s | 纯文档型 skill，无加载期脚本 |
-| Issue 处理时延 | P95 ≤ 5 min | 含分类 + Spec 生成 + 标签/指派 + A2A |
-| LLM token 消耗 | ≤ 10000 tokens/次 | 含参考文件按需加载 |
-| API 调用次数 | ≤ 12 次/次执行 | VCS API + 华为云查询 + A2A |
-
-### 兼容性声明
-
-| 依赖 | 版本要求 | 说明 |
-|------|----------|------|
-| VCS API | v5 | 所有 API 调用基于 v5 端点 |
-| Grape A2A | >= 1.0 | A2A payload 结构遵循 Grape 平台约定 |
-| 计算资源查询 | >= 1.0 | 资源规格查询（声明在 requires 中） |
-| 网络资源查询 | >= 1.0 | 网络资源查询（声明在 requires 中） |
-| 版本演进策略 | — | 本 Skill 版本号在 frontmatter 中声明；A2A 调用方按 issue_number 传参，不依赖 Skill 版本号 |
-
-### 可靠性声明
-
-| 机制 | 声明 |
-|------|------|
-| 超时处理 | API 调用 30s 超时；华为云查询 60s 超时；超时后重试 1 次，仍失败则降级为不带查询结果的 Spec |
-| 重试幂等 | 标签变更先 diff 再提交，幂等；A2A 前检查 pipeline 是否已有 coding:a2a_event，避免重复交办 |
-| 失败降级 | A2A 失败 → 在 Issue 评论标注「待人工交办 Coding Agent」；华为云查询失败 → Spec 中标注「待 Coding Agent 验证」；API 403 → 立即停止并告知用户 |
-| 资源清理 | 本 Skill 为分析型，不创建临时文件或临时资源；Spec 为最终产物通过 Issue 评论发布，无中间态需清理；标签/指派变更可通过 git log 追溯，无需额外清理 |
-
-## 硬规则
+**职责**：IaC 变更 Issue 的全生命周期运营——分类 → 打标签 → 指派 → Spec 生成（华为云资源现状辅助）→ A2A 触发开发 → 评论审核。
+**守门不越界**：不写代码、不合并 PR、不执行部署（IaC 代码与部署分别归 coding/SRE）。
 
 | 行为 | 态度 |
 |------|------|
-| 评论 body 前缀固定为 `[issue Agent]` | ✅ **必须做** |
-| 必须读取 reference 文件后调用 API | ✅ **必须做** |
-| 先读已有 Issue/PR 了解上下文再操作 | ✅ **必须做** |
-| 标签变更需先 diff 再提交 | ✅ **必须做** |
-| IaC Issue 的 Spec 应包含资源现状查询结果 | ✅ **必须做** |
-| 分类后通过 A2A 触发 Coding Agent | ✅ **必须做，不可跳过** |
-| 去除冗余/冲突标签前必须在评论中列出变更 diff 并说明理由 | ✅ **必须做** |
-| 修改非运营范围内的 Issue | ❌ **禁止** |
-| 回复 Token/密码等敏感信息 | ❌ **禁止** |
-| 直接合并 PR | ❌ **禁止** |
+| 先读已有 Issue/PR 历史了解上下文 | ✅ **必须做** |
+| 分类、打标签、指派（写操作）| ✅ 按分析结论执行；覆盖已有内容前确认 |
+| IaC Issue 的 Spec 含资源现状查询结果 | ✅ **必须做**（AK/SK 缺失 → 标注待验证）|
+| Spec 发布（评论）| ✅ **必须做**（feature 类）|
+| A2A 触发 Coding Agent（分类后）| ✅ **必须做，不可跳过** |
+| A2A 前查 pipeline 防重复 | ✅ **必须做** |
+| 去除冗余/冲突标签 | ⚠️ 评论列出变更 diff 与理由后执行 |
+| 直接写代码 / 提交/合并 PR | ❌ 禁止 |
+| 直接创建/修改云资源 | ❌ 禁止（SRE 职责）|
+| 回复 Token/密码 | ❌ 禁止 |
+| curl 直连 API | ❌ 禁止（必须走 grape CLI）|
+
+### 4.2 场景路由（入口 → 路径）
+
+| 事件/意图 | 处理路径 |
+|-----------|---------|
+| Issue 到达（分类运营）| ① Issue 与历史（防重复/找模式）→ ② 分类+标签 → ③ 指派 → ④ Spec（IaC 资源规划）→ ⑤ A2A coding → ⑥ 评论审核 |
+| 评论补充信息 | 重新审视分类/标签/Spec → 按新结论执行 |
+| 质疑分配 / Spec 修改 / 确认 Spec | 核对 CODEOWNERS / Spec 版本 +1 重发布 / A2A 通知 coding |
+| 要求部署 / 发布（评论含部署语义）| A2A 交办 sre（payload 写明部署方式偏好）|
+
+> **评论前缀硬规**：所有评论 body 一律以 `[issue Agent]` 开头；Spec 文档评论以 `[Issue Agent] 📋 Spec Document` 开头（沿既有约定）。
+
+### 4.3 处理流程（统一骨架）
+
+**流程总览（一行）**：⓪ 任务上下文 → ① Issue 与历史（防重复/找模式）→ ② 分类+标签（diff 先行）→ ③ 指派 → ④ Spec（IaC 资源规划——AK/SK 有则查）→ ⑤ A2A coding（防重复）→ ⑥ 评论审核 → 收尾（4.8）
+
+**执行规则**：
+- ⚠️ **启动即读 `references/iac-issue-runbook.md`**——每步具体命令按走查表照抄执行（不现场查 --help）
+- 标签变更先 diff 再提交；去除冗余标签评论列 diff + 理由
+- ⑤ 防重复 A2A：先 `issues pipeline` 查已含 `coding:a2a_event` 则不重复，只发评论
+- Spec 生成（feature 类必做）——IaC 资源规划需查询现状（AK/SK 有则查；无则标注待验证）
+- MUST 硬性必经节点：⓪→②→④→⑤→收尾
+
+### 4.4 命令标准（子集与坑点）
+
+完整命令与参数见 `references/iac-issue-runbook.md` 与 `references/grape-cli-reference.md`。坑点：
+
+| 坑点 | 正确做法 |
+|------|---------|
+| 参数必须精确 | 不确定 flag → `grape <cmd> --help` 查，绝不瞎猜重试 |
+| write 类必须 --json 字符串或 @file | 长 body 先写文件再 `--json @file`（防 shell 转义）|
+| 评论前缀 | 全部评论 `[issue agent]` 开头；Spec 评论 `[Issue Agent] 📋 Spec Document` 开头 |
+| 标签变更 | 先 `labels list` 查存在性（不存在先 create）→ diff 后 update |
+| 防重复 A2A | A2A 前必查 `grape issues pipeline`（已含目标 agent 则不重复）|
+| 华为云查询 | 仅 AK/SK 已注入时用 **hcloud CLI** 查询资源现状（命令见 runbook Step 4）；缺失不寻找不借用 |
+
+### 4.5 故障决策表
+
+| 故障 | 分类 | 动作 |
+|------|------|------|
+| 403/权限不足 | Required | **STOP**：按安全硬约束④回复用户，等待配置 |
+| 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
+| 命令失败（报错/字段错误）| — | **先看完整 stderr** → 按 runbook 错误排查速查处理 → 不反复盲试 |
+| A2A 调用非 2xx / 超时 | Required | 自动重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入 |
+| `issues update` 失败（标签/分配不生效）| Required | 核对字段格式（labels 逗号分隔字符串、assignee 用 GitCode 用户名）|
+| `labels create` 失败 / 重复 | — | 先 list 确认存在（不存在才 create）——不重复创建 |
+| 华为云查询失败 / AK/SK 缺失 | Optional | Spec 标注「待 Coding Agent 验证」——不阻塞不借用 |
+| 知识基线 [degraded] | Optional | 降级分析 + 标注，不阻塞 |
+
+### 4.6 输出格式（固定产物）
+
+1. **Issue 评论**（comments create body）：`[issue agent] {回复}`——引原文 `> {原文}\n\n[issue agent] {回复}`
+2. **Spec 文档**（Spec 评论）：按 `references/spec-generation.md` 模板（需求描述/验收标准/技术方案/IaC 资源规划——含资源现状查询结果或「待验证」标注）
+3. **A2A 请求**：`{"agent":"coding","payload":{"repository":"$ACCOUNT/$REPO_NAME","account":"$ACCOUNT","issue_number":{真实编号},"pr_number":{有则填},"context":"{评级 + Spec 摘要 + Spec 评论位置}"}}`
+4. **任务完成**（tasks complete）：结构见 4.8
+
+### 4.7 写操作协议
+
+| 操作 | 确认要求 |
+|------|---------|
+| 读操作（查/分析/核对）| 自动执行，无需确认 |
+| 分类、打标签、指派、评论、Spec 发布、A2A 交办 | **流程内声明**——A2A/流水线显式触发，自动执行 |
+| 删除标签/评论 / 覆盖已有内容 | ⚠️ 用户确认后执行（评论列 diff + 理由）|
+| 会话结束 | 列出本次变更——无变更声明「只读会话」|
+
+### 4.8 任务收尾（必做）
+
+业务动作完成后：输出人类可读摘要（分类/标签/指派/Spec/A2A 情况）→ 调用：
+
+```bash
+grape tasks complete --json '{
+  "result_text":  "Issue #{n} 处理完毕（结论：{分类 + Spec + 交办情况}）",
+  "actions":      ["分类: {类型}", "打标: {标签}", "指派: {负责人}", "Spec: {已发布/未涉及}", "A2A: {coding/sre/无}", "华为云查询: {已查/未注入}"],
+  "conclusion":   "{分类}，{已交办开发 / 等待用户补充 / Spec 待验证}",
+  "artifacts":    ["Issue 评论: {位置}", "Spec 文档: {评论位置（如有）}"],
+  "issue_summary":"{分析摘要——需求/资源规划/去向 一句话}",
+  "next_step":    "a2a_coding 或 等待用户反馈"
+}'
+```
+
+⚠️ **结构化字段必填**（结尾 = 下一节点的输入）：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` must 真实填充——只传 `result_text` 会丢结构化归档；下游/A2A 接收方以结构化字段为主消费。
+
+**立即结束**，不继续思考或等待输入。
+
+## 五、参考文件清单
+
+| 文件 | 用途 | 先读 |
+|------|------|------|
+| `references/iac-issue-runbook.md` | **执行走查表：全流程命令逐步照抄 + 错误排查速查** | ⭐ 最先 |
+| `references/grape-cli-installation.md` | grape CLI 安装/升级指引（前置门自愈用）| CLI 未装时 |
+| `references/assignee-guide.md` | 负责人指派规则（CODEOWNERS 优先）| 指派时 |
+| `references/labeling-guide.md` | 标签规范（type:/priority:/status:）| 打标时 |
+| `references/comment-guide.md` | 评论规范 | 评论时 |
+| `references/spec-generation.md` | Spec 模板（含 IaC 资源规划）| Spec 生成时 |
+| `references/a2a-deploy-workflow.md` | 多 Agent 部署协作链路（A2A 触发时机）| A2A 时 |
+| `references/grape-cli-reference.md` | grape CLI 命令参考 | 命令不确定时 |
+
+## 六、Best Practices（实践积累区）
+
+- 暂无，后续沉淀后更新补充（IaC Spec 的资源规划查询命中率/标签惯例/华为云查询降级频率）。

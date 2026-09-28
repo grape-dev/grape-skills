@@ -4,7 +4,7 @@
 
 ## 版本要求
 
-- 最低版本：**0.3.2**（本技能依赖 `issues detail/list/pipeline`、`git-repo issues get/comments`、`tasks current/notify/close/complete`、`a2a handoff`、`knowledge context/content` 等命令）。
+- 最低版本：**0.3.2**（本技能依赖 `issues detail/list/pipeline/create/mine`、`git-repo issues list/get/update/comments`、`a2a handoff`、`tasks current/complete` 等命令）。
 - 检查：`grape --version`。
 
 ## 安装方式（pip 直装，无需手动 clone）

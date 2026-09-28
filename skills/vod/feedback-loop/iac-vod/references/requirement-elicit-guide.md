@@ -1,6 +1,6 @@
 # IaC 需求引导与 Issue 审视指南（iac-vod）
 
-> 配套 `skills/vod/feedback-loop/iac-vod/SKILL.md`（v2.0）。覆盖：清晰度四要素 + IaC 特化要素、引导漏斗、IaC Issue 审视流程、结构化模板、A2A 交办。
+> 配套 `skills/vod/feedback-loop/iac-vod/SKILL.md`（v2.2）。覆盖：清晰度四要素 + IaC 特化要素、引导漏斗、IaC Issue 审视流程、结构化模板、A2A 交办。
 
 ## 一、清晰度四要素 + IaC 特化要素
 
@@ -49,10 +49,8 @@
   ```
 - **Issue 评论追问格式**（body 以 `[iac-vod Agent]` 开头）：
   ```bash
-  POST /repos/{owner}/{repo}/issues/{number}/comments
-  Authorization: Bearer $BOT_TOKEN
-  Content-Type: application/json
-  {"body": "> 用户的问题原文\n\n[iac-vod Agent] 您需要的是哪种 RDS 引擎？……"}
+  grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+    --json '{"body": "> 用户的问题原文\n\n[iac-vod Agent] 您需要的是哪种 RDS 引擎？……"}' --json-out
   ```
 
 ### IaC 必问清单
@@ -71,12 +69,13 @@
 
 ## 三、IaC Issue 审视流程（场景 B，`issue_opened`）
 
-1. **自建排除**：Issue 含 `auto-submitted by iac-vod Agent` 标记 → 跳过审视，直接 A2A 交办 IaC Issue Agent
-2. **IaC 相关性判定**：Issue 内容涉及 terraform / hcl / pulumi / cloudformation / 云资源编排 / 基础设施部署 → 属于 iac-vod 管辖范围；纯应用层 Issue → 回退到通用 vod 流程
-3. **清晰度审视**：读取 Issue 完整内容（title/body/标签/评论），对照四要素 + IaC 特化要素；结合知识基线判断 IaC 可执行性/重复/歧义
-4. **沟通澄清**（不清晰时）：在 Issue 评论 @开发者 追问（body 以 `[iac-vod Agent]` 开头），或飞书群沟通；≤3 轮
-5. **结构化总结**：`PATCH /issues/{number}` 将 body 收敛为 IaC 模板结构
-6. **A2A 交办**：`POST /api/a2a {"agent":"iac-issue", ...}` → IaC Issue Agent 做 spec/标签/里程碑/分配
+1. **复制需求场景**：prompt 提示「用户已为此 Issue 指定了开发场景」→ 不因标题/内容相似判重复——跳过审视，直接 B3 → B6 执行
+2. **自建排除**：Issue 含 `auto-submitted by iac-vod Agent` 标记 → 跳过审视，直接 A2A 交办 IaC Issue Agent
+3. **IaC 相关性判定**：Issue 内容涉及 terraform / hcl / pulumi / cloudformation / 云资源编排 / 基础设施部署 → 属于 iac-vod 管辖范围；纯应用层 Issue → 回退到通用 vod 流程
+4. **清晰度审视**：读取 Issue 完整内容（title/body/标签/评论），对照四要素 + IaC 特化要素；结合知识基线判断 IaC 可执行性/重复/歧义
+5. **沟通澄清**（不清晰时）：在 Issue 评论 @开发者 追问（body 以 `[iac-vod Agent]` 开头），或飞书群沟通；≤3 轮
+6. **结构化总结**：`grape git-repo issues update --json`（body 写文件 @file）将 body 收敛为 IaC 模板结构
+7. **A2A 交办**：`grape a2a handoff --json '{"agent":"iac-issue",...}'` → IaC Issue Agent 做 spec/标签/里程碑/分配（命令见 iac-vod-runbook A5/B6）
 
 ## 四、结构化 IaC Issue 模板
 
@@ -122,19 +121,12 @@ auto-submitted by iac-vod Agent（Feishu）
 ## 五、A2A 交办格式
 
 ```bash
-curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "iac-issue",
-    "payload": {
-      "repository": "'"$REPO_FULL_NAME"'",
-      "account": "'"$ACCOUNT"'",
-      "issue_number": "'"$ISSUE_NUMBER"'",
-      "pr_number": "",
-      "context": "iac-vod 已完成 IaC 需求收敛与结构化，请继续 spec 设计/打标签/排里程碑/分配责任人。结构化需求：<摘要>。IaC 关键信息：目标云服务=<X> / IaC 工具链=<X> / 目标区域=<X>"
-    }
-  }'
+# 一律用 grape a2a handoff（禁 curl 直连——命令见 iac-vod-runbook A5/B6）：
+grape a2a handoff --json '{
+  "agent": "iac-issue",
+  "payload": {"repository": "$ACCOUNT/$REPO_NAME", "account": "$ACCOUNT", "issue_number": {真实编号}, "pr_number": null, "context": "iac-vod 已完成 IaC 需求收敛与结构化，请继续 spec 设计/打标/分配"}
+}' --json-out
+# A2A 前必查防重复：grape issues pipeline（已含 iac-issue:a2a_event 则不重复）
 ```
 
 > ⚠️ `issue_number` 必填；无法确定则不调 A2A，在评论中说明。交办后 Issue 生命周期进入 `iac-issue` 阶段（`issue_state` 归属更新）。

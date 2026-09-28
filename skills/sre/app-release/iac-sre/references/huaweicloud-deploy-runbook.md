@@ -201,16 +201,18 @@ fi
 
 ⚠️ **Grape 控制台凭证变量名**：控制台注入的是 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`，不是 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。必须先做变量映射（见上方），否则 `terraform init` 会报 `No valid credential sources found`。
 
+> 以下 2-5 节为**示例项目（examples/blog-infrastructure）**的完整部署流程展示——**真实部署按 iac-sre-runbook A1-A5 执行**（workdir = /tmp/deploy-ws/iac,不依赖 examples/ 与 scripts/;OBS 上传直接 obsutil cp 见 runbook A5）。示例的 scripts/bootstrap.sh / save-inventory-to-obs.sh 仅示例项目自带。
+
 ### 2. 预建 OBS Bucket（首次部署）
 
 ```bash
-./scripts/bootstrap.sh
+./scripts/bootstrap.sh    # ⚠️ 示例项目脚本——真实部署:OBS 桶按仓库配置预先存在/手动创建,不依赖此脚本
 ```
 
 ### 3. 部署基础设施
 
 ```bash
-cd examples/blog-infrastructure
+cd /tmp/deploy-ws/iac    # ⚠️ 真实部署 workdir = iac/ 子目录(见 iac-sre-runbook A2-A3),非 examples 目录
 
 # 确认 Terraform 版本在 1.7.5 ~ 1.10.5 区间内
 terraform version

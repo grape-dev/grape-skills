@@ -10,11 +10,11 @@
 grape CLI 由 worker 包预装。使用前检查：
 
 ```bash
-which grape          # 验证安装，无结果直接报障，不自行安装
-grape --version      # 确认版本
+which grape          # 验证安装；未装/版本过低 → 按 references/grape-cli-installation.md 自动安装/升级
+grape --version      # 确认版本（≥0.3.2）
 ```
 
-> ⚠️ grape 未安装时直接报障，不 curl 直连 API。
+> ⚠️ grape 未安装时按 references/grape-cli-installation.md 自动安装/升级（不 curl 直连 API）；仍装不上才报障。
 
 ---
 
@@ -37,16 +37,15 @@ grape --version      # 确认版本
 |------|------|
 | `grape tasks current --json-out` | 获取分配给自己的任务 |
 | `grape issues detail --owner {owner} --repo {repo} --number {n} --json-out` | Issue 全貌（含阶段/事件/pipeline） |
-| `grape events detail --seq {seq} --json-out` | 读取前序 A2A 交接 payload |
 | `grape issues clarify --issue_id {id} --json '{"message":"..."}'` | 向上游提问（回复 Issue 澄清） |
 | `grape commands [pattern]` | 列出可调用命令（命令发现） |
 
 ### 3.2 知识与项目上下文
 
-| 命令 | 用途 |
+| 项目 | 说明 |
 |------|------|
-| `grape knowledge context --repo {owner}/{repo} --agent_type vod --json-out` | 合并注入上下文（项目知识基线等） |
-| `grape knowledge content --repo {owner}/{repo} --file {path} --json-out` | 读取知识文件全文 |
+| 项目知识基线 | **由 prompt 内联注入**（平台服务端维护，Agent 不自取/不自行生成）——需全文读 prompt 标注的 project-info/ 路径 |
+| ❌ 不存在的命令 | `knowledge context` / `knowledge content` 契约不存在（`grape knowledge --help` 无此子命令）——不要尝试 |
 
 ### 3.3 Issue 操作
 
@@ -124,7 +123,7 @@ VOD skill 引用的命令子集（§3.1-§3.5）均为可执行 leaf 命令，**
 > - `grape issues list attachments` — 被 `grape issues list`（GET leaf 命令）遮蔽；`--help` 显示 list 帮助而非报错
 
 > ⚠️ **不存在的命令**（`grape <cmd> --help` 返回 `No such command`，exit 2，不要引用）：
-> - `grape tasks status get` — 多词形式被 `tasks status`（leaf，0.3.3 存在）遮蔽；单用 `grape tasks status --task_id <id>` 即可
+> - `grape tasks status get` / `grape tasks status` — tasks 组**无** status 子命令（仅 complete/current/notify/wait，实测 No such command）——不要尝试
 > - `grape issues status_get` — 不存在（下划线形式，返回 `No such command 'status_get'`；空格形式 `status get` 被遮蔽见上）
 > - `grape issues pipeline_detail` — 不存在（下划线形式，返回 `No such command 'pipeline_detail'`；空格形式 `pipeline detail` 被遮蔽见上）
 > - `grape issues list_attachments` — 不存在（下划线形式，返回 `No such command 'list_attachments'`；空格形式 `list attachments` 被遮蔽见上）
@@ -137,7 +136,7 @@ v0.2.2 移除 `grape api` 通用兜底命令。契约未覆盖的端点无法通
 
 ### 不存在的能力（不要尝试）
 
-任务删除（有 close 非删除）· 知识上传 · Issue/PR 删除 · 分支创建/删除 · Token 管理 · `tasks create`（已移除，用 `issues create`）· 流式输出 · 交互式提示 · 配置初始化
+任务删除（tasks 组仅 complete/current/notify/wait——无删除命令）· 知识上传 · Issue/PR 删除 · 分支创建/删除 · Token 管理 · `tasks create`（已移除，用 `issues create`）· 流式输出 · 交互式提示 · 配置初始化
 
 > 注：`repos create`/`repos remove`（仓库创建/删除）**已存在**（v0.2.6+），不列为不存在。`skills upload`/`skills delete`/`skills convert` **已存在**，不列为不存在。
 

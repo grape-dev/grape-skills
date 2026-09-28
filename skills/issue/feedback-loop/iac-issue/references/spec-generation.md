@@ -42,4 +42,4 @@
    - Mitigation plans
 
 ## Output
-Create the spec as a comment on the original issue with [Spec] prefix.
+在 Issue 评论发布 Spec,body 以 `[Issue Agent] 📋 Spec Document` 开头(前缀硬规,见 SKILL.md 4.2)——正文按上方模板组织。

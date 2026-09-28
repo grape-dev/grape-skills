@@ -23,30 +23,28 @@ Issue Agent（需求分类、标签、指派、触发 A2A）
 
 ## A2A 触发
 
-Issue Agent 完成分类和 Spec 生成后，通过 A2A 依次派发 coding → qa 完成交付。
-PR 合并后，通过 A2A 通知 SRE Agent 执行部署。
+Issue Agent 完成分类和 Spec 生成后，通过 A2A 交办 coding（Step 5）；coding 完成后 QA 节点接力审查；PR 合并后或评论含部署语义时，通过 A2A 交办 SRE Agent 执行部署。
 
 ### A2A 触发示例
 
 ```bash
-curl -X POST $GRAPE_A2A_URL \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "sre",
-    "payload": {
-      "repository": "owner/repo",
-      "account": "owner/repo",
-      "issue_number": "8",
-      "context": "PR已合并，凭证已就绪，执行部署"
-    }
-  }'
+# 一律用 grape a2a handoff（禁 curl 直连——命令见 iac-issue-runbook Step 5）：
+grape a2a handoff --json '{
+  "agent": "sre",
+  "payload": {
+    "repository": "$ACCOUNT/$REPO_NAME",
+    "account": "$ACCOUNT",
+    "issue_number": {真实编号},
+    "pr_number": {有则填=$PR_NUMBER 值},
+    "context": "PR已合并，凭证已就绪，执行部署"
+  }
+}'
 ```
 
 ### 触发时机
 
-| 目标 Agent | 触发条件 | context 内容 |
-|-----------|---------|-------------|
-| coding | Issue 分类完成，spec 已生成 | 需求描述、方案建议、关联资源 |
-| qa | coding 创建 PR 后 | PR 编号、变更说明、资源清单 |
-| sre | PR 已合并，凭证已就绪 | 仓库、Issue 编号、部署上下文 |
+| 目标 Agent | 触发条件 | context 内容 | 谁触发 |
+|-----------|---------|-------------|--------|
+| coding | Issue 分类完成，spec 已生成 | 需求描述、方案建议、关联资源 | **Issue Agent**（Step 5） |
+| qa | coding 创建 PR 后 | PR 编号、变更说明、资源清单 | Coding/QA 节点接力——**非 Issue Agent 直接触发** |
+| sre | PR 已合并，凭证已就绪；或评论含部署语义 | 仓库、Issue 编号、部署上下文 | Issue Agent（部署语义分支） |
