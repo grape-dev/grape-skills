@@ -1,20 +1,31 @@
 ---
 name: blog-publish
-description: "Use when publishing, editing, deleting, or listing blog posts via the Blog System API. Also handles mood publishing, comments, messages, labels, and media uploads."
+description: "Use when publishing, editing, deleting, or listing blog posts via the Blog System API. Also handles mood publishing, comments, messages, labels, and media uploads. Invoked via A2A by the coding Agent after blog content generation."
 author: Hermes Agent
 license: MIT
+version: 2.1.0
 tools:
   - name: curl
     min_version: "7.68.0"
   - name: python3
     min_version: "3.8"
+  - name: grape
+    min_version: "0.3.2"
 requires:
-  - env: BOT_TOKEN
-    description: VCS API token (for PR merge)
+  - env: GRAPE_SERVER_URL
+    description: 平台服务地址（CLI 自动读取）
+  - env: GRAPE_SESSION_TOKEN
+    description: 会话令牌（CLI 自动读取——禁止手动使用）
   - env: REPO_FULL_NAME
-    description: Repository full name (owner/repo)
+    description: 仓库全名（owner/repo——REPO_NAME 派生之源）
+  - env: ACCOUNT
+    description: 仓库属主（--owner）
+  - env: REPO_NAME
+    description: 仓库名（--repo）
   - env: ISSUE_NUMBER
-    description: Issue number
+    description: 关联 Issue 编号（结果汇报落点）
+  - env: PR_NUMBER
+    description: 待合并 PR 编号（A2A context 注入）
 inputSchema:
   type: object
   required:
@@ -22,19 +33,13 @@ inputSchema:
   properties:
     BLOG_HOST:
       type: string
-      description: Blog system host address (IP:PORT or domain)
-    REPO_FULL_NAME:
-      type: string
-      description: Repository full name for PR operations
-    ISSUE_NUMBER:
-      type: integer
-      description: Issue number for context
+      description: 博客系统外部地址（IP:PORT 或域名）——解析顺序：知识基线 blog-config.yaml → 上下文 → 询问
     PR_NUMBER:
       type: integer
-      description: PR number to merge before publishing
+      description: 待合并 PR 编号
     BLOG_OUTPUT_DIR:
       type: string
-      description: Local directory containing blog output files
+      description: 博客产物目录（A2A context 提供——缺省 /root/grape-workspaces/{owner}/{repo}/issues/{issue_number}/coding/blog_output/）
 outputSchema:
   type: object
   required:
@@ -46,10 +51,8 @@ outputSchema:
       type: array
       items:
         type: string
-      description: List of performed actions
     conclusion:
       type: string
-      description: Result summary
     artifacts:
       type: object
       properties:
@@ -61,440 +64,150 @@ outputSchema:
           type: integer
     next_step:
       type: string
-      description: Next step description
     issue_summary:
       type: string
-      description: Issue summary
 metadata:
   hermes:
-    tags: [blog, publishing, api, content]
-    related_skills: []
+    tags: [blog, publishing, api, content, sre]
+    related_skills: [ai-blog-generation, blog-issue]
 ---
 
-# Blog Publish
+# 博客发布（blog-publish v2.1 · grape CLI）
 
-## Overview
+> 把已生成的博客产物发布到**外部博客系统**（独立部署的 FastAPI + MySQL 服务——非平台组件）。发布链路 = 合并 PR → 读取 `blog/` 产物目录 → 上传媒体 → 发布文章 → Issue 评论反馈。触发：A2A context 收到 coding Agent 交办（含 PR 编号 + 博客目录），或用户直接要求发布/编辑/删除文章、发说说/留言/评论、建标签/用户。
 
-Publish blog posts to the Blog System API. FastAPI + MySQL, no authentication required. Supports articles, comments, messages, moods, labels, and users.
+## 一、安全硬约束（必须遵守）
 
-## Configuration
+1. ⚠️ 平台侧操作一律 grape CLI——**禁止** curl 直连平台 API
+2. ✅ 博客系统 = **外部系统**——BLOG_HOST API 直连**合法**（与 grape 平台 API 隔离）——本技能唯一直接调用的外部 API 面（runbook P1-P6）
+3. ⚠️ 写操作（发布/更新/删除/硬删/恢复）执行前**用户确认**（A2A 链路 = 发布动作在 Issue 评论或上下文明示后执行；直接交互 = 逐次确认）
+4. ⚠️ 禁止硬删（`soft=false`）——除非用户逐次显式确认（破坏性不可恢复）
+5. ⚠️ 媒体上传失败不阻塞发布——但必须如实报告「pending upload」清单（不隐藏缺失）
+6. ⚠️ 合并 PR 失败不阻塞发布——跳过合并从本地产物直接发布 + 如实报告（发布链路优先原则）
+7. ⚠️ 发布内容 = 产物目录 HTML——**禁止**二次改写正文（标题/封面提取除外）——内容一致性由上游链路保证
 
-Before using this skill, the target server address must be determined. Replace `{BLOG_HOST}` in all commands below with the actual deployment address in the format `IP:PORT` or domain (e.g., `{BLOG_HOST}`).
+## 二、环境变量表（平台注入 + 外部解析值）
 
-The `{BLOG_HOST}` value is resolved in this priority order:
+| 变量 | 说明 | 状态 |
+|---|---|---|
+| `GRAPE_SERVER_URL` | 平台服务地址（CLI 自动读）| CLI 域 |
+| `GRAPE_SESSION_TOKEN` | 会话令牌（CLI 自动读）| CLI 域 |
+| `REPO_FULL_NAME` | 仓库全名（派生 `REPO_NAME`）| 派生之源 |
+| `ACCOUNT` / `REPO_NAME` | 平台操作实参（--owner/--repo）| 使用 |
+| `ISSUE_NUMBER` | 结果汇报落点 | 使用 |
+| `PR_NUMBER` | 待合并 PR 编号（A2A 注入）| 使用 |
+| `BLOG_HOST` | **外部博客系统地址**（外部解析值——非平台注入）| 使用 |
+| `BLOG_OUTPUT_DIR` | 博客产物目录（缺省约定路径）| 使用 |
 
-1. **Project Knowledge** — check `project-info/member/blog-config.yaml` (or similar config file) for `blog.host` field.
-2. **Current context** — the user provides it or the current conversation context already contains it; use it directly as `{BLOG_HOST}`.
-3. **Workspace files** — search the project's knowledge directory at `/root/grape-workspaces/{owner}/{repo}/project-info/` for a file containing the blog system deployment address.
-4. **Ask user** — if none of the above found, ask the user for the target server address before proceeding.
+> 平台注入变量由服务端在 prompt 内联提供（Agent 可溯源）；`BLOG_HOST` 为**外部值**（解析顺序：知识基线 blog-config.yaml → 上下文 → 工作区 → 询问——见 runbook Step 0）。
 
-## When to Use
+## 三、前置检查门（自愈 → 重试 → STOP）
 
-- User asks to publish / create / post a blog article
-- User asks to update / edit / delete a blog post
-- User asks to list articles, view detail, or check hot articles
-- User asks to publish a mood (说说) or leave a message (留言)
-- User asks to create labels or users for the blog system
+| 检查 | 不通过时 |
+|---|---|
+| CLI 可用（`grape --version` ≥ 0.3.2）| 按 references/grape-cli-installation.md 自愈 |
+| 契约刷新（`grape refresh`——失败重试 ≤2 次后继续）| 重试后继续 |
+| 任务上下文（`grape tasks current`——A2A payload 在这里）| 缺 context 时按 4.2 兜底 |
+| 博客系统可达（`curl {BLOG_HOST}/health`）| 报告用户 + 按 4.5 重试 3 次后停止（STOP——不做后续任何发布操作）|
 
-Don't use for: non-blog content or when the API is not reachable.
+## 四、技能定义与执行
 
-## API Base URL
+### 4.1 定位与职责边界
+- ✅ 发布/编辑/软删/恢复/硬删（硬删需逐次确认）文章；上传媒体；发说说/留言/评论；建标签/用户
+- ✅ 合并 PR（`grape git-repo pulls merge`——A2A 链路第一步）
+- ❌ 生成博客内容（coding 技能职责）；产出 Spec（blog-issue 职责）；不修改博客系统代码
 
+### 4.2 场景路由（入口 → 路径）
+| 场景 | 判定 | 路径 |
+|---|---|---|
+| 发布（A2A 主流程）| context 含 PR 编号 + 博客目录 | P1-P6 + 收尾 |
+| 编辑/删除/恢复 | 用户直接要求或 Issue 明确 | runbook 附录 A |
+| 其他操作（说说/留言/评论/标签/用户）| 用户明确要求 | runbook 附录 B |
+| 无法判定 | 检查 Issue 上下文（spec/评论）→ 仍无 → 询问用户 | — |
+
+### 4.3 处理流程（统一骨架）
 ```
-https://{BLOG_HOST}
+P1 健康检查     → curl {BLOG_HOST}/health（STOP 门——不通不发布）
+P2 获取标签     → curl {BLOG_HOST}/api/lables（无匹配则新建——写操作确认）
+P3 合并 PR      → grape git-repo pulls merge（A2A 链路——失败不阻塞）
+P4 媒体上传     → 遍历产物目录 → POST /api/upload → HTML src/poster 替换为 /uploads/ 路径
+P5 提取元数据   → <h1> 标题 + poster/img 封面
+P6 发布文章     → POST /api/articles（写操作——先确认）→ GET 验证
+收尾           → Issue 评论反馈 + grape tasks complete
 ```
+（详见 runbook——每个 P 有确切命令与判定）
 
-All endpoints below are relative to this base. No auth header needed.
-
-> ⚠️ **HTTPS requirement**: All API requests must use HTTPS. If the blog server does not support HTTPS, the user must explicitly confirm downgrade to HTTP before proceeding.
-
-## Endpoints
-
-> **Read/Write Semantics**: GET operations (read) execute automatically. POST/PUT/DELETE operations (write) require user confirmation before execution.
-
-### Articles (文章)
-
-| Method | Path | Body | Description | Semantics |
-|--------|------|------|-------------|-----------|
-| GET | `/api/articles?page=1&size=10&lid=0&keyword=` | — | List articles (paginated, filter by label/keyword) | Read (auto) |
-| GET | `/api/articles/{id}` | — | Get article detail (increments heat) | Read (auto) |
-| POST | `/api/articles` | `{title, content, uid, lid, img, heat}` | Publish new article | Write (confirm) |
-| PUT | `/api/articles/{id}` | `{title?, content?, lid?, img?, heat?}` | Update article | Write (confirm) |
-| DELETE | `/api/articles/{id}?soft=true` | — | Delete (soft default, soft=false for hard) | Write (confirm) |
-| POST | `/api/articles/{id}/restore` | — | Restore soft-deleted article | Write (confirm) |
-| GET | `/api/articles/heat/top?limit=5` | — | Top hot articles | Read (auto) |
-
-### Labels (标签)
-
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| GET | `/api/lables` | — | List all labels |
-| POST | `/api/lables` | `{lname}` | Create label |
-
-### Comments (评论)
-
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| GET | `/api/comments/{aid}` | — | List comments for article |
-| POST | `/api/comments` | `{uid, aid, content}` | Add comment |
-| DELETE | `/api/comments/{id}` | — | Delete comment (soft) |
-
-### Messages (留言)
-
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| GET | `/api/messages` | — | List messages with replies |
-| POST | `/api/messages` | `{uid, content}` | Post message |
-| POST | `/api/messages/reply` | `{uid, mid, content}` | Reply to message |
-| DELETE | `/api/messages/{id}` | — | Delete message (soft) |
-
-### Moods (说说)
-
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| GET | `/api/moods` | — | List moods |
-| POST | `/api/moods` | `{title, content, src}` | Publish mood |
-| DELETE | `/api/moods/{id}` | — | Delete mood |
-
-### Users (用户)
-
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| GET | `/api/users` | — | List users |
-| POST | `/api/users` | `{uname, phone, pwd, email, img}` | Create user |
-
-### Upload (上传文件)
-
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| POST | `/api/upload` | `multipart/form-data: file=@文件` | Upload image/video, returns `{url: "/uploads/xxx.png"}` |
-
-### Pages (前端页面)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Blog home page (HTML) |
-| GET | `/article/{id}` | Article detail page (HTML) |
-| GET | `/docs` | Swagger API docs |
-| GET | `/health` | Health check |
-
-## Publish an Article
-
-Step-by-step workflow:
-
-### 1. Check API is reachable
-
-```bash
-curl -s https://{BLOG_HOST}/health
+### 4.4 命令标准（子集与坑点）
+**平台命令（grape——必有 tk_ 会话 token）**：
 ```
-Expect: `{"status":"ok","service":"blog-api","version":"1.0.0"}`
-
-### 2. Get available labels
-
-```bash
-curl -s https://{BLOG_HOST}/api/lables
+grape --version / refresh / tasks current        # 就绪与上下文
+grape git-repo pulls merge --owner --repo --number   # 合并 PR（session-only）
+grape git-repo issues comments create --number --json '{"body":"..."}'   # 发布结果反馈
+grape tasks complete --json '{"result_text":..., "actions":[...], ...}'  # 收尾
 ```
-
-### 3. Upload media files to blog server
-
-Media files (images, cover, video) are stored locally in the blog output directory. They must be uploaded to the blog server first, and relative paths in the HTML must be replaced with the upload URLs.
-
-Determine `OUTPUT_DIR` from the A2A context (coding agent handoff provides the product path). If not provided, look in:
-```
-/root/grape-workspaces/{owner}/{repo}/issues/{issue_number}/coding/blog_output/
-```
-
-```python
-import os, json, subprocess, glob, re
-
-BLOG_HOST = "{BLOG_HOST}"  # Resolved from project knowledge or context
-OUTPUT_DIR = "/root/grape-workspaces/..."  # From A2A context
-UPLOAD_URL = f"https://{BLOG_HOST}/api/upload"
-
-# Step 3a: Upload all media files (using requests library instead of subprocess curl)
-import requests
-
-upload_map = {}  # rel_path -> upload_url
-for ext in ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.mp4"]:
-    for fp in glob.glob(os.path.join(OUTPUT_DIR, "**", ext), recursive=True):
-        rel = os.path.relpath(fp, OUTPUT_DIR)
-        print(f"Uploading: {rel}...")
-        with open(fp, "rb") as f:
-            resp = requests.post(UPLOAD_URL, files={"file": f}, timeout=60)
-        d = resp.json()
-        if d.get("code") == 200:
-            upload_map[rel] = d["data"]["url"]
-            print(f"  -> {d['data']['url']}")
-        else:
-            print(f"  FAILED: {resp.text}")
-
-# Step 3b: Replace relative paths in index.html with upload URLs
-html_path = os.path.join(OUTPUT_DIR, "index.html")
-with open(html_path, "r", encoding="utf-8") as f:
-    html = f.read()
-
-for rel_path, upload_url in sorted(upload_map.items(), key=lambda x: -len(x[0])):
-    html = html.replace(f'src="{rel_path}"', f'src="{upload_url}"')
-    html = html.replace(f'poster="{rel_path}"', f'poster="{upload_url}"')
-
-with open(html_path, "w", encoding="utf-8") as f:
-    f.write(html)
-
-print("HTML updated with upload URLs")
-```
-
-**Important**: After this step, all `src="intro.mp4"`, `poster="cover.png"`, `src="images/theme_1.png"` etc. are replaced with `/uploads/xxx.xxx` paths served by the blog server.
-
-### 4. Extract title and cover image URL from the updated HTML
-
-```python
-import re
-with open(os.path.join(OUTPUT_DIR, "index.html"), "r") as f:
-    html = f.read()
-
-# Extract title (<h1>)
-m = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL)
-BLOG_TITLE = m.group(1).strip() if m else "无标题"
-
-# Extract cover image URL (first poster or first img)
-BLOG_IMG = ""
-m = re.search(r'poster="(/uploads/[^"]+)"', html)
-if m:
-    BLOG_IMG = m.group(1)
-else:
-    m = re.search(r'<img[^>]+src="(/uploads/[^"]+)"', html)
-    if m:
-        BLOG_IMG = m.group(1)
-
-print(f"Title: {BLOG_TITLE}")
-print(f"Cover: {BLOG_IMG}")
-```
-
-### 5. Choose label ID
-
-From the label list obtained in step 2, pick the matching label ID for the article topic. Common labels:
-| ID | Name |
-|----|------|
-| 1 | 技术 |
-| 2 | 生活 |
-| 3 | 随笔 |
-| 4 | 教程 |
-
-If the topic is food/美食/product introduction and no matching label exists, create one with `POST /api/lables {"lname": "美食"}`.
-
-### 6. Publish article to blog API
-
-> ⚠️ **Write operation**: Confirm with the user before publishing the article to the blog API.
-
-```python
-import json
-article = {
-    "title": BLOG_TITLE,
-    "content": html,       # Full HTML with uploaded URLs
-    "uid": 1,
-    "lid": LABEL_ID,       # From step 5
-    "img": BLOG_IMG,
-    "heat": 0
-}
-
-with open("/tmp/blog_article.json", "w", encoding="utf-8") as f:
-    json.dump(article, f, ensure_ascii=False)
-```
-
-```bash
-curl -s -X POST https://{BLOG_HOST}/api/articles \
-  -H "Content-Type: application/json" \
-  -d @/tmp/blog_article.json
-```
-Expect: `{"code":200,"message":"文章发布成功","data":{"id":N}}`
-
-### 7. Verify
-
-```bash
-curl -s https://{BLOG_HOST}/api/articles/{id}
-```
-
-### 8. View in browser
-
-```bash
-echo "https://{BLOG_HOST}/article/{id}"
-```
-
-The article page should now load images and video from the blog server's `/uploads/` directory.
-
-### 9. Resource cleanup
-
-After successful publication, clean up temporary files:
-
-```bash
-rm -f /tmp/blog_article.json
-```
-
-> ⚠️ **Cleanup confirmation**: Confirm with the user before deleting temporary files.
-
-### Article Fields
-
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| title | string | Yes | — | Article title |
-| content | string | Yes | — | Article body (plain text) |
-| uid | int | No | 1 | Author user ID |
-| lid | int | No | 1 | Label ID (1=技术, 2=生活, 3=随笔, 4=教程) |
-| img | string | No | null | Cover image path |
-| heat | int | No | 0 | Initial heat value |
-
-## Update an Article
-
-```bash
-curl -s -X PUT https://{BLOG_HOST}/api/articles/{id} \
-  -H "Content-Type: application/json" \
-  -d '{"title": "新标题", "content": "新内容"}'
-```
-
-All fields optional: title, content, lid, img, heat.
-
-## Delete / Restore
-
-```bash
-# Soft delete (default, can restore)
-curl -s -X DELETE https://{BLOG_HOST}/api/articles/{id}
-
-# Hard delete (permanent)
-curl -s -X DELETE "https://{BLOG_HOST}/api/articles/{id}?soft=false"
-
-# Restore soft-deleted article
-curl -s -X POST https://{BLOG_HOST}/api/articles/{id}/restore
-```
-
-## Other Operations
-
-### Publish a Mood (说说)
-```bash
-curl -s -X POST https://{BLOG_HOST}/api/moods -H "Content-Type: application/json" \
-  -d '{"title":"今日心情","content":"今天完成了博客系统","src":"img/mood1.jpg"}'
-```
-
-### Post a Comment
-```bash
-curl -s -X POST https://{BLOG_HOST}/api/comments -H "Content-Type: application/json" \
-  -d '{"uid":1,"aid":1,"content":"很棒的文章！"}'
-```
-
-### Leave a Message (留言)
-```bash
-curl -s -X POST https://{BLOG_HOST}/api/messages -H "Content-Type: application/json" \
-  -d '{"uid":1,"content":"你好，很高兴来到这个博客！"}'
-# Reply: POST /api/messages/reply {"uid":1,"mid":1,"content":"谢谢支持！"}
-```
-
-### Create a Label
-```bash
-curl -s -X POST https://{BLOG_HOST}/api/lables -H "Content-Type: application/json" -d '{"lname":"新标签"}'
-```
-
-### Create a User
-```bash
-curl -s -X POST https://{BLOG_HOST}/api/users -H "Content-Type: application/json" \
-  -d '{"uname":"作者名","phone":"13800000000","pwd":"123456","email":"author@example.com"}'
-```
-
-## Common Pitfalls
-
-1. **API not reachable.** Always check `/health` first. The API port must be open in security group.
-2. **Wrong label ID.** Query `/api/lables` first to get current IDs. New labels can be created via POST.
-3. **Content with special characters.** Use a temp file for long content with quotes/newlines: `curl -d @/tmp/article.json`
-4. **Deleting without confirming.** Soft delete is default and recoverable. Hard delete (soft=false) is permanent — always confirm with user first.
-5. **uid mismatch.** If no blog user account exists, uid defaults to 1 (admin). Create a user first if authorship matters.
-
-## Verification Checklist
-
-### Publish Flow
-- [ ] `GET /health` returns `{"status":"ok"}`
-- [ ] `POST /api/articles` returns `{"code":200,"data":{"id":N}}`
-- [ ] `GET /api/articles/{id}` returns the created article with correct title/content
-- [ ] Article is visible on home page at `https://{BLOG_HOST}/`
-- [ ] Article detail page at `https://{BLOG_HOST}/article/{id}` renders correctly
-
-### E2E Lifecycle (create → query → update → delete)
-- [ ] **Create**: POST article → returns article_id
-- [ ] **Query**: GET /api/articles/{id} → title/content match
-- [ ] **Update**: PUT /api/articles/{id} with new title → GET confirms update
-- [ ] **Delete**: DELETE /api/articles/{id} (soft) → GET returns 404 or deleted flag
-- [ ] **Restore**: POST /api/articles/{id}/restore → GET returns article again
-- [ ] **Hard delete**: DELETE with soft=false (after user confirmation) → permanently removed
-
-## Performance Budget
-
-| Metric | Budget | Notes |
-|--------|--------|-------|
-| Skill load latency | < 2s | SKILL.md ~15KB, no external references |
-| P95 execution latency | < 90s | Health check + label query + media upload + publish + verify |
-| LLM call budget | ≤ 2 | Intent parsing (1) + error diagnosis (1) |
-| Token budget | ≤ 5000 | SKILL.md ~3500 tokens + runtime context ~1500 tokens |
-
-## Version Management Strategy
-
-- Current version: v1.0 (no version field in frontmatter, per v1.0 spec)
-- Changelog maintained in repository CHANGELOG.md
-- Backward compatibility: outputSchema new fields are optional (non-required)
-- Gradual rollout: via GitCode branch management (dev → main), requires linter + tester + auditor before merge
-
-## Resume Mechanism
-
-If the workflow is interrupted, resume from the last completed step:
-
-1. **Check temp file**: `ls /tmp/blog_article.json` — if exists, skip to step 6 (publish)
-2. **Check uploaded media**: Query `GET /api/articles` to see if article was already published
-3. **Check HTML state**: Read index.html — if paths already replaced with `/uploads/`, skip step 3
-4. **Resume from failed step**: Re-run only the failed step, not the entire workflow
-
-## Fallback Strategy
-
-| Failure | Fallback |
-|---------|----------|
-| Blog API unreachable | Report to user, retry 3 times with 5s interval, then stop |
-| Media upload fails | Skip failed file, continue with remaining, mark as "pending upload" |
-| Article publish fails (500) | Check if article already exists by title query, retry once |
-| PR merge fails | Report to user, suggest manual merge, continue with publish from local files |
-
-## Idempotency
-
-| Operation | Strategy |
-|-----------|----------|
-| POST /api/articles | Before publishing, query `GET /api/articles?keyword={title}` to check for duplicates |
-| Media upload | Upload returns unique URL; re-uploading same file creates new URL (acceptable) |
-| PR merge | Check PR state via VCS API before attempting merge |
-| Comment/message | Include unique identifier in content for deduplication |
-
-## Multi-Skill Coordination
-
-This skill is invoked by the coding Agent (via A2A) after blog content generation. It does not directly call other skills.
-
-- **Upstream**: Receives A2A context from coding Agent with PR number and blog output directory
-- **Downstream**: Reports publication result back to the Issue (comment) for review
-- **Conflict resolution**: If multiple publish tasks target the same blog, use article title deduplication
-- **Cross-Skill data**: Returns `article_id` and `article_url` in output JSON for downstream consumption
-
-## Lifecycle Declaration
-
-This skill handles create/update/delete operations for blog articles. Hard delete requires explicit user confirmation. Article restoration is supported via POST /api/articles/{id}/restore.
-
-## Output Format
-
-After task completion, output a structured JSON block:
-
+**外部命令（BLOG_HOST——curl 直连合法）**：`curl -s https://$BLOG_HOST/health|/api/lables|...`（runbook P1-P6/附录全量）
+**坑点**：
+- pulls merge / issues comments create / tasks complete 均 session-only——API key（grape_ 前缀）直调 403——Agent 环境天然有 tk_
+- `grape tasks complete --json` 支持多行（multi-line, no escaping）——长 payload 直接整块写
+- 完整命令面与 ❌ 警示表见 `references/grape-cli-reference.md`（如 `grape api`、`grape git <verb>` 不存在）
+
+### 4.5 故障决策表
+| 故障 | 决策 |
+|---|---|
+| 博客 API 不可达 | 报告用户 + 重试 3 次（间隔 5s）→ 停止 |
+| 媒体上传失败 | 跳过该文件标记「pending upload」，其余继续 |
+| 发布失败（500）| 按标题查重（可能已存在）→ 重试 1 次 |
+| PR 合并失败 | 报告用户 + 建议人工合并 → 继续从本地产物发布（不阻塞）|
+| PR 不存在 / 编号缺失 | 跳过合并步骤——直接从产物目录发布 + Issue 评论说明 |
+
+### 4.6 输出格式（固定产物）
 ```json
 {
-  "actions": ["health_check", "label_query", "media_upload", "article_publish", "verify"],
-  "conclusion": "Article published successfully",
-  "artifacts": {
-    "article_id": 42,
-    "article_url": "https://{BLOG_HOST}/article/42",
-    "media_uploads": 6
-  },
-  "next_step": "Article is live. Report result to Issue comment.",
-  "issue_summary": "Blog article published: title | article_id=42 | url=..."
+  "result_text": "结论：博客发布{成功/失败}（{article_id/article_url/媒体统计}）",
+  "actions": ["health_check", "label_query", "pr_merge", "media_upload", "article_publish", "verify", "issue_report"],
+  "artifacts": {"article_id": N, "article_url": "https://{BLOG_HOST}/article/N", "media_uploads": M},
+  "conclusion": "文章已发布（或：发布失败原因）",
+  "next_step": "a2a 结果已回传 Issue {ISSUE_NUMBER}——等待用户验收或下一个任务",
+  "issue_summary": "博客文章已发布：{标题} | article_id=N | url=..."
 }
 ```
+未输出 JSON = 任务未完成。产物结构约定（与上游 coding 链路一致）：`blog/{topic-slug}/` 下 `index.html` + `images/` + `intro.mp4` 等。
 
-**Not outputting the JSON block means the task is incomplete.**
+### 4.7 写操作协议
+| 动作 | 确认要求 |
+|---|---|
+| POST/PUT/DELETE（发布/更新/软删/恢复/建标签/建用户/说说/留言/评论）| 执行前**用户确认**（A2A 链路 = 上下文明示后执行）|
+| DELETE `soft=false`（硬删）| **逐次显式确认**（不可恢复——硬约束④）|
+| 媒体路径替换（src/poster → /uploads/）| 必做（不做 = 文章内媒体 404——硬约束⑤ pending 如实报）|
+| 标题去重（发前 keyword 查重）| 幂等——重复标题不重复发 |
+
+### 4.8 任务收尾（必做）
+收尾顺序：**先 Issue 评论反馈发布结果 → 再 `grape tasks complete`**（评论确保用户可追溯）：
+```bash
+grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  --json '{"body":"[blog-publish Agent] 博客已发布：{标题} | article_id={n} | {BLOG_HOST}/article/{n}（{媒体统计/pending}）"}' --json-out
+grape tasks complete --json '{
+  "result_text": "结论：博客发布成功（article_id={n} | {BLOG_HOST}/article/{n} | 媒体 {n} 个）",
+  "actions": ["health_check", "label_query", "pr_merge", "media_upload", "article_publish", "verify", "issue_report"],
+  "artifacts": {"article_id": {n}, "article_url": "https://{BLOG_HOST}/article/{n}", "media_uploads": {n}},
+  "conclusion": "文章已发布",
+  "next_step": "结果已回传 Issue {ISSUE_NUMBER}——等待用户验收",
+  "issue_summary": "博客文章已发布：{标题} | article_id={n} | url={BLOG_HOST}/article/{n}"
+}'
+```
+评论前缀固定 `[blog-publish Agent]`（链路角色标识——与 coding / blog-issue 各自前缀区分）。A2A 链路位置：上游 = coding Agent（A2A context：PR_NUMBER + 博客目录）；下游 = Issue 评论反馈（供 blog-issue 收尾复盘）。
+
+## 五、参考文件清单
+
+| 文件 | 用途 |
+|---|---|
+| `references/blog-publish-runbook.md` | **执行主路径**：Step 0 + P1-P6 命令与判定 + 附录 A（编辑/删除/恢复）+ 附录 B（其他操作）+ 错误排查 + 断点续跑 |
+| `references/grape-cli-reference.md` | 本技能平台命令面（3 写 2 读）+ ❌ 警示表（8 条）|
+| `references/grape-cli-installation.md` | CLI 版本要求与安装/自愈 |
+
+## 六、Best Practices（实践积累区）
+
+- **BLOG_HOST 是外部值**：不来自平台注入——按解析顺序（知识基线 → 上下文 → 工作区 → 询问）确定，绝不猜地址；博客系统无鉴权——**不臆造凭据、不把平台 token 发给外部系统**
+- **断点续跑**（沿用旧版 Resume 机制）：`/tmp/blog_article.json` 存在 → 跳 P5 直接 P6；HTML 已替换 `/uploads/` → 跳 P4b；标题查重已有 → 不重复发布
+- **发布链路优先**：合并 PR 失败不阻塞发布（本地产物直接发）——追溯性和上线速度冲突时上线优先，但要如实报告 + 建议人工合并
+- **媒体挂掉是最高频故障**：P4 替换漏项 → 验证环节必须检查 HTML 无相对路径残留（`src="intro.mp4"` 之类一个都不能留）

@@ -1,6 +1,7 @@
 # 评论与标签规范（blog-vod Agent 用）
 
 > 配套 `skills/vod/feedback-loop/blog-vod/SKILL.md`。覆盖：Issue 评论礼仪、评论类型与格式、标签体系与管理规则。
+> 所有 GitCode 操作用 grape CLI 完成（`grape git-repo ...`），禁止 curl 直连平台 API。
 
 ## 一、评论规范
 
@@ -19,23 +20,28 @@
 | 类型 | 适用场景 | 要点 |
 |------|---------|------|
 | 需求澄清追问 | 博客需求信息不足 | 引用用户原文 + 提出 1-3 个具体问题，不一次性抛太多 |
-| 需求确认评论 | 已输出「博客需求清单」待确认 | 说明待执行的写操作清单，请用户回复确认 |
+| 需求清单评论 | 已输出「博客需求清单」 | 按 requirement-elicit-guide §三 JSON 模板组织，未回复维度标注「默认值」 |
 | A2A 交办说明 | 已交办 Issue Agent | 简述已收敛结论与交办结果 |
-| 失败/降级说明 | API 403 / A2A 不可达 | 按安全硬约束说明原因与人工介入路径 |
+| 失败/降级说明 | 命令 403 / A2A 不可达 | 按安全硬约束说明原因与人工介入路径 |
 
-### 3. 评论格式示例
+### 3. 评论命令（grape CLI）
 
 ```bash
-curl -s --max-time 30 -X POST \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"body": "> {用户评论原文}\n\n[blog-vod Agent] {答复/追问正文}"}' \
-  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}/comments"
+# 发评论（长 body 先写文件再 --json @file，防转义）
+cat > /tmp/blog_vod_comment.json << 'EOF'
+{"body": "> {用户评论原文}\n\n[blog-vod Agent] {答复/追问正文}"}
+EOF
+grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/blog_vod_comment.json
 ```
 
 ### 4. 评论幂等
 
-- 发布前先 `GET .../issues/{number}/comments` 查询是否已有同前缀评论，避免重复追问/重复确认。
+- 发布前先查是否已有同前缀评论，避免重复追问/重复确认：
+
+```bash
+grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+```
+
 - 内容唯一性检查以「评论前缀 + 本技能标记」为准，防止 Issue 重新打开触发重复评论。
 
 ## 二、标签规范
@@ -60,28 +66,25 @@ curl -s --max-time 30 -X POST \
 
 ### 3. 管理规则
 
-1. 创建标签前先 `GET /repos/{owner}/{repo}/labels` 查询，已存在则跳过创建（幂等）。
-2. `PATCH /issues/{number}` 的 `labels` 字段为整体替换语义，更新时需携带全部既有标签，避免只传新标签导致旧标签丢失。
+1. 创建标签前先 `labels list` 查询，已存在则跳过创建（幂等）。
+2. `issues update` 的 `labels` 字段为整体替换语义，更新时需携带全部既有标签，避免只传新标签导致旧标签丢失。
 3. 每个 Issue 至少有 1 个 type 标签；类型存疑时优先 `type:feature`（博客需求为内容生成需求）。
 4. 冲突标签（同一类别存在多个取值）需清理为唯一取值。
 5. 优先复用已有标签，仅当确实缺失时新建。
 
-### 4. 标签操作示例
+### 4. 标签操作（grape CLI）
 
 ```bash
-# 创建标签（form-encoded，不接受 JSON body）
-curl -s --max-time 30 -X POST \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "name=blog-vod&color=#f9d0c4" \
-  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/labels"
+# 查重（幂等——已存在则跳过创建）
+grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
 
-# 给 Issue 添加标签（整体替换语义，携带既有标签）
-curl -s --max-time 30 -X PATCH \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "labels=blog-vod,type:feature" \
-  "$VCS_API_BASE/repos/${REPO_FULL_NAME}/issues/${ISSUE_NUMBER}"
+# 创建缺失标签
+grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"blog-vod","color":"#f9d0c4"}'
+grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}'
+
+# 给 Issue 打标（整体替换语义——携带既有标签）
+grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  --json '{"labels":"{既有标签列表,}blog-vod,type:feature"}'
 ```
 
-> 标签操作统一通过 VCS API，使用 `$BOT_TOKEN` 认证；A2A 等 Grape 接口使用 `$GRAPE_SESSION_TOKEN`，两者不混用。
+> 标签操作统一通过 grape CLI（grape git-repo labels / issues update），平台 token 由 CLI 自动读取（$GRAPE_SESSION_TOKEN），禁止 curl 直连。
