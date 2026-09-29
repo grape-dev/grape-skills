@@ -14,9 +14,9 @@ tools:
 
 ## 一、安全硬约束（必须遵守）
 
-1. **令牌获取方式（凭据走平台通道）**：平台 token（CLAWHUB_TOKEN / GITHUB_TOKEN / GITCODE_TOKEN）仅从**场景 custom_fields** 获取——`GRAPE_CF_MAP` 按 key 动态取值（平台注入通道）。⚠️ 服务端不向 `.project-info/` 物化凭据（member 凭据文件被显式过滤）——**读取 secrets 字段是空转路径，已废弃**；配置（GITHUB/GITCODE_PUBLISH_REPO / CLAWHUB_OWNER_HANDLE）从 `.project-info/` config（member 文档）解析。⚠️ sync_skill_platform.sh 脚本自动完成 GRAPE_CF_MAP 解析，agent 无需手动 export（export 不跨 shell 生效）。
-2. **禁止直连业务数据库**（repo_platform_tokens 等）、读取 Grape 运行目录（data/、configs/、sessions.db）或日志寻找 token；允许的 token 获取仅限：`GRAPE_CF_MAP` 映射的凭据变量（custom_fields）。
-3. **严禁遍历系统目录考古**（/usr/local/lib/hermes-agent、/opt/grape 等）——只读 `GRAPE_CF_*` 映射凭据或项目知识 `.project-info/` 非敏感配置（member 文档；凭据类文件平台不物化）。
+1. **令牌获取（凭据走平台通道，分两类）**：**GitCode 发布** → 运行时 **GIT_ASKPASS 自动认证**（任务进程 env 已设 GIT_ASKPASS——平台生成的 askpass 脚本内部 echo BOT_GITCODE_TOKEN）——git clone/push 自动通过，**技能不接触 token 值**（对齐平台 token 停注入 → CLI/git 内化方向，无需用户配置）。**外部平台发布**（GitHub / ClawHub）→ 在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 `name=GITHUB_TOKEN` / `name=CLAWHUB_TOKEN`（name 严格用约定名）→ 平台**按 name 直接注入同名环境变量**（GitHub 发布另有平台 `BOT_GITHUB_TOKEN` 兜底——GitHub 托管仓库任务自动注入）。⚠️ 服务端不向 `.project-info/` 物化凭据（member 凭据文件被显式过滤）——**读取 secrets 字段是空转路径，已废弃**；配置（GITHUB/GITCODE_PUBLISH_REPO / CLAWHUB_OWNER_HANDLE）从 `.project-info/` config（member 文档）解析。⚠️ sync_skill_platform.sh 直接读取同名环境变量/askpass，agent 无需手动 export（export 不跨 shell 生效）。
+2. **禁止直连业务数据库**（repo_platform_tokens 等）、读取 Grape 运行目录（data/、configs/、sessions.db）或日志寻找 token；允许的 token 获取仅限：GitCode = 运行时 GIT_ASKPASS（不接触值）；GitHub/ClawHub = custom_fields 按 name 直注的同名环境变量（GITHUB_TOKEN / CLAWHUB_TOKEN）。
+3. **严禁遍历系统目录考古**（/usr/local/lib/hermes-agent、/opt/grape 等）——只读 custom_fields 直注的同名凭据变量或项目知识 `.project-info/` 非敏感配置（member 文档；凭据类文件平台不物化）。
 4. **401/403 严格区分**：401 = 令牌无效/过期 → 报告「{平台} 令牌无效或过期，请到设置页更新」→ 跳过该平台；403 = 令牌无权限 → 报告「{平台} 令牌对目标无权限，请检查 token 权限或目标归属」→ 跳过该平台；两者都**立即停止该平台任务，不重试、不用其他 token 绕行**。
 5. **token 绝不落盘**：不写入任何文件、日志、评论、脚本（项目知识库 JSON 由上层业务维护，本技能只读不写）。
 6. **所有 curl / git 调用设 30s 超时**（curl `--max-time 30`；git 用 `timeout 30`）——超时判定该平台任务失败，不 hang。
@@ -43,25 +43,18 @@ tools:
 | `ACCOUNT` / `REPO_NAME` | 派生（`${REPO_FULL_NAME%/*}` / `${REPO_FULL_NAME#*/}`）| 评论 --owner/--repo 参数 | grape 平台 |
 | `ISSUE_NUMBER` | 系统注入 | Issue 编号 | grape 平台 |
 | `PR_NUMBER` | 系统注入（A2A 时）| PR 编号追溯 | 有 PR 时 |
-| `CLAWHUB_TOKEN` | 场景 custom_fields → `GRAPE_CF_MAP` 按 key（**凭据走平台通道**）| ClawHub API Bearer token | 外部 ClawHub |
-| `GITHUB_TOKEN` | 场景 custom_fields → `GRAPE_CF_MAP` 按 key（**凭据走平台通道**）| GitHub PAT（x-access-token 格式）| 外部 GitHub |
-| `GITCODE_TOKEN` | 场景 custom_fields → `GRAPE_CF_MAP` 按 key（**凭据走平台通道**）| GitCode 目标仓库 push token（oauth2 格式）| 外部 GitCode |
+| `GITHUB_TOKEN` | 场景高级选项 custom_fields 配置 name=GITHUB_TOKEN（平台按 name 直注同名 env）；GitHub 托管任务由平台 `BOT_GITHUB_TOKEN` 自动兜底 | GitHub PAT（x-access-token 格式）| 外部 GitHub |
+| `CLAWHUB_TOKEN` | 场景高级选项 custom_fields 配置 name=CLAWHUB_TOKEN（平台按 name 直注同名 env）| ClawHub API Bearer token | 外部 ClawHub |
 | `CLAWHUB_OWNER_HANDLE` | 项目知识 `.project-info/` config（member 文档）→ 用户指令 | ClawHub 组织 handle（可选，空=个人发布）| 外部 ClawHub |
 | `GITHUB_PUBLISH_REPO` | 项目知识 `.project-info/` config（member 文档）→ 用户指令 | GitHub 目标仓库 namespace/repo | 外部 GitHub |
 | `GITCODE_PUBLISH_REPO` | 项目知识 `.project-info/` config（member 文档）→ 用户指令 | GitCode 目标仓库 namespace/repo | 外部 GitCode |
 
 敏感变量（token 类）**绝不 printenv、不落盘**。
 
-> **平台 token 取值（GRAPE_CF_* 通道——凭据走平台通道）**：场景 custom_fields 配置 `CLAWHUB_TOKEN` / `GITHUB_TOKEN` / `GITCODE_TOKEN` key → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`。技能不硬编码序号，按 key 动态取值：
+> **平台 token 取值（分两类通道）**：**GitCode 发布**走运行时 GIT_ASKPASS（技能 0 接触，无需取值）；**GitHub/ClawHub 发布**读同名环境变量（custom_fields 按 name 直注；GITHUB 另有平台 `BOT_GITHUB_TOKEN` 兜底）：
 
 ```bash
-eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
-m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
-for var, key in m.items():
-    v = os.environ.get(var, "")
-    print("export %s=%r" % (key, v))
-')"
-CLAWHUB_TOKEN="${CLAWHUB_TOKEN:-}"; GITHUB_TOKEN="${GITHUB_TOKEN:-}"; GITCODE_TOKEN="${GITCODE_TOKEN:-}"
+GITHUB_TOKEN="${GITHUB_TOKEN:-${BOT_GITHUB_TOKEN:-}}"; CLAWHUB_TOKEN="${CLAWHUB_TOKEN:-}"
 ```
 （凭据值只进 env 不进 prompt——不回显到日志/评论）
 
@@ -73,7 +66,7 @@ CLAWHUB_TOKEN="${CLAWHUB_TOKEN:-}"; GITHUB_TOKEN="${GITHUB_TOKEN:-}"; GITCODE_TO
 | 契约刷新 | `grape refresh` | 成功 | 重试 ≤2 次；仍失败 → 继续（回退内置快照）|
 | 执行器脚本存在 | `ls scripts/sync_skill_platform.sh` | 文件存在且有执行权限 | 缺失 → STOP（GitHub/GitCode 平台无法执行——报告配置问题）|
 | 入参齐全 | A2A payload（action/skill_name/issue_number/publish 还需 pr_number+skill_dir）| 必填项全有 | 缺失 → 终止任务，Issue 评论返回参数缺失（4.2 路由）|
-| 目标平台令牌 | `GRAPE_CF_MAP` 映射（custom_fields）| 至少一个有值 | 全缺或 401/403 → 按硬约束①/④ 跳过该平台（不中断其他平台）|
+| 目标平台令牌 | GitCode=运行时 askpass 自动；GitHub/ClawHub=custom_fields 按 name 直注同名 env（GITHUB_TOKEN/CLAWHUB_TOKEN；GITHUB 另有 BOT 兜底）| 外部平台至少一个有值（GitCode 恒可用）| 外部平台全缺或 401/403 → 按硬约束①/④ 跳过该平台（不中断其他平台）|
 
 ## 四、技能定义与执行
 
@@ -86,7 +79,7 @@ CLAWHUB_TOKEN="${CLAWHUB_TOKEN:-}"; GITHUB_TOKEN="${GITHUB_TOKEN:-}"; GITCODE_TO
 | 行为 | 态度 |
 |------|------|
 | 幂等探测 → bump 重试（≤3 次）→ 多平台发布/下架 → 校验 | ✅ **必须做** |
-| 令牌从 `GRAPE_CF_MAP` 映射读取（custom_fields）；项目知识仅读非敏感 config | ✅ **必须做** |
+| 令牌读取：同名 env 直读（custom_fields 按 name 直注）；项目知识仅读非敏感 config | ✅ **必须做** |
 | 发布/下架完成后必须发 Issue 评论告知 | ✅ **必须做，不可跳过**（事件未完成处理）|
 | 一个平台失败不中断其他平台 | ✅ **必须做** |
 | 跳过平台时说明**真实原因**（令牌缺失/403 无权限/仓库 404/push 失败）| ✅ **必须做（不得用「未配置」兜底）** |
@@ -124,7 +117,7 @@ CLAWHUB_TOKEN="${CLAWHUB_TOKEN:-}"; GITHUB_TOKEN="${GITHUB_TOKEN:-}"; GITCODE_TO
 
 1. **敏感文件扫描（发布前必执行）**——扫描 skill 目录，发现以下文件直接终止该平台发布并 Issue 评论告警：`.env` / `.env.*`；`id_rsa` / `id_ed25519` / `*.pem` / `*.p12` / `*.keystore`；文件名含 key/secret 但实际非密钥（如 keyboard-config.json）→ grep 文件内容检测 AK/SK/token 模式，命中才拦截。
 2. **定位 skill + 读 frontmatter**：仓库内 `skills/{name}/` 或根目录 `{name}/`（含 SKILL.md）；version 取 SKILL.md frontmatter（默认 0.1.0）；slug = name 转小写连字符；**文件指纹 SHA-256**：skill 目录全部文件**按文件路径字典序排序**后读取拼接，计算哈希（排除 `.git/`、`__pycache__/`、`*.pyc`——包含会导致指纹不一致）。
-3. **读取各平台令牌**（`GRAPE_CF_MAP` 按 key 映射——custom_fields 配置）：映射缺失 → 报告「未配置 {平台} 令牌，请在场景 custom_fields 配置对应 key 后重试」→ 跳过该平台；401/403 → 按硬约束④区分报告 → 跳过（不中断其他平台）。
+3. **读取各平台令牌**（分两类）：**GitCode** → 无需读取（GIT_ASKPASS 运行时自动）；**GitHub/ClawHub** → 同名 env 直读（custom_fields 按 name 直注；GITHUB 用 `${GITHUB_TOKEN:-${BOT_GITHUB_TOKEN:-}}` 兜底）：缺失 → 报告「未配置 {平台} 令牌，请在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name={平台}_TOKEN、value=<token> 后重试」→ 跳过该平台；401/403 → 按硬约束④区分报告 → 跳过（不中断其他平台）。
 4. **幂等探测**：
    - 计算 skill 文件指纹 SHA-256（字典序排序拼接）
    - ClawHub: `GET /api/v1/skills/{slug}`（组织配置时带 `?ownerHandle=`）——200（skill 存在）→ 比对版本/指纹——内容未变 → 跳过（报告「已是最新，无需发布」）——变了 → bump 后发布；404（不存在）→ 直接发布

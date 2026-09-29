@@ -23,8 +23,9 @@
 #   --version     版本号（publish 用于 commit message，unpublish 不需要）
 #   --issue-num   Issue 编号（unpublish 用于 commit message，可选）
 #
-# 环境变量（已由系统注入）：
-#   GITCODE_TOKEN / GITHUB_TOKEN            目标仓库 push 鉴权
+# 环境变量（已由系统注入 / 运行时提供）：
+#   GitCode 发布认证 → 运行时 GIT_ASKPASS（平台 askpass 内部 echo BOT_GITCODE_TOKEN——脚本无需 token）
+#   GitHub 发布鉴权 → GITHUB_TOKEN（用户高级选项配置）或 BOT_GITHUB_TOKEN（GitHub 托管任务平台兜底）
 #   GITCODE_PUBLISH_REPO / GITHUB_PUBLISH_REPO  目标仓库 namespace/repo
 #
 # 退出码：0=成功；1=参数/环境错误；2=git 操作失败
@@ -87,19 +88,13 @@ if [[ "$ACTION" == "publish" ]]; then
 fi
 
 # ---- 凭据与配置获取 ------------------------------------------------------------
-# 凭据（平台 token）走平台通道：场景 custom_fields → GRAPE_CF_MAP 按 key 动态取值（skill-publish SKILL.md 硬约束①）
+# 凭据获取分两类通道（skill-publish SKILL.md 硬约束①）：
+#   · GitCode 发布：运行时 GIT_ASKPASS 自动认证（askpass 内部 echo BOT_GITCODE_TOKEN——技能 0 接触）
+#   · GitHub 发布：${GITHUB_TOKEN:-${BOT_GITHUB_TOKEN:-}}——用户高级选项配置 name=GITHUB_TOKEN 优先，
+#     GitHub 托管任务由平台 BOT_GITHUB_TOKEN 兜底
+# 此处仅做空值兜底声明（不 export 不覆盖——平台已注入）：
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 # 配置（GITHUB/GITCODE_PUBLISH_REPO）从项目知识加载（.project-info/ 下非凭据 member 文档——config 字段）
-if [[ -n "${GRAPE_CF_MAP:-}" ]]; then
-  while IFS='=' read -r key val; do
-    [[ -n "$key" && -n "$val" ]] && export "$key=$val"
-  done < <(python3 -c "
-import json, os
-m = json.loads(os.environ.get('GRAPE_CF_MAP', '{}'))
-for var, key in m.items():
-    v = os.environ.get(var, '')
-    if v: print(f'{key}={v}')
-" 2>/dev/null)
-fi
 _need_load=0
 if [[ "$PLATFORM" == "gitcode" ]]; then
   [[ -z "${GITCODE_PUBLISH_REPO:-}" ]] && _need_load=1
@@ -122,15 +117,16 @@ fi
 
 # ---- 解析环境变量 -----------------------------------------------------------
 if [[ "$PLATFORM" == "gitcode" ]]; then
-  TOKEN="${GITCODE_TOKEN:-}"
   PUBLISH_REPO="${GITCODE_PUBLISH_REPO:-}"
+  # GitCode 发布认证走运行时 GIT_ASKPASS（平台生成的 askpass 脚本内部 echo BOT_GITCODE_TOKEN——
+  # 技能/脚本 0 接触 token 值，对齐 BOT_* 停注入 → CLI/git 内化方向）——无需 token 变量
 else
-  TOKEN="${GITHUB_TOKEN:-}"
+  TOKEN="${GITHUB_TOKEN:-${BOT_GITHUB_TOKEN:-}}"   # 用户高级选项配置优先；GitHub 仓库任务的平台 BOT 兜底
   PUBLISH_REPO="${GITHUB_PUBLISH_REPO:-}"
 fi
 
-if [[ -z "$TOKEN" ]]; then
-  echo "[sync] ERROR: ${PLATFORM^^}_TOKEN 未设置" >&2; exit 1
+if [[ "$PLATFORM" != "gitcode" && -z "$TOKEN" ]]; then
+  echo "[sync] ERROR: GITHUB_TOKEN 未设置（GitHub 发布需在场景高级选项配置 name=GITHUB_TOKEN，或任务仓库为 GitHub 托管由平台 BOT_GITHUB_TOKEN 兜底）" >&2; exit 1
 fi
 if [[ -z "$PUBLISH_REPO" ]]; then
   echo "[sync] ERROR: ${PLATFORM^^}_PUBLISH_REPO 未设置" >&2; exit 1
@@ -139,10 +135,11 @@ fi
 OWNER="${PUBLISH_REPO%%/*}"
 REPO="${PUBLISH_REPO#*/}"
 
-# 构建 clone URL（HTTPS + token 鉴权，不依赖 SSH key）
-# GitCode 私有仓库必须用 oauth2:{token} 格式；GitHub 用 x-access-token:{token}
+# 构建 clone URL（HTTPS 鉴权，不依赖 SSH key）
+# GitCode：URL 不带 token——认证由运行时 GIT_ASKPASS 完成（内化，技能不接触值）
+# GitHub：x-access-token:{TOKEN}（用户配置 GITHUB_TOKEN 或平台 BOT_GITHUB_TOKEN）
 if [[ "$PLATFORM" == "gitcode" ]]; then
-  CLONE_URL="https://oauth2:${TOKEN}@gitcode.com/${OWNER}/${REPO}.git"
+  CLONE_URL="https://gitcode.com/${OWNER}/${REPO}.git"
 else
   CLONE_URL="https://x-access-token:${TOKEN}@github.com/${OWNER}/${REPO}.git"
 fi

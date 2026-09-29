@@ -62,15 +62,8 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 ```bash
 # 查看仓库结构（IaC 目录识别——terraform modules / pulumi stacks / cloudformation）：
 grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
-# 华为云凭据取值（场景 custom_fields → GRAPE_CF_MAP 按 key）：
-#   eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
-#   m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
-#   for var, key in m.items():
-#       v = os.environ.get(var, "")
-#       print("export %s=%r" % (key, v))
-#   
-#   ')"
-#   HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+# 华为云凭据取值（两个入口：①场景高级选项 name=HUAWEI_AK/HUAWEI_SK 按 name 直注；②通用设置注入 HUAWEICLOUD_SDK_AK/SK 自动兜底）：
+#   HUAWEI_AK="${HUAWEI_AK:-${HUAWEICLOUD_SDK_AK:-}}"; HUAWEI_SK="${HUAWEI_SK:-${HUAWEICLOUD_SDK_SK:-}}"
 # 华为云资源现状查询（仅 HUAWEI_AK/SK 有值时——用 hcloud 查现有 VPC/ECS/RDS，避免 CIDR 冲突/重复创建/规格建议。命令族同 iac-coding A3/SRE A2）：
 #   hcloud VPC ListVpcs 2>&1 | grep -i "名称" || echo 无同名
 #   hcloud ECS ListServersDetails --limit 20 2>&1 | head -20

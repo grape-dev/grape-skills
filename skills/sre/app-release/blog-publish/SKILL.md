@@ -108,7 +108,7 @@ metadata:
 | CLI 可用（`grape --version` ≥ 0.3.2）| 按 references/grape-cli-installation.md 自愈 |
 | 契约刷新（`grape refresh`——失败重试 ≤2 次后继续）| 重试后继续 |
 | 任务上下文（`grape tasks current`——A2A payload 在这里）| 缺 context 时按 4.2 兜底 |
-| 博客系统可达（`curl {BLOG_HOST}/health`）| 报告用户 + 按 4.5 重试 3 次后停止（STOP——不做后续任何发布操作）|
+| 博客系统可达（`curl {BLOG_HOST}/health`——BLOG_HOST 未提供或不可达）| 报告用户 + 重试 3 次（间隔 5s）→ 仍不可用 → **P3 内容 PR 合并照常**（`grape git-repo pulls merge`，不依赖 BLOG_HOST）→ 博客 API 发布（P2/P4-P6）跳过 + 如实报告「博客 API 未发布：BLOG_HOST 未提供/不可达」——不假装成功 |
 
 ## 四、技能定义与执行
 
@@ -127,7 +127,7 @@ metadata:
 
 ### 4.3 处理流程（统一骨架）
 ```
-P1 健康检查     → curl {BLOG_HOST}/health（STOP 门——不通不发布）
+P1 健康检查     → curl {BLOG_HOST}/health（不可达/未提供 → 不 STOP 全链：P3 合并照常，博客 API 发布降级如实报告）
 P2 获取标签     → curl {BLOG_HOST}/api/lables（无匹配则新建——写操作确认）
 P3 合并 PR      → grape git-repo pulls merge（A2A 链路——失败不阻塞）
 P4 媒体上传     → 遍历产物目录 → POST /api/upload → HTML src/poster 替换为 /uploads/ 路径
@@ -154,7 +154,7 @@ grape tasks complete --json '{"result_text":..., "actions":[...], ...}'  # 收�
 ### 4.5 故障决策表
 | 故障 | 决策 |
 |---|---|
-| 博客 API 不可达 | 报告用户 + 重试 3 次（间隔 5s）→ 停止 |
+| BLOG_HOST 未提供 / 博客 API 不可达 | 报告用户 + 重试 3 次（间隔 5s）→ 仍不可用 → **P3 内容 PR 合并照常**（入库主线不丢）+ 博客 API 发布跳过（P2/P4-P6）+ 评论/result_text 如实注明「博客 API 未发布：BLOG_HOST 未提供/不可达」——不假装成功 |
 | 媒体上传失败 | 跳过该文件标记「pending upload」，其余继续 |
 | 发布失败（500）| 按标题查重（可能已存在）→ 重试 1 次 |
 | PR 合并失败 | 报告用户 + 建议人工合并 → 继续从本地产物发布（不阻塞）|

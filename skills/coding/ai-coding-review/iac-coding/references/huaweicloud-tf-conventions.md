@@ -26,10 +26,10 @@ repo/
 
 ### AK/SK 来源
 
-华为云 AK/SK 从场景 custom_fields 获取（GRAPE_CF_MAP 映射）（与 SRE Agent 使用同一组凭证）。场景 custom_fields 配置的 key 是（经 GRAPE_CF_MAP 映射） `HUAWEI_AK`/`HUAWEI_SK`，必须映射为 Terraform 期望的 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。Coding 执行 `terraform plan` 时需要 AK/SK 调用 provider API 验证资源规格，但**仅用于 plan（只读），不执行 apply/destroy**。
+华为云 AK/SK 由用户在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK/name=HUAWEI_SK 配置（平台按 name 直注同名环境变量；通用设置 HUAWEICLOUD_SDK_AK/SK 旧名兜底，与 SRE Agent 使用同一组凭证）。配置的变量名是 `HUAWEI_AK`/`HUAWEI_SK`，必须映射为 Terraform 期望的 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。Coding 执行 `terraform plan` 时需要 AK/SK 调用 provider API 验证资源规格，但**仅用于 plan（只读），不执行 apply/destroy**。
 
 ```bash
-# 场景 custom_fields 配置的 key（经 GRAPE_CF_MAP 映射） → Terraform 期望的变量名映射
+# 场景配置的 HUAWEI_AK/HUAWEI_SK → Terraform 期望的变量名映射
 export HW_ACCESS_KEY="${HUAWEI_AK}"
 export HW_SECRET_KEY="${HUAWEI_SK}"
 export HW_REGION="cn-north-4"
@@ -163,7 +163,7 @@ obsutil 使用 `~/.obsutilconfig` 中的凭证，与环境变量 `HW_ACCESS_KEY`
 
 ### 场景 custom_fields 凭据 key映射
 
-场景 custom_fields 配置的是（经 GRAPE_CF_MAP 映射） `HUAWEI_AK`/`HUAWEI_SK`，Terraform 期望的是 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。编码时生成的部署脚本/Makefile 中应包含变量映射：
+场景配置的 `HUAWEI_AK`/`HUAWEI_SK`，Terraform 期望的是 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。编码时生成的部署脚本/Makefile 中应包含变量映射：
 
 ```bash
 export HW_ACCESS_KEY="${HUAWEI_AK}"

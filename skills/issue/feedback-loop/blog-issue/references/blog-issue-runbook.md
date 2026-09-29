@@ -75,7 +75,8 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 ```bash
 # BLOG_HOST 解析优先级：① 知识基线 project-info/member/blog-config.yaml 的 blog.host
 #   ② VOD A2A context 提及的博客地址 ③ Issue 正文/评论提及的地址
-#   ④ 都没有 → STOP，评论询问用户（不猜不编）
+#   ④ 都没有 → 评论询问用户（不猜不编）+ 流程继续——Spec 标注「发布目标待用户提供」，
+#      A2A coding 照常交办（sre 发布前再落实 BLOG_HOST——内容生成与 PR 入库不依赖它）
 # 博客系统健康与接口探测（curl 仅限 BLOG_HOST——外部交付系统，非平台 API）：
 curl -s --max-time 10 "https://$BLOG_HOST/health"
 # 期望 {"status":"ok","service":"blog-api",...}；不可达 → 评论说明 + Spec 标注「发布目标待验证」（不阻塞内容生成交办——sre 发布前再验）
@@ -224,7 +225,7 @@ grape tasks complete --json '{
 | `pulls list` / `issues list` 返回空 | 属正常（无 PR/无 Issue）——按「无历史」分支处理 |
 | A2A 非 2xx / 超时 | 重试 ≤3 次 → 仍失败：评论说明「A2A 服务不可达，待恢复后重试」+ next_step 人工介入 |
 | notify 返回 `{ok:false}` | 责任人未注册平台——评论说明即可，继续收尾不阻塞 |
-| BLOG_HOST 解析不到 | 博客链路 STOP——评论询问用户（不猜不编）|
+| BLOG_HOST 解析不到 | 评论询问用户（不猜不编）+ **流程继续**——Spec 标注「发布目标待用户提供」，A2A coding 照常交办（sre 发布前再落实）|
 | 博客系统 /health 不可达 | 评论说明 + Spec 标注「发布目标待验证」——内容生成仍交办（不阻塞），sre 发布前再验 |
 | AI 模型配置缺失 | Spec 标注「模型配置待 Coding Agent 验证」——不阻塞不借用 |
 | 401 凭据失效 | 说明「凭据已失效」即可，不换 token（安全硬约束⑥）|
