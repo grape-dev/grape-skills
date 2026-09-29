@@ -112,7 +112,7 @@ rest-api-skill-creator 生成的 REST API skill 除满足上述通用规范外�
 | Common Pitfalls | 至少 5 条常见陷阱 + 解决方案 |
 | 字段说明 | 字段 / 类型 / 必填 / 默认值 / 说明 |
 
-base_url 解析优先级（Configuration 段落）：项目知识（.project-info/ 下 JSON 配置文件）> 当前上下文（A2A context / 用户提供）> 环境变量 {PREFIX}_BASE_URL > 交互输入
+base_url 解析优先级（Configuration 段落）：项目知识（.project-info/ 下 JSON 配置文件）> 环境变量 {PREFIX}_BASE_URL > 当前上下文（A2A context / 用户提供）> 交互输入
 
 ### 步骤 / Steps
 
@@ -158,7 +158,7 @@ rest-api-skill-creator 通过 grape A2A 链路触发，生成的 skill 默认为
 | Configuration | 评论规范后 | 是 | base_url 解析 4 级优先级 + 配置指导（环境变量方式 + 项目知识 JSON 方式 + 示例） |
 | 输出规范（Issue 评论格式） | 输出规范段落内 | 是 | 成功/失败两种 Issue 评论 body 格式模板（操作结果表格 + 错误分析） |
 | 分析结论示例 | 参考文档后 | 是 | 成功/失败两种场景的分析结论输出参考 |
-| 任务结束 | 分析结论示例后 | 是 | JSON 块（actions/conclusion/artifacts/next_step/issue_summary） |
+| 任务结束 | 分析结论示例后 | 是 | 统一收尾协议（先 grape tasks complete 再输出 JSON 块 actions/conclusion/artifacts/next_step/issue_summary） |
 
 ### 安全硬约束内容
 
@@ -181,6 +181,16 @@ rest-api-skill-creator 通过 grape A2A 链路触发，生成的 skill 默认为
 - 引用用户原文：`> {用户评论}\n\n[$AGENT_NAME] {回复}`
 
 ### 任务结束内容
+
+**统一收尾协议（每个任务都必须执行，两件事都要做）：**
+
+1. **先调 `grape tasks complete` 关闭当前任务**（任务中心闭环）：
+
+```bash
+grape tasks complete --json '{"result_text": "处理结论", "actions": ["做了什么"], "conclusion": "处理结论", "artifacts": ["产生的产物"], "next_step": "下一步建议"}'
+```
+
+2. **再在最终答复末尾输出结构化 JSON 块**（平台读取）：
 
 ```json
 {

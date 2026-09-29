@@ -54,13 +54,10 @@
 ## 创建引导 Issue 的 API 调用
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "[ACTION] 请配置仓库模块负责人",
-    "body": "上述引导模板的完整内容"
-  }' \
-  $VCS_API_BASE/repos/{owner}/{repo}/issues
+grape git-repo issues create --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --json '{
+  "title": "[ACTION] 请配置仓库模块负责人",
+  "body": "上述引导模板的完整内容"
+}'
 ```
 
 ## 用户回复后的处理
@@ -87,23 +84,11 @@ curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
 ### A2A 调用
 
 ```bash
-curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "coding",
-    "payload": {
-      "repository": "'"$REPO_FULL_NAME"'",
-      "account": "'"$ACCOUNT"'",
-      "issue_number": "'"$ISSUE_NUMBER"'",
-      "pr_number": "'"$PR_NUMBER"'",
-      "context": "用户填写的模块责任人信息（见上方）"
-    }
-  }'
+grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$REPO_FULL_NAME"'","account":"'"$ACCOUNT"'","issue_number":'"$ISSUE_NUMBER"',"pr_number":'"$PR_NUMBER"',"context":"用户填写的模块责任人信息（见上方）"}}'
 ```
 
 ⚠️ **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（当前 Issue 的真实编号）；**无法确定 issue_number 就不要调用 A2A**。`pr_number` 有则填（PR 编号）、无则不填，严禁将 PR 编号填入 issue_number。
 
 ### 通知责任人（必做）
 
-责任人确定后调用 `POST /api/tasks/notify` 创建任务（详见 SKILL.md「任务通知硬规则」）。
+责任人确定后调用 `grape tasks notify` 创建任务（详见 SKILL.md 硬约束⑧——任务通知硬规则）。

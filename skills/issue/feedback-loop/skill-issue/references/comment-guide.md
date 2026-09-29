@@ -28,23 +28,20 @@
 | 用户补充信息后重新分析 | 重新执行深度可开发性分析，根据新评级执行对应动作 |
 | 用户对 Spec 提出修改意见 | 更新 Spec 版本，重新发布，A2A 通知 Coding Agent |
 | 用户确认 Spec 可执行 | A2A 通知 Coding Agent 开始开发 |
-| issue_opened 新 Issue | 告知对 Issue 的理解总结用于对齐双方认知，同时说明处理结果（评级、标签、分配情况）；如有疑问或信息缺失，继续追问 |
+| 评论事件新交互（A2A 交办/issue_updated——issue_opened 已由 VOD 接管，见 SKILL 4.2）| 告知对 Issue 的理解总结用于对齐双方认知，同时说明处理结果（评级、标签、分配情况）；如有疑问或信息缺失，继续追问 |
 | 用户 @提及机器人 | 分析评论并回复 |
-| 评论补充了信息（原为 need-info） | 重新分类，PATCH 更新 labels，再回复 |
+| 评论补充了信息（原为 need-info） | 重新分类，`issues update` 更新 labels，再回复 |
 | 评论请求关闭 Issue | 验证后回复建议 |
 | 评论讨论方案设计 | 参与讨论给出建议 |
 | 用户质疑分配结果 | 重新核对 CODEOWNERS，基于分析维持或调整，不盲从 |
-| 用户要求启动开发等超出范围的任务 | 查 Agent 列表，通过 A2A API 交办 |
+| 用户要求启动开发等超出范围的任务 | 查 Agent 列表，通过 A2A 交办（`grape a2a handoff`） |
     | 用户回复了 CODEOWNERS 引导 Issue | 提取内容，构造 context，A2A 调用 Coding Agent |
 | 其他 DevOps 相关评论 | 分析并回复 |
 
 ## 评论格式要求
 
 ```bash
-POST /repos/{owner}/{repo}/issues/{number}/comments
-Authorization: Bearer $BOT_TOKEN
-Content-Type: application/json
-{"body": "> 用户的问题原文\n\n[Issue Agent] 这是机器人的回复内容。"}
+grape git-repo issues comments create --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --number "$ISSUE_NUMBER" --json '{"body": "> 用户的问题原文\n\n[Issue Agent] 这是机器人的回复内容。"}'
 ```
 
 - body 必须以 `[Issue Agent]` 开头

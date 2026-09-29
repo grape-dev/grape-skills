@@ -145,8 +145,9 @@ echo ""
 
 echo "3. description field"
 # Description may span multiple lines (YAML block scalar or folded scalar)
-# Try to extract it robustly
-DESC_RAW=$(echo "$FRONTMATTER" | sed -n '/^description:/,/^[a-z]/p' | head -n -1 | sed 's/^description:[[:space:]]*//' | sed 's/^[[:space:]]*//')
+# Try to extract it robustly — description 起始行 + 后续缩进行（block scalar 内容），
+# 剥指示符（> | 及 -/+ 折叠标记）逐行拼内容；遇下一顶层键（非缩进行）即停
+DESC_RAW=$(echo "$FRONTMATTER" | awk '/^description:/{sub(/^description:[[:space:]]*/,""); sub(/^[>|][-+]?[[:space:]]*/,""); a=$0; next} /^[[:space:]]/{line=$0; sub(/^[[:space:]]*/,"",line); if(line!="") a=a" "line; next} a!=""{exit} END{print a}')
 if [ -z "$DESC_RAW" ]; then
     # Try single-line extraction
     DESC_RAW=$(echo "$FRONTMATTER" | grep -E '^description:' | head -1 | sed 's/^description:[[:space:]]*//')

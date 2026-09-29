@@ -26,8 +26,8 @@ const fs = require("fs");
 const SPECS = {
   lint: {
     label: "lint",
-    raw: "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_skillslinter.json",
-    api: "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=members-contribution",
+    raw: "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_skillslinter.json",
+    api: "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=update-audit-clearlist-20260924",
     validate: (j) => Array.isArray(j.groups),
     summary: (j) => {
       const total = j.groups.reduce((s, g) => s + (g.items ? g.items.length : 0), 0);
@@ -36,8 +36,8 @@ const SPECS = {
   },
   test: {
     label: "test",
-    raw: "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_functions.json",
-    api: "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_functions.json?ref=members-contribution",
+    raw: "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_functions.json",
+    api: "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_functions.json?ref=update-audit-clearlist-20260924",
     validate: (j) => Array.isArray(j.test_groups),
     summary: (j) => {
       const total = j.test_groups.reduce((s, g) => s + (g.items ? g.items.length : 0), 0);
@@ -46,8 +46,8 @@ const SPECS = {
   },
   audit: {
     label: "audit",
-    raw: "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_auditor.json",
-    api: "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_auditor.json?ref=members-contribution",
+    raw: "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_auditor.json",
+    api: "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_auditor.json?ref=update-audit-clearlist-20260924",
     validate: (j) => Array.isArray(j.groups),
     summary: (j) => {
       const total = j.groups.reduce((s, g) => s + (g.items ? g.items.length : 0), 0);

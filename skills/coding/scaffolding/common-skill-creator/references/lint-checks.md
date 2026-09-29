@@ -6,8 +6,8 @@ Phase 4b 使用与 skill-linter / common-skill-tester lint 套件**同一套**�
 
 | 项目 | 值 |
 |------|-----|
-| 在线地址（raw） | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_skillslinter.json` |
-| 回退地址（API v5，base64） | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=members-contribution` |
+| 在线地址（raw） | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_skillslinter.json` |
+| 回退地址（API v5，base64） | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=update-audit-clearlist-20260924` |
 | 拉取方式 | `node scripts/fetch_checks.js`（raw 失败自动回退 API v5；`-o` 可保存到文件用于断点续跑/复查） |
 
 **核心原则：检查集完全动态，不硬编码任何检查项。** 在线 JSON 新增/变更条目时，按 `rule` 字段描述自动纳入。

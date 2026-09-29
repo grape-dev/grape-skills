@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # ============================================================================
-# create_skill_pr.sh — Coding Agent 创建 GitCode PR 的脚本
+# create_rest_api_skill_pr.sh — Coding Agent 创建 GitCode PR 的脚本(grape CLI 版)
 #
-# 职责：git commit + push → 调 VCS API 创建 PR → 设置审查人 → 输出 PR URL
+# 职责：git commit + push → grape pulls 幂等查重 → grape pulls create
+#       (+ update 补 body，pulls create 无 body 字段) → base 校验 → 输出 PR URL
 # 复用 worktree 已有分支 feat/issue-{N}，不另建分支。
 #
 # 用法：
-#   create_skill_pr.sh <skill_name>
+#   create_rest_api_skill_pr.sh <skill_name>
 #
 # 环境变量（已由系统注入，不用查 env）：
-#   BOT_TOKEN  仓库 bot token（必填，所有 agent 已注入）
 #   REPO_FULL_NAME     仓库全名 owner/repo（必填）
 #   ISSUE_NUMBER       Issue 编号（必填）
-#   BOT_USERNAME       审查人用户名（可选，未注入时兜底 owner）
+#   平台认证：grape CLI 自动读取 $GRAPE_SESSION_TOKEN，无需手动配置
 #
-# 退出码：0=成功（创建或复用 PR）；1=参数/环境错误；2=API 调用失败
+# 退出码：0=成功（创建或复用 PR）；1=参数/环境错误；2=调用失败
 # ============================================================================
 set -uo pipefail
 
@@ -24,14 +24,9 @@ if [[ -z "$SKILL_NAME" ]]; then
   exit 1
 fi
 
-TOKEN="${BOT_TOKEN:-}"
 REPO_FULL="${REPO_FULL_NAME:-}"
 ISSUE_NUM="${ISSUE_NUMBER:-}"
 
-if [[ -z "$TOKEN" ]]; then
-  echo "[create_skill_pr] ERROR: BOT_TOKEN 未设置"
-  exit 1
-fi
 if [[ -z "$REPO_FULL" ]]; then
   echo "[create_skill_pr] ERROR: REPO_FULL_NAME 未设置"
   exit 1
@@ -40,11 +35,14 @@ if [[ -z "$ISSUE_NUM" ]]; then
   echo "[create_skill_pr] ERROR: ISSUE_NUMBER 未设置"
   exit 1
 fi
+if ! command -v grape >/dev/null 2>&1; then
+  echo "[create_skill_pr] ERROR: grape CLI 未安装或不在 PATH（安装见 skill references/grape-cli-installation.md）"
+  exit 1
+fi
 
 # 解析 owner/repo
 OWNER="${REPO_FULL%%/*}"
 REPO="${REPO_FULL#*/}"
-API_BASE="$VCS_API_BASE"
 BRANCH="feat/issue-${ISSUE_NUM}"
 
 log() { echo "[create_skill_pr] $*"; }
@@ -52,12 +50,9 @@ log() { echo "[create_skill_pr] $*"; }
 # ============================================================================
 # 0. 获取仓库默认分支（不硬编码 main——目标仓库默认分支可能是 master）
 # ============================================================================
-log "获取仓库默认分支: GET /repos/${OWNER}/${REPO}"
-REPO_RESP=$(curl -s --max-time 30 \
-  -H "PRIVATE-TOKEN: ${TOKEN}" \
-  "${API_BASE}/repos/${OWNER}/${REPO}" 2>/dev/null)
-
-DEFAULT_BRANCH=$(echo "$REPO_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('default_branch',''))" 2>/dev/null || true)
+log "获取仓库默认分支: grape git-repo repo"
+DEFAULT_BRANCH=$(grape git-repo repo --owner "$OWNER" --repo "$REPO" --json-out \
+  | python3 -c "import json,sys; print((json.load(sys.stdin).get('default_branch') or ''))" 2>/dev/null || true)
 if [[ -z "$DEFAULT_BRANCH" ]]; then
   log "WARNING: 无法获取默认分支，回退 main"
   BASE_BRANCH="main"
@@ -94,12 +89,9 @@ git push origin "$BRANCH" 2>&1 | sed 's/^/[create_skill_pr] /' || {
 # ============================================================================
 # 2. 幂等查重：同分支已有 open PR → 复用
 # ============================================================================
-log "查重: GET /repos/${OWNER}/${REPO}/pulls?state=open"
-PRS_RESP=$(curl -s --max-time 30 \
-  -H "PRIVATE-TOKEN: ${TOKEN}" \
-  "${API_BASE}/repos/${OWNER}/${REPO}/pulls?state=open&per_page=100" 2>/dev/null)
-
-PR_NUMBER=$(echo "$PRS_RESP" | python3 -c "
+log "查重: grape git-repo pulls list --state open"
+PR_NUMBER=$(grape git-repo pulls list --owner "$OWNER" --repo "$REPO" --state open --per_page 100 --json-out \
+  | python3 -c "
 import json, sys
 try:
     for pr in json.load(sys.stdin):
@@ -121,41 +113,39 @@ if [[ -n "$PR_NUMBER" ]]; then
 fi
 
 # ============================================================================
-# 3. 创建 PR
+# 3. 创建 PR（pulls create 无 body 字段 → create 后 update 补 body）
 # ============================================================================
-PR_BODY=$(python3 -c "
-import json
-body = '## 新增 Skill: ${SKILL_NAME}\n\n由 rest-api-skill-creator 自动创建\n\nFixes #${ISSUE_NUM}'
-print(json.dumps({
-    'head': '${BRANCH}',
-    'base': '${BASE_BRANCH}',
-    'title': 'feat(skill): 新增 ${SKILL_NAME}',
-    'body': body
-}))
-" 2>/dev/null)
+log "创建 PR: grape git-repo pulls create  base=${BASE_BRANCH} head=${BRANCH}"
+CREATE_RESP=$(grape git-repo pulls create \
+  --owner "$OWNER" --repo "$REPO" \
+  --json "{
+    \"title\": \"feat(skill): 新增 ${SKILL_NAME}\",
+    \"head\": \"${BRANCH}\",
+    \"base\": \"${BASE_BRANCH}\",
+    \"inner_issue_nums\": \"${OWNER}/${REPO}#${ISSUE_NUM}\",
+    \"close_related_issue\": true
+  }" 2>/dev/null)
 
-log "创建 PR: POST /repos/${OWNER}/${REPO}/pulls  base=${BASE_BRANCH} head=${BRANCH}"
-CREATE_RESP=$(curl -s -w "\n%{http_code}" --max-time 30 \
-  -X POST \
-  -H "PRIVATE-TOKEN: ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "$PR_BODY" \
-  "${API_BASE}/repos/${OWNER}/${REPO}/pulls" 2>/dev/null)
-
-HTTP_CODE=$(echo "$CREATE_RESP" | tail -n 1)
-BODY_ONLY=$(echo "$CREATE_RESP" | head -n -1)
-
-if [[ ! "$HTTP_CODE" =~ ^2 ]]; then
-  log "ERROR: 创建 PR 失败 HTTP ${HTTP_CODE}"
-  echo "$BODY_ONLY" | head -c 500
+if [[ -z "$CREATE_RESP" ]]; then
+  echo "[create_skill_pr] ERROR: 创建 PR 失败（grape 无输出）" >&2
+  exit 2
+fi
+PR_NUMBER=$(echo "$CREATE_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('number',''))" 2>/dev/null || true)
+if [[ -z "$PR_NUMBER" ]]; then
+  log "ERROR: 创建响应无 PR number"
+  echo "$CREATE_RESP" | head -c 500
   echo ""
   exit 2
 fi
 
-PR_NUMBER=$(echo "$BODY_ONLY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('number',''))" 2>/dev/null || true)
-if [[ -z "$PR_NUMBER" ]]; then
-  log "ERROR: 创建响应无 PR number"
-  exit 2
+# 补 PR body（create 无 body 字段，用 update 补；失败不阻塞——PR 已创建）
+PR_BODY="## 新增 Skill: ${SKILL_NAME}\n\n由 rest-api-skill-creator 自动创建\n\nFixes #${ISSUE_NUM}"
+if grape git-repo pulls update \
+  --owner "$OWNER" --repo "$REPO" --number "$PR_NUMBER" \
+  --json "{\"body\": \"${PR_BODY}\"}" >/dev/null 2>&1; then
+  log "PR body 已补充"
+else
+  log "WARNING: PR body 补充失败（不影响 PR 创建，base 校验继续）"
 fi
 
 PR_URL="https://gitcode.com/${OWNER}/${REPO}/merge_requests/${PR_NUMBER}"
@@ -164,12 +154,9 @@ log "PR 已创建 #${PR_NUMBER} (${PR_URL})"
 # ============================================================================
 # 4. base 校验（防 base 写错）
 # ============================================================================
-log "base 校验: GET /repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}"
-DETAIL=$(curl -s --max-time 30 \
-  -H "PRIVATE-TOKEN: ${TOKEN}" \
-  "${API_BASE}/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}" 2>/dev/null)
-
-ACTUAL_BASE=$(echo "$DETAIL" | python3 -c "import json,sys; d=json.load(sys.stdin); print((d.get('base') or {}).get('ref',''))" 2>/dev/null || true)
+log "base 校验: grape git-repo pulls get"
+ACTUAL_BASE=$(grape git-repo pulls get --owner "$OWNER" --repo "$REPO" --number "$PR_NUMBER" --json-out \
+  | python3 -c "import json,sys; print(((json.load(sys.stdin).get('base') or {}).get('ref','')) or '')" 2>/dev/null || true)
 if [[ "$ACTUAL_BASE" != "$BASE_BRANCH" ]]; then
   log "ERROR: PR base 校验不过: 期望 ${BASE_BRANCH}, 实际 ${ACTUAL_BASE:-未知}"
   exit 2
@@ -177,22 +164,10 @@ fi
 log "base 校验通过: base=${ACTUAL_BASE}"
 
 # ============================================================================
-# 5. 设置审查人（best-effort，失败不阻塞）
+# 5. 设置审查人 —— ⚠️ grape CLI 0.3.3 无 assignees 接口，跳过
+#    （原实现 curl POST /pulls/{n}/assignees 属平台 API 直连，已按纪律移除；
+#     审查人缺省不影响 PR 创建与 tester 测试，如需要请人工在平台指派）
 # ============================================================================
-REVIEWER="${BOT_USERNAME:-}"
-if [[ -z "$REVIEWER" ]]; then
-  REVIEWER="$OWNER"
-  log "BOT_USERNAME 未注入，兜底审查人: ${REVIEWER}"
-fi
-
-log "设置审查人: ${REVIEWER}"
-ASSIGN_RESP=$(curl -s -m 10 \
-  -X POST \
-  -H "PRIVATE-TOKEN: ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"assignees\": \"${REVIEWER}\"}" \
-  "${API_BASE}/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/assignees" 2>/dev/null)
-log "审查人设置响应: ${ASSIGN_RESP:-empty}"
 
 # ============================================================================
 # 6. 输出

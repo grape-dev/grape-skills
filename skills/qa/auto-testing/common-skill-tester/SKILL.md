@@ -10,57 +10,75 @@ description: >
   "skill-auditor", "common-skill-tester", "检查报告", "validate skill", "test skill",
   "audit skill", "check skill", "lint my skill", "帮我检查skill", "帮我测试skill",
   "帮我审计skill", "检测恶意代码".
+version: 2.1.0
 ---
 
-# Common Skill Tester — 通用 Skill 三合一测试器
+# Common Skill Tester
 
-## 概述
+> 本技能遵循统一技能框架 v2.1.0（与 common-skill-creator 同构）。
 
-本技能整合三个通用测试工具的全部功能点，对 Skill 目录进行**一站式**质量验证：
+## 一、安全硬约束（必须遵守）
 
-| 套件 | 对应原工具 | 职责 | 规范来源（在线动态拉取） |
-|------|-----------|------|--------------------------|
-| **Lint 规范检查** | skill-linter | 结构合规、安全基线、资源限制、提交隔离 | `common_skillslinter.json` |
-| **Test 功能测试** | skill-tester | 运行时功能验证：正确性/性能/兼容/可靠/编排 | `common_functions.json` |
-| **Audit 安全审计** | skill-auditor | 恶意代码、后门、注入、凭据窃取、CWE 漏洞 | `common_auditor.json` |
+1. **本地测试器定位**：本技能对用户指定的 Skill 目录做**只读检查**——Lint 规范检查、Test 功能测试、Audit 安全审计三合一。不修改被测 Skill 的任何文件；**唯一写操作**是 4.7 的输出报告文件。不调用 grape 平台管理命令（issues/pulls/a2a/refresh 等均不适用）；唯一平台接口是 4.8 任务收尾的 `tasks complete`。
+2. **动态规范拉取**：三份规范 JSON（lint `common_skillslinter.json` / test `common_functions.json` / audit `common_auditor.json`）**不硬编码、不凭记忆、不用缓存**——每次执行从在线地址拉取最新版（`scripts/fetch_specs.js`，raw → gitcode API v5 自动回退）；拉取失败按 4.5 降级（该套件标记「未执行(原因)」+ 本地文件指定恢复），**不得**用旧快照/记忆假装执行。
+3. **外部域界**：fetch_specs.js 访问的在线规范源（gitcode.com 生态规范文件仓库）属**外部规范源域**——脚本内 https 请求合法；此域与 grape 平台管理 API 严格区分（平台管理一律走 CLI 纪律，此处无 CLI 通道也不制造）。
+4. **客观证据判定**：每项 pass/fail/warn/skip 必须基于**客观证据**（文件存在、grep 命中、行列号、统计数字）——不主观臆断；audit 每条 fail 必须关联 CWE 编号并引用文件/行号/代码片段。
+5. **不写死凭据**：检查/扫描中不向被测文件写入任何内容；被测 skill 的凭据（`{PREFIX}_*`）只读不写；本技能自身不硬编码任何 AK/SK/密码/token。
+6. **不跳过未知项**：在线规范新增/未知条目按其 `rule`/`input`/`detection` 描述自行设计检查方法执行——**绝不跳过**；网络不可用时才允许标记「未执行(原因)」。
 
-三套规范均**不写死**在技能中，每次执行从在线地址动态拉取最新版本。默认三合一执行（`mode=all`），也可单独执行某一套（`mode=lint|test|audit`），输出一份组合报告（综合判定 + 三份子报告），保留各套件的评分公式、P0/CRITICAL 门禁、CWE 映射等全部功能点。
+## 二、环境变量表
 
-## 输入参数（inputSchema）
+| 变量 | 来源 | 说明 |
+|------|------|------|
+| `GRAPE_SESSION_TOKEN` | 平台注入 | 会话令牌——**仅 4.8 任务收尾的 `tasks complete` 使用**（CLI 自动读取，不手动传入）|
+| `NODE`（可选）| 环境探测 | node 可执行文件路径——预检时探测；缺失时按三、前置检查门自愈（或 Agent 直接 curl 拉规范）|
+| `{PREFIX}_*`（可选）| 被测 skill 上下文 | 被测 skill 的目标系统凭据——**只读**（若被测 skill 需要运行时验证且其文档声明该读取方式）|
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| skill_path | string | 是 | 目标 Skill 目录路径 |
-| mode | string | 否 | 执行模式：`all`（默认，三合一）/ `lint` / `test` / `audit` |
-| checks_url | string | 否 | 自定义 lint 检查点 JSON 地址（默认在线地址） |
-| tests_url | string | 否 | 自定义 test 测试点 JSON 地址（默认在线地址） |
-| rules_url | string | 否 | 自定义 audit 规则 JSON 地址（默认在线地址） |
-| output_file | string | 否 | 报告输出文件路径（不指定则写入被测 Skill 父目录） |
+## 三、前置检查门（自愈 → 重试 → STOP）
 
-合法输入：`skill_path` 为存在的目录路径；各 URL 为返回 JSON 的地址。
-非法输入：`skill_path` 不存在或非目录 → 返回错误提示，不执行任何检查。
+1. **node ≥ 12**（运行 `scripts/fetch_specs.js` 拉取三份规范）：`node --version` 检查——缺失 → 尝试安装 → 重试 → 仍失败则 **Agent 直接用 curl/网络工具拉取规范 JSON** 继续（不阻塞主流程）。
+2. **目标 Skill 目录存在**：`<skill_path>` 是存在的目录——不存在/非目录 → 返回错误提示，**不执行任何检查**。
+3. **可选依赖**：bash（目标脚本 `bash -n` 语法检查）/ python（目标脚本 `py_compile` 检查）——缺失则该类检查项标记 skip 并注明原因，不阻塞。
+4. 任一前置门失败 → 输出「前置检查未通过：<原因>」并结束任务，不无限重试。
 
-## 输出格式（outputSchema）
+## 四、技能定义与执行
 
-输出为 Markdown 格式的组合报告，结构遵循 `references/report-template.md`，包含以下固定部分：
+### 4.1 定位与职责边界
 
-1. 综合概览（时间、目标、模式、三份规范来源/版本、总体统计摘要）
-2. 综合判定与评分（综合分、星级、判定结果、一票否决项统计）
-3. Lint 检查结果（概览 + 评分 + 必改项 + 建议修改 + 通过项 + 跳过项 + 详细记录）
-4. 功能测试结果（概览 + 通过率 + P0 详情 + 失败/警告分析 + 通过项 + 跳过项 + 详细记录 + 分组汇总）
-5. 安全审计结果（概览 + 安全评分 + 严重/警告/提示发现 + CWE 检测结果 + 通过项 + 详细记录）
+- **做什么**：对 Skill 目录做一站式质量验证，整合三个套件：
+  | 套件 | 对应原工具 | 职责 | 规范来源（在线动态拉取）|
+  |------|-----------|------|------------------------|
+  | **Lint 规范检查** | skill-linter | 结构合规、安全基线、资源限制、提交隔离 | `common_skillslinter.json` |
+  | **Test 功能测试** | skill-tester | 运行时功能验证：正确性/性能/兼容/可靠/编排 | `common_functions.json` |
+  | **Audit 安全审计** | skill-auditor | 恶意代码、后门、注入、凭据窃取、CWE 漏洞 | `common_auditor.json` |
+- **不做什么**：
+  - 不修改/修复被测 Skill（检测出问题只报告，修复交还用户/creator）。
+  - 不生成 skill（那是 `common-skill-creator` 的职责）。
+  - 不判定产物是否可上线发布（那是质量门禁消费方的职责——本技能只出报告与综合判定）。
+  - 不执行平台发布/PR/A2A 链路。
+- **默认三合一执行（mode=all）**，也可 `mode=lint|test|audit` 单套件——输出一份组合报告（综合判定 + 各套件子报告）。
 
-报告为纯 Markdown 文本，可被其他 Skill（如 huawei-cloud-skill-reporter）和 CI/CD 流水线解析引用。`mode` 为 `lint`/`test`/`audit` 单模式时，仅输出对应套件章节（保留原单工具报告结构）。
+### 4.2 场景路由
 
-## 执行流程
+| 入口 | 路径 |
+|------|------|
+| 用户要检查/测试/审计一个 skill 目录（默认）| 4.3 全流程（mode=all）|
+| 用户只要规范检查 | 4.3 流程（mode=lint——只执行 Lint 套件章节）|
+| 用户只要功能测试 | 4.3 流程（mode=test）|
+| 用户只要安全审计 | 4.3 流程（mode=audit）|
+| 用户在平台任务上下文中收到「测试某 skill」交办 | 4.3 全流程 + 4.8 任务收尾 |
+| 其他场景 | 不做处理——告知本技能边界并结束（不硬套流程）|
+
+### 4.3 处理流程（三合一 → 统一骨架）
 
 ```
-第 1 步 拉取规范 → 第 2 步 收集信息 → 第 3 步 Lint → 第 4 步 Test → 第 5 步 Audit → 第 6 步 汇总报告
+Step 0 就绪（前置门） → Step 1 拉取规范 → Step 2 收集信息
+→ Step 3 Lint → Step 4 Test → Step 5 Audit → Step 6 汇总报告 + 任务收尾
 ```
 
-### 第 1 步：拉取三份规范
+**Step 0 就绪**：跑三、前置检查门（node/目标目录/可选依赖）；确认 mode（默认 all；非法 mode 回退 all 并在报告注明）。
 
-运行辅助脚本拉取在线规范 JSON：
+**Step 1 拉取三份规范**
 
 ```bash
 node common-skill-tester/scripts/fetch_specs.js                              # 全部三份，输出合并 JSON
@@ -71,70 +89,91 @@ node common-skill-tester/scripts/fetch_specs.js "https://...json" --type lint  #
 node common-skill-tester/scripts/fetch_specs.js -o /tmp/specs.json           # 保存到文件供后续引用
 ```
 
-拉取成功后解析 JSON，读取对应字段（详细结构见 `references/spec-sources.md`）。
+拉取成功 → 解析 JSON 读对应字段（结构见 `references/spec-sources.md`）；失败 → 按 4.5 降级。**核心原则：以拉取到的实际 JSON 内容为准，不硬编码任何检查项/测试项/规则**——在线新增分组/条目自动纳入执行范围。
 
-**核心原则：以拉取到的实际 JSON 内容为准，不硬编码任何检查项/测试项/规则。** 在线新增分组或条目时自动纳入执行范围。
+**Step 2 收集目标 Skill 信息（一次收集，三套复用）**
 
-### 第 2 步：收集目标 Skill 信息（一次收集，三套复用）
-
-对用户指定的 Skill 目录，收集以下信息：
-
-1. **目录结构**：列出所有文件和子目录，记录路径、大小、扩展名（重点标记可执行代码文件 .sh/.py/.js/.ts/.go/.rs）
-2. **SKILL.md 内容**：读取完整文本，提取 YAML Frontmatter（name/description/version），解析 Workflow、inputSchema/outputSchema、读写操作声明
-3. **脚本文件内容**：读取所有 .sh/.py/.js/.ts 文件（可执行代码与依赖声明的安全审计素材）
-4. **配置文件**：检查 .env 是否存在；读取 package.json/requirements.txt/pyproject.toml 等依赖声明
-5. **危险模式预扫描**（一次 grep，三套复用）：凭据（AK/SK/密码/token）、内网 IP/域名、危险命令（sudo/rm -rf）、敏感路径（~/.ssh、~/.aws）、网络请求 URL、动态执行/系统命令调用函数
+1. **目录结构**：列出所有文件和子目录，记录路径、大小、扩展名（重点标记可执行代码 .sh/.py/.js/.ts/.go/.rs）
+2. **SKILL.md 内容**：读完整文本，提取 YAML Frontmatter（name/description/version），解析 Workflow、inputSchema/outputSchema、读写操作声明
+3. **脚本文件内容**：读所有 .sh/.py/.js/.ts 文件（可执行代码与依赖声明的安全审计素材）
+4. **配置文件**：检查 .env 是否存在；读 package.json/requirements.txt/pyproject.toml 等依赖声明
+5. **危险模式预扫描**（一次 grep 三套复用）：凭据（AK/SK/密码/token）、内网 IP/域名、危险命令（sudo/rm -rf）、敏感路径（~/.ssh、~/.aws）、网络请求 URL、动态执行/系统命令调用函数
 6. **文件统计**：总大小、文件数、SKILL.md 行数、文件类型列表
 7. **跨引用与集成声明**：SKILL.md 中引用的其他具名 Skill、多 Skill 编排、数据传递机制
 
-使用工具：`Glob`（列文件）、`Read`（读内容）、`Grep`（模式搜索）、`Bash`（统计/语法检查）。
+工具：Glob（列文件）/ Read（读内容）/ Grep（模式搜索）/ Bash（统计/语法检查）。
 
-### 第 3 步：Lint 规范检查（mode 含 lint 时执行）
+**Step 3 Lint 规范检查（mode 含 lint 时执行）**
 
-对拉取到的**每一个检查项**（`groups[].items[]`）执行：
+1. 对**每一个**检查项（`groups[].items[]`）按 `references/lint-methods.md` 方法映射表逐项检查（结构/命名/frontmatter/.env/危险脚本/资源限制/凭证/删除操作确认等）
+2. 判定 pass/fail/warn/skip——全部基于**客观证据**
+3. 按公式算 Lint 总分：`100 - (Critical×15 + High×8 + Medium×4 + Low×2 + warn×1)`
+4. Critical fail 记录为必改项（附具体修改建议）；非 Critical fail 和 warn 为建议修改项
+5. 输出到报告「三、Lint 检查结果」章节
 
-1. 按 `references/lint-methods.md` 的方法映射表逐项检查（结构/命名/frontmatter/.env/危险脚本/资源限制/凭证/删除操作确认等）
-2. 判定每个检查项：pass / fail / warn / skip，全部基于**客观证据**（文件存在、grep 命中、统计数字）
-3. 按公式计算 Lint 总分：`100 - (Critical×15 + High×8 + Medium×4 + Low×2 + warn×1)`
-4. 记录 Critical fail 为必改项（附具体修改建议），非 Critical fail 和 warn 为建议修改项
-5. 输出到报告的"三、Lint 检查结果"章节
+**Step 4 功能测试（mode 含 test 时执行）**
 
-### 第 4 步：功能测试（mode 含 test 时执行）
+1. 对**每一条**测试用例（`test_groups[].items[]`）按 `references/test-methods.md` 方法映射表执行（触发词/工作流/Schema/读写语义/性能/兼容/可靠/编排等）
+2. 以**静态分析**为主（验证 SKILL.md 是否声明必要机制），可实际运行时结合运行结果
+3. 判定 pass/fail/warn/skip + 客观证据（引用章节/行号/内容）
+4. 通过率：`pass / (总用例数 - skip) × 100%`；P0 必测项单独统计，任一 fail 标记「建议打回」
+5. 输出到报告「四、功能测试结果」章节
 
-对拉取到的**每一条测试用例**（`test_groups[].items[]`）执行：
+**Step 5 安全审计（mode 含 audit 时执行）**
 
-1. 按 `references/test-methods.md` 的方法映射表执行（触发词/工作流/Schema/读写语义/性能/兼容/可靠/编排等）
-2. 以**静态分析**为主（验证 SKILL.md 是否声明了必要机制），可实际运行时结合运行结果
-3. 判定：pass / fail / warn / skip，附带客观证据（引用章节/行号/内容）
-4. 计算通过率：`pass / (总用例数 - skip) × 100%`；P0 必测项单独统计，任一 fail 标记"建议打回"
-5. 输出到报告的"四、功能测试结果"章节
+1. 对**每一条**检测规则（`groups[].items[]` + CWE 模式）按 `references/audit-methods.md` 方法映射表检测（网络请求/敏感文件/危险命令/注入/后门/混淆/依赖安全等）
+2. 判定 pass/fail/warn/skip；fail 必须**关联 CWE 编号**并引用文件、行号、代码片段
+3. 安全分：`100 - (CRITICAL×20 + WARNING×8 + INFO×2 + warn×1)`；CRITICAL fail 一票否决
+4. CWE 覆盖率：`已检测 CWE 数 / 总 CWE 数 × 100%`
+5. 输出到报告「五、安全审计结果」章节
 
-### 第 5 步：安全审计（mode 含 audit 时执行）
-
-对拉取到的**每一条检测规则**（`groups[].items[]` + CWE 模式）执行：
-
-1. 按 `references/audit-methods.md` 的方法映射表检测（网络请求/敏感文件/危险命令/注入/后门/混淆/依赖安全等）
-2. 判定：pass / fail / warn / skip；fail 必须**关联 CWE 编号**并引用文件、行号、代码片段
-3. 计算安全分：`100 - (CRITICAL×20 + WARNING×8 + INFO×2 + warn×1)`；CRITICAL fail 一票否决
-4. 计算 CWE 覆盖率：`已检测 CWE 数 / 总 CWE 数 × 100%`
-5. 输出到报告的"五、安全审计结果"章节
-
-### 第 6 步：汇总报告与综合判定
+**Step 6 汇总报告 + 综合判定**
 
 按 `references/report-template.md` 生成组合报告：
 
-1. 汇总三套统计，计算综合分：`round((Lint总分 + Test通过率 + Audit安全分) / 3)`
-2. 按"评分与综合判定"章节规则给出判定结果（✅ 通过 / ⚠️ 有条件通过 / ❌ 不通过）
-3. 将完整报告输出到两个地方：
-   - **对话输出**：Markdown 直接输出给用户查看
-   - **文件输出**：写入被测 Skill 的**父目录**下，文件名 `{skill-name}-tester-report-{YYYYMMDD-HHmmss}.md`
-     - 从 `skill_path` 提取目录名作为 `{skill-name}`；示例：`skill_path=/repos/skills/dev/my-skill` → `/repos/skills/dev/my-skill-tester-report-20260916-120000.md`
-     - 使用 `Write` 工具写入后，在对话中提示报告保存路径
-4. 判定为 ❌ 时，对话中明确列出未达标项（fail 清单 + 未达 95 的套件 + 原因），并给出修复建议
+1. 三套统计 → 综合分：`round((Lint总分 + Test通过率 + Audit安全分) / 3)`
+2. 判定：✅ 通过 / ⚠️ 有条件通过 / ❌ 不通过（见 4.6 判定表）
+3. 输出两处：**对话输出**（Markdown 直接给用户）+ **文件输出**（被测 Skill 父目录下 `{skill-name}-tester-report-{YYYYMMDD-HHmmss}.md`——从 skill_path 提取目录名）
+4. 判定 ❌ 时对话明确列未达标项（fail 清单 + 未达 95 的套件 + 原因）+ 修复建议
+5. **平台任务上下文**：收尾 4.8（tasks complete + JSON 块）
 
-## 评分与综合判定
+### 4.4 命令标准（本技能命令子集）
 
-### 三套评分公式
+本技能的 grape 命令面**仅一条**——4.8 任务收尾的 `grape tasks complete`（平台全部技能通用的收尾协议，不由本技能发起任何业务操作）。**平台管理命令**（issues/pulls/a2a/refresh 等）本技能**不使用**——命令面 = 本地脚本 + 外部规范源拉取：
+
+| 命令 | 用途 | 前置 |
+|------|------|------|
+| `node common-skill-tester/scripts/fetch_specs.js [--type lint\|test\|audit] [-o <file>] [<url>]` | 拉取三份在线规范 | node ≥ 12 |
+| `grape tasks complete --json '{...}'` | **仅 4.8 任务收尾** | 平台任务上下文 |
+
+> ⚠️ **不存在的命令（防误用——本技能禁止尝试）**：
+>
+> | 命令 | 理由 |
+> |------|------|
+> | `grape git-repo issues / pulls / a2a handoff / refresh` 等平台管理命令 | 本技能无平台业务交互——本地测试器不走链路 |
+> | `grape api` | 已移除（0.2.2 起），且平台禁止直连 API |
+> | 检查中的写操作（修改被测文件/`sed -i`/覆盖 SKILL.md）| 本技能只读——检测不改动 |
+
+### 4.5 故障决策表
+
+| 场景 | 处理 |
+|------|------|
+| skill_path 不存在或非目录 | 返回错误提示，不执行任何检查 |
+| 某份规范拉取失败（网络不可用）| 该套件标记「未执行(原因)」，其余照常；提示用户可指定本地 JSON 文件（`-o` 保存的或手动指定路径作为 URL 参数）|
+| 用户只要某一种检查 | mode 指定 lint/test/audit，只执行对应套件章节 |
+| mode 传非法值 | 回退 all，并在报告中注明 |
+| 目标 Skill 无脚本/可执行代码 | audit 中代码相关规则 skip；lint 的脚本检查项 skip 或 pass（注明原因）|
+| 目标 Skill 无写操作 | test 中读写语义、幂等、资源清理等用例 skip（注明原因）|
+| 在线规范新增未知条目 | 按 `rule`/`input`/`detection` 描述自行设计检查/测试/检测方法，不跳过 |
+| 报告过长 | 按模板章节结构输出，详细记录表保留全部条目 |
+| 三套评分均 ≥ 95 但存在 warn | 判定 ⚠️ 有条件通过，报告列 warn 项及修正建议 |
+| CRITICAL/P0 fail 多处出现 | 判定 ❌ 不通过，全部列出；修复后建议重跑全量 |
+| 断点续跑 | 已拉取规范用 `-o` 保存；中断后重新指定该文件作为对应 URL 参数（本地文件路径直接读取）恢复执行 |
+| node 不可用 | Agent 直接用 curl/网络工具拉取规范 JSON 后继续（不阻塞主流程）|
+
+### 4.6 输出格式（固定产物）
+
+**三套评分公式与门禁**：
 
 | 套件 | 公式 | 一票否决项 |
 |------|------|-----------|
@@ -142,116 +181,63 @@ node common-skill-tester/scripts/fetch_specs.js -o /tmp/specs.json           # �
 | Test | `通过率 = pass / (总用例 - skip) × 100%` | P0 必测项 fail |
 | Audit | `安全分 = 100 - (CRITICAL×20 + WARNING×8 + INFO×2 + warn×1)` | CRITICAL 严重发现 |
 
-### 星级标准（三套统一口径 + 综合分）
+**星级标准**（三套统一 + 综合分）：90-100 ⭐⭐⭐⭐⭐ / 75-89 ⭐⭐⭐⭐ / 60-74 ⭐⭐⭐ / 40-59 ⭐⭐ / 0-39 ⭐
 
-| 分数 | 星级 | 等级 |
-|------|------|------|
-| 90-100 | ⭐⭐⭐⭐⭐ | 优秀 |
-| 75-89 | ⭐⭐⭐⭐ | 良好 |
-| 60-74 | ⭐⭐⭐ | 合格 |
-| 40-59 | ⭐⭐ | 需改进 |
-| 0-39 | ⭐ | 不合格 |
-
-### 综合判定
+**综合判定**：
 
 | 判定 | 条件 |
 |------|------|
 | ✅ 通过 | 三套评分均 ≥ 95，且无 lint Critical fail、无 test P0 fail、无 audit CRITICAL 发现 |
-| ⚠️ 有条件通过 | 无上述三类 fail，但存在 warn 或任一评分在 75-94 之间（按报告修正后复测） |
+| ⚠️ 有条件通过 | 无上述三类 fail，但存在 warn 或任一评分在 75-94（按报告修正后复测）|
 | ❌ 不通过 | 存在任一上述 fail 类型，或任一评分 < 75 |
 
-> 门禁语义：lint Critical / test P0 / audit CRITICAL 均为**一票否决**项。该判定规则与质量门槛要求一致（三套检查评分全 ≥ 95 才合格），可直接用于 CI/CD 门禁解析。
+**报告结构**（`references/report-template.md`）：综合概览 → 综合判定与评分 → Lint 结果 → Test 结果 → Audit 结果；报告为纯 Markdown，含 `{OVERALL_SCORE}`/`{LINT_SCORE}`/`{TEST_PASS_RATE}`/`{AUDIT_SCORE}`/`{VERDICT}` 等占位符数值供 CI/CD 门禁解析。报告使用中文输出。
 
-## 使用方式
+**文件输出**：`{被测 Skill 父目录}/{skill-name}-tester-report-{YYYYMMDD-HHmmss}.md`（从 skill_path 提取目录名；例：`skill_path=/repos/skills/dev/my-skill` → `/repos/skills/dev/my-skill-tester-report-20260916-120000.md`）
 
-用户可以这样说：
+### 4.7 写操作协议
 
-- "检查+测试+审计 .opencode/skills/my-skill 目录"（mode=all，默认）
-- "用 common-skill-tester 测一下 /path/to/skill"
-- "只检查规范：lint /path/to/skill"
-- "只做功能测试：test /path/to/skill"
-- "只做安全审计：audit /path/to/skill"
-- "这个 skill 有没有问题？"（→ 默认三合一）
+- **唯一写操作**：报告文件写入被测 Skill **父目录**（文件名含 skill 名 + 时间戳——重复执行覆盖写入，幂等无副作用）。
+- **绝不修改被测 Skill 目录内任何文件**（检测只读）；不创建临时文件（拉取规范用 `-o` 保存的文件由用户决定清理）。
+- 报告保存后在对话中提示报告路径。
 
-执行顺序固定：第 1 步 → 第 2 步 →（第 3/4/5 步按 mode）→ 第 6 步。`mode` 单模式时只执行对应套件，报告只含对应章节（保留原单工具结构）。
+### 4.8 任务收尾（必做）
 
-## 性能预算
+业务动作全部完成后：
 
-| 指标 | 预估值（all 模式） | 说明 |
-|------|--------|------|
-| LLM 调用次数 | 30-90 次 | 三套并跑，取决于目标 Skill 文件数和条目数 |
-| token 消耗 | 15000-45000 token | SKILL.md(~3k) + 拉取三份 JSON(~9k) + 目标文件内容(可变) + 执行推理 |
-| 加载时延 | < 1s | 6 文件 / ~30KB |
-| 执行时延 | 1-8min | 单模式约为 all 的 1/3 |
+1. **先调 `grape tasks complete` 关闭当前任务**（任务中心闭环）：
+```bash
+grape tasks complete --json '{"result_text": "三合一测试完成：<skill 名称> 综合判定 <✅/⚠️/❌>", "actions": ["拉取规范/lint/test/audit/汇总报告"], "conclusion": "<综合判定与关键发现>", "artifacts": ["<报告文件路径>"], "next_step": "<按判定给用户的下一步（修复后重测/通过) 建议>"}'
+```
+2. **再在最终答复末尾输出结构化 JSON 块**（平台读取）：
+```json
+{
+  "actions": ["拉取规范/lint/test/audit/汇总报告"],
+  "conclusion": "综合判定与关键发现",
+  "artifacts": ["<报告文件路径>"],
+  "next_step": "按判定给用户的下一步建议",
+  "issue_summary": "本次任务最新聚合结论（紧凑文本，用 | 分隔）"
+}
+```
 
-上下文压缩策略：拉取的规范 JSON 解析后仅保留各套件的 `items[]` 必要字段（`check`/`rule`/`severity`/`failure_handling`/`input`/`expected`/`priority`/`detection`/`cwe` 等），丢弃 `summary`/`legend` 等冗余字段。三套共享第 2 步收集的信息，避免重复读取目标文件。
+## 五、参考文件清单
 
-## 版本管理
+| 文件 | 职责 | 何时加载 |
+|------|------|---------|
+| `references/spec-sources.md` | 三份规范的在线地址、合并输出结构、各自预期 JSON 结构、最新规范概要 | Step 1 拉取后核对结构时 |
+| `references/lint-methods.md` | Lint 检查方法映射表 + 判定逻辑 + 评分公式 | Step 3 |
+| `references/test-methods.md` | 功能测试方法映射表 + 判定逻辑 + 通过率公式 + 证据要求 | Step 4 |
+| `references/audit-methods.md` | 安全审计方法映射表 + 判定逻辑 + 安全评分 + CWE 映射要求 | Step 5 |
+| `references/report-template.md` | 组合报告模板（综合判定 + 三套子报告）| Step 6 |
+| `scripts/fetch_specs.js` | 三份规范动态拉取器（raw → API v5 回退；--type/-o/--help）| Step 1 |
+| `references/tester-runbook.md` | 执行走查表（命令固化——照着执行不查 help）| 全流程 |
 
-- 当前版本：v1.0（Frontmatter 无 version 字段，遵循 v1.0 规范）
-- **规范版本兼容**：三份 JSON 结构可能各自变化，本 Skill 以实际拉取内容为准执行，新增/变更条目自动纳入；未知字段或新分组根据 `rule`/`input`/`detection` 描述自行判断，不影响既有逻辑
-- **向后兼容**：`mode` 单模式输出结构兼容原 skill-linter / skill-tester / skill-auditor 的独立报告结构，原报告的解析方无需改动
-- **灰度策略**：如在线规范发生重大变更，建议先手动拉取 JSON 审查（`fetch_specs.js -o` 保存）后再执行
+## 六、Best Practices
 
-## 可靠性声明
-
-| 机制 | 声明 |
-|------|------|
-| 断点续跑（resume） | 拉取的规范 JSON 可通过 `-o` 保存到临时文件；执行中断后重新指定该文件作为对应 URL 参数（`checks_url`/`tests_url`/`rules_url` 指向本地文件路径时直接读取）恢复执行，无需重新拉取 |
-| 重试幂等 | 重复执行同一目标 Skill 产生相同结果（规范动态拉取可能因在线更新导致结果略有差异）；输出报告覆盖写入指定文件，幂等无副作用 |
-| 资源清理 | 执行过程不创建临时文件，仅读取目标目录和在线 JSON；使用 `-o` 保存的规范文件由用户决定是否清理 |
-| 降级策略 | 每份规范独立降级：raw URL 失败(403) → 回退 gitcode API v5（base64 解码）→ 仍失败则仅该套件标记"未执行(原因)"，其余套件照常执行，并在报告中注明 |
-
-## 依赖兼容
-
-| 依赖 | 版本要求 | 说明 |
-|------|----------|------|
-| node | ≥ 12 | 运行 `scripts/fetch_specs.js`（仅用 http/https/fs 标准库） |
-| 网络 | 需可访问 gitcode.com | 拉取规范 JSON；不可用时走本地文件指定（见可靠性声明） |
-| bash | 可选 | 目标脚本的 `bash -n` 语法检查 |
-| python | 可选 | 目标脚本的 `py_compile` 语法检查 |
-
-如 `node` 不可用，由 agent 直接用 `curl`/网络工具拉取规范 JSON 后继续执行，不阻塞主流程。
-
-## 跨 Skill 协作
-
-- 输出报告为固定结构 Markdown，可被其他 Skill 消费：`huawei-cloud-skill-reporter` 可解析综合判定作为上报结论；CI/CD 可解析 `{OVERALL_SCORE}`、`{LINT_SCORE}`、`{TEST_PASS_RATE}`、`{AUDIT_SCORE}`、`{VERDICT}` 等占位符数值作为门禁判断
-- 可引用其他 Skill 的报告作为上下文：如先由本 Skill 输出 lint/test/audit 三套结果，再交给人审或修复 Skill 使用
-- 报告按章节标题解析（一~五章固定），各套件子报告保留原单工具结构，兼容旧解析方
-
-## 可用脚本
-
-- **`scripts/fetch_specs.js`** — 动态拉取三份规范 JSON（lint 检查点/test 测试点/audit 规则），raw URL 失败自动回退 gitcode API v5；支持 `--type` 单拉、自定义 URL、`-o` 保存、`--help`
-
-## 参考文档
-
-- **`references/spec-sources.md`** — 三份规范的在线地址、合并输出结构与各自预期 JSON 结构、最新规范概要。第 1 步拉取后核对结构时读取。
-- **`references/lint-methods.md`** — Lint 检查方法映射表 + 判定逻辑 + 评分公式。第 3 步执行时读取。
-- **`references/test-methods.md`** — 功能测试方法映射表 + 判定逻辑 + 通过率公式 + 证据要求。第 4 步执行时读取。
-- **`references/audit-methods.md`** — 安全审计方法映射表 + 判定逻辑 + 安全评分 + CWE 映射要求。第 5 步执行时读取。
-- **`references/report-template.md`** — 组合报告模板（综合判定 + 三套子报告）。第 6 步生成报告时读取。
-
-## 边界情况
-
-| 场景 | 处理 |
-|------|------|
-| skill_path 不存在或非目录 | 返回错误提示，不执行任何检查 |
-| 网络不可用 | 某套规范拉取失败则该套标记"未执行(原因)"，其余照常；提示用户可指定本地 JSON 文件 |
-| 用户只要某一种检查 | `mode` 参数指定 lint/test/audit，只执行对应套件 |
-| mode 传非法值 | 回退到 `all`，并在报告中注明 |
-| 目标 Skill 无脚本/可执行代码 | audit 中代码相关规则 skip；lint 的脚本检查项 skip 或 pass（注明原因） |
-| 目标 Skill 无写操作 | test 中读写语义、幂等、资源清理等用例 skip（注明原因） |
-| 在线规范新增未知条目 | 按 `rule`/`input`/`detection` 描述自行设计检查/测试/检测方法，不跳过 |
-| 报告过长 | 按模板章节结构输出，详细记录表保留全部条目 |
-| 三套评分均 ≥ 95 但存在 warn | 判定为 ⚠️ 有条件通过，报告列出 warn 项及修正建议 |
-| CRITICAL/P0/CRITICAL fail 同时多处出现 | 判定 ❌ 不通过，全部列出；修复后建议重跑全量 |
-
-## 注意事项
-
-- **规范动态加载**：每次执行都必须从在线地址拉取最新规范，不使用缓存或硬编码条目
-- **以实际 JSON 为准**：三份 JSON 的结构、字段、条目变化时，以拉取到的实际内容为准执行
-- **不跳过未知项**：在线新增的、本 SKILL.md 未描述的条目，根据其字段描述自行判断执行方法
-- **客观判定**：每项 pass/fail 必须基于客观证据（文件内容、grep 命中、行列号、统计数字），不主观臆断
+- **动态规范为本**：每次执行都必须从在线地址拉取最新规范——不使用缓存或硬编码条目；三份 JSON 结构/字段/条目变化时以实际内容为准
+- **客观证据**：每项 pass/fail 基于文件内容/grep 命中/行列号/统计数字——不主观臆断
 - **证据与 CWE**：test 每条结果附证据；audit 每条 fail 必须关联 CWE 编号
 - **门禁语义**：lint Critical / test P0 / audit CRITICAL 一票否决；三套评分全 ≥ 95 才判定通过
-- **报告语言**：报告使用中文输出
+- **不跳过未知项**：在线新增条目按其字段描述执行
+- **只读纪律**：检测不改动被测文件——发现问题列清单与修复建议，修复交还用户
+- **复用收集**：Step 2 一次收集信息三套复用，避免重复读目标文件；规范 JSON 解析后仅保留必要字段（丢弃 summary/legend 冗余）控制上下文

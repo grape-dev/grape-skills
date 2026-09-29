@@ -18,9 +18,9 @@ const http = require("http");
 const fs = require("fs");
 
 const RAW_URL =
-  "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_skillslinter.json";
+  "https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_skillslinter.json";
 const API_URL =
-  "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=members-contribution";
+  "https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=update-audit-clearlist-20260924";
 
 function fetch(url) {
   return new Promise((resolve, reject) => {

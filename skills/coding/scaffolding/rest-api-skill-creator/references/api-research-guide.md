@@ -26,7 +26,7 @@ for path, methods in spec.get('paths', {}).items():
 - 解析得到全部端点（method + path + 参数 + 响应结构）
 - 每个端点生成一个子命令
 - 如果文档有 operationId → 优先用 operationId 作为子命令名
-- 如果没有 operationId → 按子命令生成规则推导（见 SKILL.md Step 3）
+- 如果没有 operationId → 按子命令生成规则推导（见 SKILL 4.3 处理流程 Step 3 子命令生成规则）
 
 ### 2. Markdown 文档（回退）
 
@@ -44,16 +44,16 @@ agent 阅读文档，提取以下信息：
 
 用户提供 API 基础信息（base_url + 口头描述端点）：
 
-> base_url 优先从项目知识（.project-info/member/ 目录）获取，缺失时从环境变量 $${PREFIX}_BASE_URL 获取。如两者都无，提示用户提供。
+> base_url 优先从项目知识（递归扫描 .project-info/ 下所有 JSON）获取，缺失时从环境变量 ${PREFIX}_BASE_URL 获取。如两者都无，提示用户提供。
 
 ```bash
 # 探测 API 可达性（PREFIX 由 skill name 推导，端点根据用户描述替换）
-curl -s --max-time 30 -u "$${PREFIX}_USERNAME:$${PREFIX}_PASSWORD" \
-  "$${PREFIX}_BASE_URL/" | python3 -m json.tool
+curl -s --max-time 30 -u "${PREFIX}_USERNAME:${PREFIX}_PASSWORD" \
+  "${PREFIX}_BASE_URL/" | python3 -m json.tool
 
 # 探测用户描述的端点（示例：/api/posts /api/articles——实际端点由用户提供）
-curl -s --max-time 30 -u "$${PREFIX}_USERNAME:$${PREFIX}_PASSWORD" \
-  "$${PREFIX}_BASE_URL/{用户描述的端点}" | python3 -m json.tool
+curl -s --max-time 30 -u "${PREFIX}_USERNAME:${PREFIX}_PASSWORD" \
+  "${PREFIX}_BASE_URL/{用户描述的端点}" | python3 -m json.tool
 ```
 
 - 探测成功 → 记录端点 + 响应结构
@@ -83,19 +83,19 @@ API 端点只认以下可信来源：
 
 ```bash
 # 无认证探测（公开 API）
-curl -s --max-time 30 "$${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
+curl -s --max-time 30 "${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
 
 # Basic Auth 探测
-curl -s --max-time 30 -u "$${PREFIX}_USERNAME:$${PREFIX}_PASSWORD" \
-  "$${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
+curl -s --max-time 30 -u "${PREFIX}_USERNAME:${PREFIX}_PASSWORD" \
+  "${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
 
 # Bearer Token 探测
-curl -s --max-time 30 -H "Authorization: Bearer $${PREFIX}_TOKEN" \
-  "$${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
+curl -s --max-time 30 -H "Authorization: Bearer ${PREFIX}_TOKEN" \
+  "${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
 
 # API Key（Header）探测
-curl -s --max-time 30 -H "X-API-Key: $${PREFIX}_API_KEY" \
-  "$${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
+curl -s --max-time 30 -H "X-API-Key: ${PREFIX}_API_KEY" \
+  "${PREFIX}_BASE_URL/api/" -w "\n%{http_code}"
 ```
 
 - 200 → 认证成功，API 可用

@@ -84,10 +84,10 @@
 
 | 输入 | 来源 | 用途 |
 |------|------|------|
-| Issue 完整内容 | `GET /repos/{owner}/{repo}/issues/{number}` | Objective + Scope |
-| Issue 评论 | `GET /repos/{owner}/{repo}/issues/{number}/comments` | 补充需求细节 |
-| 项目架构图 | `data/workspaces/{owner}/{repo}/project-info/project-graph.md` | Technical Approach + Affected Modules |
-| 项目能力特性 | `data/workspaces/{owner}/{repo}/project-info/project-capabilities.md` | Technical Approach + Risks |
+| Issue 完整内容 | `grape git-repo issues get`（见 cli-reference §3.2） | Objective + Scope |
+| Issue 评论 | `grape git-repo issues comments list` | 补充需求细节 |
+| 项目架构图 | prompt「项目知识基线」章节（project-graph，服务端内联） | Technical Approach + Affected Modules |
+| 项目能力特性 | prompt「项目知识基线」章节（project-capabilities） | Technical Approach + Risks |
 | 可开发性分析结论 | 上一步输出 | 验证四维全通过 |
 
 ### Step 2: 填写 Objective
@@ -132,7 +132,7 @@
   - 在 Spec 中**改写为一次性验证模式**，严禁把裸前台命令写入 Spec：
     `python3 -m http.server 8080 >/tmp/httpd.log 2>&1 & sleep 1; curl -s http://localhost:8080/ | head -20; kill %1`
   - 或将"运行验证"标注为**由 SRE Agent 执行**（构建部署/运行验证），编码阶段不做运行时验证；
-  - 原因：coding 前台执行长驻命令会导致 opencode 等待命令退出而超时失败（见 coding-worktree-skill-collision.md §4.5）。
+  - 原因：coding 前台执行长驻命令会导致 opencode 等待命令退出而超时失败。
 
 ### Step 7: 填写 Risks & Mitigations
 
@@ -162,7 +162,7 @@
 | ⚠️ 涉及{危险类型}（{具体操作}） | High | 变更类操作需用户确认 |
 ```
 
-⚠️ 识别到危险场景后，skill-issue 不会立即 A2A coding，而是在 Issue 评论提示用户确认。详见 SKILL.md Step 5。
+⚠️ 识别到危险场景后，skill-issue 不会立即 A2A coding，而是在 Issue 评论提示用户确认。详见 SKILL 4.3 步骤 5（危险场景识别）。
 
 ### Step 8: 质量检查
 
@@ -179,12 +179,7 @@
 ### 作为 Issue 评论发布
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "body": "[Issue Agent] 📋 Spec Document\n\n{spec 完整内容}"
-  }' \
-  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}/comments
+grape git-repo issues comments create --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --number "$ISSUE_NUMBER" --json '{"body": "[Issue Agent] 📋 Spec Document\n\n{spec 完整内容}"}'
 ```
 
 格式要求：
@@ -194,10 +189,7 @@ curl -s -X POST -H "Authorization: Bearer $BOT_TOKEN" \
 ### 同时打标签
 
 ```bash
-curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"labels": "{原有标签},spec-ready"}' \
-  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
+grape git-repo issues update --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --number "$ISSUE_NUMBER" --json '{"labels": "{原有标签},spec-ready"}'
 ```
 
 新增 `spec-ready` 标签（颜色 `#0075ca`）。
@@ -205,10 +197,7 @@ curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
 ### 分配给机器人
 
 ```bash
-curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"assignee": "{BOT_USERNAME}"}' \
-  $VCS_API_BASE/repos/{owner}/{repo}/issues/{number}
+grape git-repo issues update --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --number "$ISSUE_NUMBER" --json '{"assignee": "{BOT_USERNAME}"}'
 ```
 
 使用 Grape 的 GitCode 用户名作为 assignee，表示机器人接管后续开发流程。
@@ -216,23 +205,10 @@ curl -s -X PATCH -H "Authorization: Bearer $BOT_TOKEN" \
 ## A2A 通知 Coding Agent
 
 ```bash
-curl -X POST {{SERVER_URL}}/api/a2a \
-  -H "Authorization: Bearer $BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent": "coding",
-    "payload": {
-      "repository": "'"$REPO_FULL_NAME"'",
-      "account": "'"$ACCOUNT"'",
-      "issue_number": "'"$ISSUE_NUMBER"'",
-      "pr_number": "'"$PR_NUMBER"'",
-      "context": "Issue #'"$ISSUE_NUMBER"' 已通过深度可开发性分析（评级: ready），Spec 已发布，负责人已分配给机器人。\n\n## Objective\n{spec.objective 摘要}\n\n## Scope (In)\n{spec.in_scope 摘要}\n\n## Technical Approach\n{spec.technical_approach 摘要}\n\n## Affected Modules\n{spec.affected_modules 摘要}\n\n## Acceptance Criteria\n{spec.acceptance_criteria 摘要}\n\n请基于以上 Spec 启动开发实现。完整 Spec 见 Issue 评论。"
-    }
-  }'
+grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$REPO_FULL_NAME"'","account":"'"$ACCOUNT"'","issue_number":'"$ISSUE_NUMBER"',"pr_number":'"$PR_NUMBER"',"context":"Issue #'"$ISSUE_NUMBER"' 已通过深度可开发性分析（评级: ready），Spec 已发布，负责人已分配给机器人。\n\n## Objective\n{spec.objective 摘要}\n\n## Scope (In)\n{spec.in_scope 摘要}\n\n## Technical Approach\n{spec.technical_approach 摘要}\n\n## Affected Modules\n{spec.affected_modules 摘要}\n\n## Acceptance Criteria\n{spec.acceptance_criteria 摘要}\n\n请基于以上 Spec 启动开发实现。完整 Spec 见 Issue 评论。"}}'
 ```
 
 ⚠️ **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（当前 Issue 的真实编号）；**无法确定 issue_number 就不要调用 A2A**。`pr_number` 有则填（PR 编号）、无则不填（Spec 阶段通常无 PR），严禁将 PR 编号填入 issue_number。
-```
 
 ### context 构造规则
 
@@ -266,7 +242,7 @@ curl -X POST {{SERVER_URL}}/api/a2a \
 Coding Agent 收到 A2A 调用后：
 
 1. 从 A2A context 获取 Spec 摘要
-2. 通过 VCS API 获取 Issue 完整内容（含 Spec 评论）
+2. 通过 grape CLI 获取 Issue 完整内容（含 Spec 评论）
 3. 基于 Spec，由 Coding Agent 按 implementation skill 的开发流程执行（spec 落在 Issue 评论作为上下文）
 4. Spec 中的 Technical Approach 对应方案设计
 5. Spec 中的 Acceptance Criteria 对应测试用例设计
