@@ -76,6 +76,10 @@ grape issues create --owner "$ACCOUNT" --repo "$REPO_NAME" --json @/tmp/iac-vod-
 grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（必须携带真实 issue_number；无法确定则不调用，评论说明）：
 grape a2a handoff --json '{"agent":"iac-issue","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"'"$ACCOUNT"'","issue_number":{真实编号},"pr_number":null,"context":"iac-vod 已完成 IaC 需求收敛与结构化，请继续 spec 设计/打标/分配"}}'
+# ⚠️ 交办返回 not_in_scene（目标 agent 名不在本场景流水线——场景实际用通用 agent 名挂 iac 技能）：
+#   ① 先 grape issues pipeline 确认本场景既有 agent 序列（如 vod→issue→coding→qa→sre）
+#   ② 按场景既有 issue 阶段 agent 名重发（payload 不变——事件将命中挂有 iac 技能的场景节点）
+#   ③ 重发仍 not_in_scene → 评论说明「场景无 iac 节点，已停止」→ 收尾（不盲发）
 # A2A 失败 → 重试 ≤3 次 → 仍失败：评论说明「A2A 服务不可达，待恢复后重试」+ next_step 人工介入
 ```
 

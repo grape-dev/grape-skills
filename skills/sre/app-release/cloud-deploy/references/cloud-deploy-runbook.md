@@ -9,8 +9,8 @@
 grape refresh 2>&1 && echo REFRESH_OK          # 契约保鲜；失败重试 ≤2 次后回退内置快照继续
 grape tasks current --json-out                 # 当前任务（事件/Issue/Spec 指引）
 grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
-# AK/SK 未配置（HUAWEICLOUD_SDK_AK/SK 为空）且任务需要云资源部署
-# → STOP：提示「请在 Grape 控制台配置华为云 AK/SK 后重试」——不硬编码、不找替代（安全硬约束⑥/前置门）
+# AK/SK 未配置（HUAWEI_AK/SK 为空）且任务需要云资源部署
+# → STOP：提示「请在场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK 后重试」——不硬编码、不找替代（安全硬约束⑥/前置门）
 #   并发出阻塞评论（含完整恢复路径——见场景 A「STOP 评论模板」）
 # 任务仅需构建验证（无需云资源）→ 走场景 A A4（构建+验证——不触云）
 ```
@@ -18,8 +18,7 @@ grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMB
 ## 场景 A：A2A 部署（a2a_event——issue/coding/qa 交办）
 ```bash
 # A1 读任务上下文与基线（先读 runbook 与部署指南——不跳过）
-# grape issues detail 已取（Step 0）——再取知识基线（prompt 已内联或手动）：
-grape knowledge context --repo "$ACCOUNT/$REPO_NAME" --agent_type sre --json-out
+# 项目知识基线已由服务端 prompt 内联（0.3.3 移除 knowledge context 命令——不存在，勿用）
 # A2 拉代码（grape git 透传）——部署用分支：$GRAPE_WORK_BRANCH（默认 main）
 grape git clone "https://gitcode.com/$ACCOUNT/$REPO_NAME.git" /tmp/deploy-ws && cd /tmp/deploy-ws
 git checkout "$GRAPE_WORK_BRANCH" 2>&1 || git checkout main
@@ -35,18 +34,18 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
   --json '{"body":"[SRE Agent] 部署验证结论：{验证清单表格 + 结论 / 阻塞原因 + 恢复路径}"}' --json-out
 ```
 
-## STOP 评论模板（AK/SK 缺失且需云部署——Step 0 分支——必发）
+## STOP 评论模板（凭据缺失且需云部署——Step 0 分支——必发）
 
 ```bash
 # body（完整恢复路径——用户按此操作即可继续流水线）：
 #   [SRE Agent] 部署前置检查未通过：华为云 AK/SK 未配置。
 #   本次未执行任何云操作。
 #   👉 恢复路径：
-#   1. 在 Grape 控制台配置华为云 AK/SK（个人设置 → 云凭据 → AK/SK）
+#   1. 在 场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK（个人设置 → 云凭据 → AK/SK）
 #   2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』
 #   3. 平台将自动重新触发本部署任务——无需其他操作
 grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"body":"[SRE Agent] 部署前置检查未通过：华为云 AK/SK 未配置。本次未执行任何云操作。\n\n👉 恢复路径：\n1. 在 Grape 控制台配置华为云 AK/SK（个人设置 → 云凭据 → AK/SK）\n2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』\n3. 平台将自动重新触发本部署任务——无需其他操作"}' --json-out
+  --json '{"body":"[SRE Agent] 部署前置检查未通过：华为云 AK/SK 未配置。本次未执行任何云操作。\n\n👉 恢复路径：\n1. 在 场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK（个人设置 → 云凭据 → AK/SK）\n2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』\n3. 平台将自动重新触发本部署任务——无需其他操作"}' --json-out
 ```
 
 ## 场景 B：PR 合并自动部署（pull_request_merged）

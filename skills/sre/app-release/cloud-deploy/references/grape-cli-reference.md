@@ -29,11 +29,11 @@ grape CLI 支持三种认证方式（优先级从高到低）：
 
 ```bash
 # 单次使用
-grape --token "$BOT_GITCODE_TOKEN" --base-url https://api.gitcode.com tasks mine
+grape --token "$BOT_GITCODE_TOKEN" --base-url https://api.gitcode.com tasks current
 
 # 或设置环境变量
 export GRAPE_API_TOKEN="$BOT_GITCODE_TOKEN"
-grape tasks mine
+grape tasks current
 ```
 
 ### Base URL
@@ -73,7 +73,8 @@ grape --base-url https://api.gitcode.com --token "$BOT_GITCODE_TOKEN" git-repo i
 | `grape git-repo branches --owner <o> --repo <r>` | 分支列表 |
 | `grape git-repo commits --owner <o> --repo <r>` | 提交历史 |
 | `grape git-repo contents --owner <o> --repo <r> --path <p>` | 文件内容 |
-| `grape git-repo git credential --owner <o> --repo <r>` | 一次性 git 凭据 |
+
+> ⚠️ `grape git-repo git credential` **不存在**（0.3.3 实测 `No such command`——v2.1.0 契约已移除该端点）——git 克隆/拉取认证统一由 **GIT_ASKPASS 注入**处理，不要引用。
 
 ### Git 透传
 
@@ -92,14 +93,10 @@ grape git push origin feat/issue-5
 | 命令 | 说明 |
 |------|------|
 | `grape tasks current --json-out` | 当前任务 |
-| `grape tasks mine --json-out` | 我的任务列表 |
-| `grape tasks start --task_id <id>` | 打开任务会话 |
-| `grape tasks status --task_id <id> --json-out` | 查询任务状态（--json 可携带更新状态 body）|
 | `grape tasks complete --json '{"result_text":"...","next_step":"done","actions":[...],"conclusion":"...","artifacts":[...],"issue_summary":"..."}'` | 任务完成自报（会话 token 自动定位，无需 --task_id）|
-| `grape tasks close` | 关闭 Issue 的任务 |
-| `grape tasks clarify` | 任务澄清（流程内问答）|
+| `grape tasks notify` | 通知（等待人工确认等场景）|
 
-> ⚠️ `tasks create` / `tasks wait` 已从契约移除（0.3.3：建任务用 `issues create`；轮询终态用 `tasks status` 循环）——不得使用。
+> ⚠️ `tasks` 组命令面（0.3.3 实测 `grape tasks --help`）仅为 `complete` / `current` / `notify` / `wait`——`tasks mine` / `start` / `status` / `close` / `clarify` **不存在**（v2.1.0 契约已移除）；`tasks create` 亦不存在——建任务用 `issues create`；轮询终态用 `tasks wait --task_id <id>`（或 `issues pipeline` 查流水线）。不得使用上述不存在命令。
 
 ### A2A 交办
 
@@ -117,12 +114,9 @@ grape a2a handoff --json '{
 }'
 ```
 
-### 通用 API 兜底
+### 无 grape api 逃生舱
 
-```bash
-grape api GET /api/repos/XOcto/grape-cli
-grape api POST /api/repos/XOcto/grape-cli/issues/5/comments -d '{"body":"评论内容"}'
-```
+v0.2.2 起移除 `grape api` 通用兜底命令（0.3.3 实测 `No such command`）——契约未覆盖的端点无法通过 CLI 调用，**不要 curl 直连**。项目知识基线由服务端 prompt 内联（`knowledge context/content` 亦已于 v2.1.0 移除）。
 
 ### 其他
 

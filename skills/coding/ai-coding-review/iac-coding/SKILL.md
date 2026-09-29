@@ -19,7 +19,7 @@ tools:
 3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）；token 不写文件/日志/评论，不 printenv 打印。
 4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
 5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
-6. **AK/SK 纪律**：`HUAWEICLOUD_SDK_AK/SK` 从 Grape 控制台配置注入；未配置 → 前置门 STOP 提示配置，**严禁从其他位置寻找凭证**；AK/SK 不得硬编码到任何 .tf 文件（一律环境变量映射 `HW_ACCESS_KEY`/`HW_SECRET_KEY`）。
+6. **AK/SK 纪律**：华为云凭据经场景 custom_fields 注入（`GRAPE_CF_MAP` 按 key 取 `HUAWEI_AK/HUAWEI_SK`——凭据走平台通道）；未配置 → 前置门 STOP 提示「在场景高级选项 custom_fields 配置 HUAWEI_AK/HUAWEI_SK」，**严禁从其他位置寻找凭证**；AK/SK 不得硬编码到任何 .tf 文件（一律环境变量映射 `HW_ACCESS_KEY`/`HW_SECRET_KEY`）。
 7. **terraform 边界**：编码只执行到 `terraform plan`（只读预览）——**禁止 terraform apply / destroy**（部署是 SRE 职责）。
 8. **长命令/常驻命令纪律**：terraform init/plan 等可能长耗时 → 加 `timeout` 限制、一次只装必要依赖；常驻/服务命令严禁前台执行（后台 + 验证 + kill 或交 SRE）。
 
@@ -33,9 +33,22 @@ tools:
 | `ISSUE_NUMBER` | Issue 编号 | A2A payload / 分支名 feat/issue-{n} | 全部 |
 | `PR_NUMBER` | PR 编号（代码优化场景有）| A2A payload | 有 PR 时 |
 | `GRAPE_WORK_BRANCH` | 场景工作基线分支 | checkout 基座 | 场景任务 |
-| `HUAWEICLOUD_SDK_AK/SK` | 华为云凭据（资源规格查询/plan 凭证）| hcloud/obsutil 查询 + terraform 凭证映射 | 注入时 |
+| `HUAWEI_AK`/`HUAWEI_SK` | 华为云凭据（资源规格查询/plan 凭证——场景 custom_fields → `GRAPE_CF_MAP` 按 key 动态取值，**凭据走平台通道**）| hcloud/obsutil 查询 + terraform 凭证映射 | 场景配置时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
+
+> **华为云凭据取值（GRAPE_CF_* 通道）**：场景 custom_fields 配置 `HUAWEI_AK`/`HUAWEI_SK` key → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`。技能不硬编码序号，按 key 动态取值：
+
+```bash
+eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
+m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
+for var, key in m.items():
+    v = os.environ.get(var, "")
+    print("export %s=%r" % (key, v))
+')"
+HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+```
+（凭据值只进 env 不进 prompt——不回显到日志/评论）
 本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
@@ -46,7 +59,7 @@ tools:
 | 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退内置快照）|
 | 任务上下文 | `grape tasks current` + `grape issues detail` | 拿到任务与上下文 | 定位不到 → STOP（不执行写操作）|
 | terraform 可用 | `terraform version` | ≥1.7.5 且 ≤1.10.5 | **自愈**：按官方源安装 → 再验；仍不可用 → 报告阻塞 |
-| 华为云凭据（资源规格查询前）| `${HUAWEICLOUD_SDK_AK:+ok}` 校验 | 有值 | **STOP**：提示「请在 Grape 控制台配置华为云 AK/SK 后重试」——不寻找不借用（资源规格查询是 TF 生成前置——见 4.3）|
+| 华为云凭据（资源规格查询前）| `${HUAWEI_AK:+ok}` 校验（GRAPE_CF_MAP 映射后）| 有值 | **STOP**：提示「请在场景高级选项 custom_fields 配置 HUAWEI_AK/HUAWEI_SK 后重试」——不寻找不借用（资源规格查询是 TF 生成前置——见 4.3）|
 | 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
 ## 四、技能定义与执行
@@ -93,7 +106,7 @@ tools:
 
 **执行规则**：
 - ⚠️ **启动即读 `references/iac-coding-runbook.md`**——每步具体命令按走查表照抄执行（不现场查 --help）
-- 资源规格查询（③）成功是 TF 生成前提——查询失败/AK/SK 缺失 → **不降级继续**（STOP 提示配置或报告阻塞——见 4.5）
+- 资源规格查询（③）成功是 TF 生成前提——查询失败/凭据缺失 → **不降级继续**（STOP 提示配置或报告阻塞——见 4.5）
 - TF 边界：只到 `terraform plan`——apply/destroy 一律禁止
 - ⑧ A2A 防重复：先 `issues pipeline` 查已含 `qa:a2a_event` 则不重复，只发评论
 - MUST 硬性必经节点：③ → ④ → ⑤ → ⑥ → ⑦ → ⑧ → 收尾
@@ -108,7 +121,7 @@ tools:
 | write 类必须 --json 字符串或 @file | 长 body 先写文件再 `--json @file`（防 shell 转义）|
 | 评论前缀 | 全部评论 `[coding Agent]` 开头 |
 | PR 描述 | `pulls create` 契约无 body 字段——创建后 `git-repo pulls update` 补描述（四段：变更说明/资源清单/文件变更/后续步骤）；title 用 Conventional Commits |
-| terraform 凭证 | `HW_ACCESS_KEY=${HUAWEICLOUD_SDK_AK}` 映射（env——不写进 .tf）|
+| terraform 凭证 | `HW_ACCESS_KEY=${HUAWEI_AK}` 映射（env——不写进 .tf）|
 | 防重复 A2A | A2A 前必查 `grape issues pipeline`（已含 `qa:a2a_event` 则不重复）|
 | PR 链接 | Web 页面 `/pull/`（单数）markdown 格式——不得用 API 路径 |
 
@@ -119,7 +132,7 @@ tools:
 | 403/权限不足 | Required | **STOP**：按安全硬约束④回复用户，等待配置 |
 | 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
 | 命令失败（报错/字段错误）| — | **先看完整 stderr** → 按 runbook 错误排查速查处理 → 不反复盲试 |
-| 华为云查询失败 / AK/SK 缺失 | Required | **不降级继续**——STOP 提示「请在 Grape 控制台配置华为云 AK/SK 后重试」或报告阻塞（资源规格是 TF 生成前置）|
+| 华为云查询失败 / 凭据缺失 | Required | **不降级继续**——STOP 提示「请在场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK 后重试」或报告阻塞（资源规格是 TF 生成前置）|
 | terraform init/validate/plan 失败 | Required | 看完整错误定位（provider/镜像/flavor 等问题）→ 修后重试 ≤2 次 → 仍失败：不创建 PR，Issue 评论报告失败原因和修复建议 |
 | git push 失败 | — | 检查分支状态后重试 ≤1 次；仍失败报告 |
 | A2A 调用非 2xx / 超时 | Required | 自动重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入 |

@@ -96,5 +96,5 @@ grape --version      # 确认版本（≥0.3.2）
 - **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）和 prompt 注入的 `$BOT_GITCODE_TOKEN`（GIT_ASKPASS）。不得从数据库、配置文件、日志、历史中寻找其他 token。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`user_accounts` 表、`managed_repos` 表、`configs/` 目录（含 `global-bot-token.json` 等）。`data/workspaces/` 项目知识文档除外。
 - **403/401 处理**：命令返回 403 或权限不足时，停止操作并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行手段。
-- **华为云凭证**：只用 `HUAWEICLOUD_SDK_AK/SK` 环境变量映射（A3 export）——禁用 hcloud CLI profile 里的凭据（权限不一致），不写 .tf 不 printenv。
+- **华为云凭证**：只用 `HUAWEI_AK/SK` 环境变量映射（A3 export）——禁用 hcloud CLI profile 里的凭据（权限不一致），不写 .tf 不 printenv。
 - **token 不写入文件**：不将 token 写进日志、脚本、Issue 评论或工具调用以外的地方。

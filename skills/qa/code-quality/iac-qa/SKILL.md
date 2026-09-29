@@ -20,7 +20,7 @@ tools:
 3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）；token 不写文件/日志/评论，不 printenv 打印。
 4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
 5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
-6. **华为云查询可选**：`HUAWEICLOUD_SDK_AK/SK` 已注入 → 资源规格交叉验证；未注入 → 报告中标注「资源规格未交叉验证」——**不寻找/不借用**，不阻塞。
+6. **华为云查询可选**：`HUAWEI_AK/SK` 有值（GRAPE_CF_MAP 映射）→ 资源规格交叉验证；无值 → 报告中标注「资源规格未交叉验证」——**不寻找/不借用**，不阻塞。
 7. **terraform 边界**：只执行 `terraform plan` 审查（只读）——**禁止 terraform apply / destroy**（SRE 职责）。
 8. **长命令/常驻命令纪律**：terraform init/plan 长耗时 → 加 `timeout`；常驻命令严禁前台执行。
 
@@ -34,9 +34,22 @@ tools:
 | `ISSUE_NUMBER` | Issue 编号 | A2A payload | 全部 |
 | `PR_NUMBER` | PR 编号 | pulls get/files/merge | 全部 |
 | `GRAPE_WORK_BRANCH` | 工作基线（terraform plan 用）| plan 分支 | 场景任务 |
-| `HUAWEICLOUD_SDK_AK/SK` | 华为云凭据（资源交叉验证——可选）| hcloud 查询 | 注入时 |
+| `HUAWEI_AK/SK` | 华为云凭据（资源交叉验证——可选）| hcloud 查询 | 场景配置时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
+
+> **华为云凭据取值（GRAPE_CF_* 通道）**：场景 custom_fields 配置 `HUAWEI_AK`/`HUAWEI_SK` key → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`。技能不硬编码序号，按 key 动态取值：
+
+```bash
+eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
+m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
+for var, key in m.items():
+    v = os.environ.get(var, "")
+    print("export %s=%r" % (key, v))
+')"
+HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+```
+（凭据值只进 env 不进 prompt——不回显到日志/评论）
 本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
@@ -47,7 +60,7 @@ tools:
 | 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退内置快照）|
 | 任务上下文 | `grape tasks current` + `grape issues detail` | 拿到任务与上下文 | 定位不到 → STOP（不执行写操作）|
 | PR/Issue 就绪 | `grape git-repo pulls get` + `pulls files` | 拿到 PR 与 diff | PR 无 diff → 终止并说明 |
-| 华为云凭据（仅交叉验证用）| `${HUAWEICLOUD_SDK_AK:+ok}` 校验 | 有值才查 | 缺失 → 跳过查询，报告标注「资源规格未交叉验证」——不寻找不借用 |
+| 华为云凭据（仅交叉验证用）| `${HUAWEI_AK:+ok}` 校验 | 有值才查 | 缺失 → 跳过查询，报告标注「资源规格未交叉验证」——不寻找不借用 |
 | 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
 ## 四、技能定义与执行
@@ -60,7 +73,7 @@ tools:
 | 行为 | 态度 |
 |------|------|
 | 审查包含代码质量/功能/安全三方面 | ✅ **必须做** |
-| IaC PR 交叉验证资源规格可用性 | ✅ **必须做**（AK/SK 缺失 → 标注未交叉验证，不阻塞）|
+| IaC PR 交叉验证资源规格可用性 | ✅ **必须做**（凭据缺失 → 标注未交叉验证，不阻塞）|
 | terraform plan 审查（真实 OBS backend 验证 state 读写）| ✅ **必须做**（只 plan——不 apply）|
 | 问题按 P0/P1/P2/P3 分级 | ✅ **必须做** |
 | 发现问题在 PR 评论详细描述 | ✅ **必须做** |
@@ -114,7 +127,7 @@ tools:
 | 403/权限不足（含 merge 失败）| Required | **STOP**：按安全硬约束④回复用户，等待配置；merge 失败 → PR 评论告知等待人工处理 |
 | 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
 | 命令失败（报错/字段错误）| — | **先看完整 stderr** → 按 runbook 错误排查速查处理 → 不反复盲试 |
-| 华为云查询失败 / AK/SK 缺失 | Optional | 报告标注「资源规格未交叉验证」——不阻塞不借用 |
+| 华为云查询失败 / 凭据缺失 | Optional | 报告标注「资源规格未交叉验证」——不阻塞不借用 |
 | terraform plan 失败（OBS backend 不通等）| Required | 看完整错误定位 → 修后重试 ≤2 次 → 仍失败：报告标注「plan 未执行」+ 原因 |
 | A2A 调用非 2xx / 超时 | Required | 自动重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入 |
 | merge 重复（已合并）| — | 检查 PR 状态（`pulls get`）——已合并则跳过 merge 直接 A2A sre |

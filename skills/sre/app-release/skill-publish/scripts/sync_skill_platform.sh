@@ -86,13 +86,25 @@ if [[ "$ACTION" == "publish" ]]; then
   fi
 fi
 
-# ---- 环境变量缺失时从项目知识加载（.project-info/ 下递归扫描 JSON）-----------
-# 按当前平台检查所需 token 和 PUBLISH_REPO，任一缺失则从项目知识加载
+# ---- 凭据与配置获取 ------------------------------------------------------------
+# 凭据（平台 token）走平台通道：场景 custom_fields → GRAPE_CF_MAP 按 key 动态取值（skill-publish SKILL.md 硬约束①）
+# 配置（GITHUB/GITCODE_PUBLISH_REPO）从项目知识加载（.project-info/ 下非凭据 member 文档——config 字段）
+if [[ -n "${GRAPE_CF_MAP:-}" ]]; then
+  while IFS='=' read -r key val; do
+    [[ -n "$key" && -n "$val" ]] && export "$key=$val"
+  done < <(python3 -c "
+import json, os
+m = json.loads(os.environ.get('GRAPE_CF_MAP', '{}'))
+for var, key in m.items():
+    v = os.environ.get(var, '')
+    if v: print(f'{key}={v}')
+" 2>/dev/null)
+fi
 _need_load=0
 if [[ "$PLATFORM" == "gitcode" ]]; then
-  [[ -z "${GITCODE_TOKEN:-}" || -z "${GITCODE_PUBLISH_REPO:-}" ]] && _need_load=1
+  [[ -z "${GITCODE_PUBLISH_REPO:-}" ]] && _need_load=1
 else
-  [[ -z "${GITHUB_TOKEN:-}" || -z "${GITHUB_PUBLISH_REPO:-}" ]] && _need_load=1
+  [[ -z "${GITHUB_PUBLISH_REPO:-}" ]] && _need_load=1
 fi
 if [[ "$_need_load" == "1" ]]; then
   while IFS='=' read -r key val; do
@@ -102,7 +114,7 @@ import json, glob
 for f in glob.glob('.project-info/**/*.json', recursive=True):
     try:
         d = json.load(open(f))
-        for k, v in {**d.get('secrets',{}), **d.get('config',{})}.items():
+        for k, v in d.get('config', {}).items():   # 仅 config——凭据类字段（secrets）平台不物化，不在此读取
             if v: print(f'{k}={v}')
     except: pass
 " 2>/dev/null)

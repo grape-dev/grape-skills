@@ -4,12 +4,12 @@
 
 ## 凭证获取（QA 执行 terraform plan 时需要）
 
-QA 执行 `terraform plan` 审查时需要 AK/SK 连接 OBS backend 和调用 provider API。AK/SK 从 Grape 控制台获取（与 SRE Agent 使用同一组凭证）。Grape 控制台注入的变量名是 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`，必须映射为 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。仅用于 plan（只读），不执行 apply/destroy。
+QA 执行 `terraform plan` 审查时需要 AK/SK 连接 OBS backend 和调用 provider API。AK/SK 从场景 custom_fields 获取（GRAPE_CF_MAP 映射）（与 SRE Agent 使用同一组凭证）。场景 custom_fields 配置的 key（经 GRAPE_CF_MAP 映射）是 `HUAWEI_AK`/`HUAWEI_SK`，必须映射为 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。仅用于 plan（只读），不执行 apply/destroy。
 
 ```bash
-# Grape 控制台变量名 → Terraform 期望的变量名映射
-export HW_ACCESS_KEY="${HUAWEICLOUD_SDK_AK}"
-export HW_SECRET_KEY="${HUAWEICLOUD_SDK_SK}"
+# 场景 custom_fields key → Terraform 期望的变量名映射
+export HW_ACCESS_KEY="${HUAWEI_AK}"
+export HW_SECRET_KEY="${HUAWEI_SK}"
 export HW_REGION="cn-north-4"
 export AWS_ACCESS_KEY_ID="$HW_ACCESS_KEY"
 export AWS_SECRET_ACCESS_KEY="$HW_SECRET_KEY"

@@ -44,8 +44,7 @@ grape --version      # 确认版本
 
 | 命令 | 用途 |
 |------|------|
-| `grape knowledge context --repo {owner}/{repo} --agent_type qa --json-out` | 合并注入上下文（项目知识基线等） |
-| `grape knowledge content --repo {owner}/{repo} --file {path} --json-out` | 读取知识文件全文 |
+| ~~`grape knowledge context` / `knowledge content`~~ | **❌ 已移除（v2.1.0 契约，0.3.3 实测不存在）**——项目知识基线由服务端 prompt 内联，无需 CLI 读取 |
 
 ### 3.3 PR 读取（审查核心）
 
@@ -131,8 +130,8 @@ pr 引用的命令子集（§3.1-§3.6）经 `grape commands` + `grape <cmd> --h
 | `grape git-repo issues comments list` | GET | ✅ 可执行 |
 | `grape git-repo issues comments create` | POST | ✅ 可执行（body: `body`） |
 | `grape git-repo issues update` | PATCH | ✅ 可执行（body: `assignee/body/labels/milestone_id/state`） |
-| `grape knowledge context` | GET | ✅ 可执行（`--repo/--agent_type/--json-out`） |
-| `grape knowledge content` | GET | ✅ 可执行（`--repo/--file/--json-out`） |
+| ~~`grape knowledge context`~~ | GET | ❌ 已移除（v2.1.0 契约——0.3.3 实测不存在；基线由 prompt 内联） |
+| ~~`grape knowledge content`~~ | GET | ❌ 已移除（同上） |
 | `grape a2a handoff` | POST | ✅ 可执行（body: `agent/payload`） |
 
 > ⚠️ **不存在的命令/能力**（不要引用，不要 curl 直连补齐）：

@@ -12,7 +12,7 @@
 - **Terraform >= 1.7.5 且 <= 1.10.5**（⚠️ 版本硬约束，详见下方「Terraform 版本兼容性」段）
 - huaweicloud provider（最新版即可，实际验证 v1.94.0 可用；不要写 `~> 1.50` 或 `~> 1.60` 等上限约束，会匹配不到高版本）
 - obsutil 已安装（用于 OBS 对象操作，替代 curl SigV4）
-- 华为云 AK/SK 已获取（或通过 Grape 控制台注入）
+- 华为云 AK/SK 已获取（或经场景 custom_fields 配置——GRAPE_CF_MAP 映射取得）
 - OBS bucket 已创建（或通过 scripts/bootstrap.sh 创建）
 
 ## Terraform 版本兼容性（⚠️ 关键约束）
@@ -153,12 +153,12 @@ terraform init -backend=false
 
 ### 1. 凭证设置
 
-Grape 控制台注入的凭证环境变量名为 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`，但 Terraform provider 和 OBS S3 backend 期望的是 `HW_ACCESS_KEY`/`HW_SECRET_KEY` 和 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`。**必须先做变量映射**：
+场景 custom_fields 配置的凭据 key（经 GRAPE_CF_MAP 映射）为 `HUAWEI_AK`/`HUAWEI_SK`，但 Terraform provider 和 OBS S3 backend 期望的是 `HW_ACCESS_KEY`/`HW_SECRET_KEY` 和 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`。**必须先做变量映射**：
 
 ```bash
-# ⚠️ Grape 控制台注入的变量名 → Terraform 期望的变量名映射
-export HW_ACCESS_KEY="${HUAWEICLOUD_SDK_AK}"
-export HW_SECRET_KEY="${HUAWEICLOUD_SDK_SK}"
+# ⚠️ 场景 custom_fields 配置的 key（经 GRAPE_CF_MAP 映射） → Terraform 期望的变量名映射
+export HW_ACCESS_KEY="${HUAWEI_AK}"
+export HW_SECRET_KEY="${HUAWEI_SK}"
 export HW_REGION="cn-north-4"
 
 # AWS 兼容凭证（OBS S3 backend init 必需，与 HW 同值）
@@ -186,7 +186,7 @@ provider_installation {
 EOF
 fi
 
-# 敏感密码（如果 Grape 控制台未注入，通过 random_password 自动生成，可不设置）
+# 敏感密码（如果 场景 custom_fields 未配置，通过 random_password 自动生成，可不设置）
 # 如需手动指定（仅大小写+数字，不含特殊字符，避免 shell 转义问题）：
 # export TF_VAR_ecs_admin_pass='<ECS密码>'
 # export TF_VAR_rds_password='<RDS密码>'
@@ -199,7 +199,7 @@ fi
 
 ⚠️ **obsutil 凭证隔离**：`obsutil` 使用 `~/.obsutilconfig` 中的凭证，与环境变量 `HW_ACCESS_KEY`/`HW_SECRET_KEY` **不是同一套**。`~/.obsutilconfig` 中的 SK 可能是 base64 编码的，不要尝试解码或混用。obsutil 仅用于 OBS 对象上传/下载（如 inventory.json），**不用于 Terraform 部署**。
 
-⚠️ **Grape 控制台凭证变量名**：控制台注入的是 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`，不是 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。必须先做变量映射（见上方），否则 `terraform init` 会报 `No valid credential sources found`。
+⚠️ **场景 custom_fields 凭据 key 映射**：custom_fields 配置的是 `HUAWEI_AK`/`HUAWEI_SK`（经 GRAPE_CF_MAP 映射取得），不是 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。必须先做变量映射（见上方），否则 `terraform init` 会报 `No valid credential sources found`。
 
 > 以下 2-5 节为**示例项目（examples/blog-infrastructure）**的完整部署流程展示——**真实部署按 iac-sre-runbook A1-A5 执行**（workdir = /tmp/deploy-ws/iac,不依赖 examples/ 与 scripts/;OBS 上传直接 obsutil cp 见 runbook A5）。示例的 scripts/bootstrap.sh / save-inventory-to-obs.sh 仅示例项目自带。
 
@@ -325,8 +325,8 @@ hcloud CLI 与 Terraform/provider 使用的凭证可能不同。**资源验证�
 
 ### terraform init 失败：No valid credential sources found
 
-- 根因：环境变量 HW_ACCESS_KEY / HW_SECRET_KEY 未设置，或 Grape 控制台注入的是 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK` 但未做变量映射
-- 解决：先执行 `export HW_ACCESS_KEY="${HUAWEICLOUD_SDK_AK}"` / `export HW_SECRET_KEY="${HUAWEICLOUD_SDK_SK}"`，再设置 AWS 兼容变量
+- 根因：环境变量 HW_ACCESS_KEY / HW_SECRET_KEY 未设置，或 场景 custom_fields 配置的是（经 GRAPE_CF_MAP 映射） `HUAWEI_AK`/`HUAWEI_SK` 但未做变量映射
+- 解决：先执行 `export HW_ACCESS_KEY="${HUAWEI_AK}"` / `export HW_SECRET_KEY="${HUAWEI_SK}"`，再设置 AWS 兼容变量
 - 注意：同时需要设置 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY（S3 backend 兼容）
 - ⚠️ 不要使用 obsutil 的 `~/.obsutilconfig` 中的凭证——那是另一套，可能 base64 编码，不能直接用于 Terraform
 

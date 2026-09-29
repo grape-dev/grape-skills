@@ -37,7 +37,7 @@ tools:
 | `GRAPE_LINKED_WORKTREES` | 关联仓库 worktree 路径列表 JSON（平台自动初始化）| 读取关联仓库代码 | qa 任务且有 linked_repos 时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
-本技能不涉及 `GRAPE_WORK_BRANCH`/`BOT_USERNAME`（无 git 分支/身份操作——审查只读 diff）、`HUAWEICLOUD_SDK_AK/SK`（SRE 域）与 `USER_GITCODE_TOKEN`（Chat 域）。
+本技能不涉及 `GRAPE_WORK_BRANCH`/`BOT_USERNAME`（无 git 分支/身份操作——审查只读 diff）、`HUAWEI_AK/SK`（SRE 域）与 `USER_GITCODE_TOKEN`（Chat 域）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 

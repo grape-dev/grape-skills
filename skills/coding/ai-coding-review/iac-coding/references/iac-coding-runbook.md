@@ -47,7 +47,7 @@ mkdir -p docs tasks
 ### A3 · 资源规格查询验证（生成 TF 前必须执行——不可跳过）
 
 ```bash
-# 前置：${HUAWEICLOUD_SDK_AK:+ok} 校验——缺失 → STOP 提示配置（不寻找不借用——见 SKILL 4.5）
+# 前置：${HUAWEI_AK:+ok} 校验——缺失 → STOP 提示配置（不寻找不借用——见 SKILL 4.5）
 # ECS flavor（确认所选 flavor 在目标区域可用——JMESPath 过滤，防上下文爆炸）：
 hcloud ECS ListFlavors --cli-region=cn-north-4 --cli-output=json \
   --cli-query="flavors[?contains(name, '{flavor}')].{name:name, vcpus:vcpus, ram:ram}" 2>&1 | head -30
@@ -71,7 +71,7 @@ obsutil ls -s 2>&1 | grep -i "{桶名}" || echo "无同名桶"
 mkdir -p iac
 # 按 `references/huaweicloud-tf-conventions.md` 生成（目录结构/凭证映射/版本约束/OBS backend）
 # 凭证映射（env——不写进 .tf）：
-export HW_ACCESS_KEY="${HUAWEICLOUD_SDK_AK}"; export HW_SECRET_KEY="${HUAWEICLOUD_SDK_SK}"
+export HW_ACCESS_KEY="${HUAWEI_AK}"; export HW_SECRET_KEY="${HUAWEI_SK}"
 export HW_REGION="cn-north-4"; export AWS_ACCESS_KEY_ID="$HW_ACCESS_KEY"; export AWS_SECRET_ACCESS_KEY="$HW_SECRET_KEY"; export AWS_DEFAULT_REGION="cn-north-4"
 ```
 

@@ -14,9 +14,9 @@ tools:
 
 ## 一、安全硬约束（必须遵守）
 
-1. **令牌获取方式（仅限两类来源）**：优先从项目知识（`.project-info/` 目录递归扫描所有 JSON 文件）读取 secrets 字段令牌（CLAWHUB_TOKEN / GITHUB_TOKEN / GITCODE_TOKEN）+ config 字段发布配置（GITHUB_PUBLISH_REPO / GITCODE_PUBLISH_REPO / CLAWHUB_OWNER_HANDLE），读到后直接在 curl/脚本命令中使用；项目知识缺失时，扫描环境变量 `$CLAWHUB_TOKEN` / `$GITHUB_TOKEN` / `$GITCODE_TOKEN` / `$CLAWHUB_OWNER_HANDLE`。⚠️ sync_skill_platform.sh 脚本会自动从 `.project-info/` 读取令牌，agent 无需手动 export（export 不跨 shell 生效）。
-2. **禁止直连业务数据库**（repo_platform_tokens 等）、读取 Grape 运行目录（data/、configs/、sessions.db）或日志寻找 token；允许的 token 来源仅限：环境变量 + `.project-info/` 下 JSON 配置文件。
-3. **严禁遍历系统目录考古**（/usr/local/lib/hermes-agent、/opt/grape 等）——只读注入的环境变量或项目知识库 JSON 配置文件。
+1. **令牌获取方式（凭据走平台通道）**：平台 token（CLAWHUB_TOKEN / GITHUB_TOKEN / GITCODE_TOKEN）仅从**场景 custom_fields** 获取——`GRAPE_CF_MAP` 按 key 动态取值（平台注入通道）。⚠️ 服务端不向 `.project-info/` 物化凭据（member 凭据文件被显式过滤）——**读取 secrets 字段是空转路径，已废弃**；配置（GITHUB/GITCODE_PUBLISH_REPO / CLAWHUB_OWNER_HANDLE）从 `.project-info/` config（member 文档）解析。⚠️ sync_skill_platform.sh 脚本自动完成 GRAPE_CF_MAP 解析，agent 无需手动 export（export 不跨 shell 生效）。
+2. **禁止直连业务数据库**（repo_platform_tokens 等）、读取 Grape 运行目录（data/、configs/、sessions.db）或日志寻找 token；允许的 token 获取仅限：`GRAPE_CF_MAP` 映射的凭据变量（custom_fields）。
+3. **严禁遍历系统目录考古**（/usr/local/lib/hermes-agent、/opt/grape 等）——只读 `GRAPE_CF_*` 映射凭据或项目知识 `.project-info/` 非敏感配置（member 文档；凭据类文件平台不物化）。
 4. **401/403 严格区分**：401 = 令牌无效/过期 → 报告「{平台} 令牌无效或过期，请到设置页更新」→ 跳过该平台；403 = 令牌无权限 → 报告「{平台} 令牌对目标无权限，请检查 token 权限或目标归属」→ 跳过该平台；两者都**立即停止该平台任务，不重试、不用其他 token 绕行**。
 5. **token 绝不落盘**：不写入任何文件、日志、评论、脚本（项目知识库 JSON 由上层业务维护，本技能只读不写）。
 6. **所有 curl / git 调用设 30s 超时**（curl `--max-time 30`；git 用 `timeout 30`）——超时判定该平台任务失败，不 hang。
@@ -43,14 +43,27 @@ tools:
 | `ACCOUNT` / `REPO_NAME` | 派生（`${REPO_FULL_NAME%/*}` / `${REPO_FULL_NAME#*/}`）| 评论 --owner/--repo 参数 | grape 平台 |
 | `ISSUE_NUMBER` | 系统注入 | Issue 编号 | grape 平台 |
 | `PR_NUMBER` | 系统注入（A2A 时）| PR 编号追溯 | 有 PR 时 |
-| `CLAWHUB_TOKEN` | 项目知识 secrets / 环境变量 | ClawHub API Bearer token | 外部 ClawHub |
-| `GITHUB_TOKEN` | 项目知识 secrets / 环境变量 | GitHub PAT（x-access-token 格式）| 外部 GitHub |
-| `GITCODE_TOKEN` | 项目知识 secrets / 环境变量 | GitCode 目标仓库 push token（oauth2 格式）| 外部 GitCode |
-| `CLAWHUB_OWNER_HANDLE` | 项目知识 config / 环境变量 | ClawHub 组织 handle（可选，空=个人发布）| 外部 ClawHub |
-| `GITHUB_PUBLISH_REPO` | 项目知识 config / 环境变量 | GitHub 目标仓库 namespace/repo | 外部 GitHub |
-| `GITCODE_PUBLISH_REPO` | 项目知识 config / 环境变量 | GitCode 目标仓库 namespace/repo | 外部 GitCode |
+| `CLAWHUB_TOKEN` | 场景 custom_fields → `GRAPE_CF_MAP` 按 key（**凭据走平台通道**）| ClawHub API Bearer token | 外部 ClawHub |
+| `GITHUB_TOKEN` | 场景 custom_fields → `GRAPE_CF_MAP` 按 key（**凭据走平台通道**）| GitHub PAT（x-access-token 格式）| 外部 GitHub |
+| `GITCODE_TOKEN` | 场景 custom_fields → `GRAPE_CF_MAP` 按 key（**凭据走平台通道**）| GitCode 目标仓库 push token（oauth2 格式）| 外部 GitCode |
+| `CLAWHUB_OWNER_HANDLE` | 项目知识 `.project-info/` config（member 文档）→ 用户指令 | ClawHub 组织 handle（可选，空=个人发布）| 外部 ClawHub |
+| `GITHUB_PUBLISH_REPO` | 项目知识 `.project-info/` config（member 文档）→ 用户指令 | GitHub 目标仓库 namespace/repo | 外部 GitHub |
+| `GITCODE_PUBLISH_REPO` | 项目知识 `.project-info/` config（member 文档）→ 用户指令 | GitCode 目标仓库 namespace/repo | 外部 GitCode |
 
 敏感变量（token 类）**绝不 printenv、不落盘**。
+
+> **平台 token 取值（GRAPE_CF_* 通道——凭据走平台通道）**：场景 custom_fields 配置 `CLAWHUB_TOKEN` / `GITHUB_TOKEN` / `GITCODE_TOKEN` key → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`。技能不硬编码序号，按 key 动态取值：
+
+```bash
+eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
+m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
+for var, key in m.items():
+    v = os.environ.get(var, "")
+    print("export %s=%r" % (key, v))
+')"
+CLAWHUB_TOKEN="${CLAWHUB_TOKEN:-}"; GITHUB_TOKEN="${GITHUB_TOKEN:-}"; GITCODE_TOKEN="${GITCODE_TOKEN:-}"
+```
+（凭据值只进 env 不进 prompt——不回显到日志/评论）
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 
@@ -60,7 +73,7 @@ tools:
 | 契约刷新 | `grape refresh` | 成功 | 重试 ≤2 次；仍失败 → 继续（回退内置快照）|
 | 执行器脚本存在 | `ls scripts/sync_skill_platform.sh` | 文件存在且有执行权限 | 缺失 → STOP（GitHub/GitCode 平台无法执行——报告配置问题）|
 | 入参齐全 | A2A payload（action/skill_name/issue_number/publish 还需 pr_number+skill_dir）| 必填项全有 | 缺失 → 终止任务，Issue 评论返回参数缺失（4.2 路由）|
-| 目标平台令牌 | 项目知识 `.project-info/` JSON → 回退环境变量 | 至少一个有值 | 全缺或 401/403 → 按硬约束①/④ 跳过该平台（不中断其他平台）|
+| 目标平台令牌 | `GRAPE_CF_MAP` 映射（custom_fields）| 至少一个有值 | 全缺或 401/403 → 按硬约束①/④ 跳过该平台（不中断其他平台）|
 
 ## 四、技能定义与执行
 
@@ -73,7 +86,7 @@ tools:
 | 行为 | 态度 |
 |------|------|
 | 幂等探测 → bump 重试（≤3 次）→ 多平台发布/下架 → 校验 | ✅ **必须做** |
-| 令牌优先从项目知识读取，缺失时回退环境变量 | ✅ **必须做** |
+| 令牌从 `GRAPE_CF_MAP` 映射读取（custom_fields）；项目知识仅读非敏感 config | ✅ **必须做** |
 | 发布/下架完成后必须发 Issue 评论告知 | ✅ **必须做，不可跳过**（事件未完成处理）|
 | 一个平台失败不中断其他平台 | ✅ **必须做** |
 | 跳过平台时说明**真实原因**（令牌缺失/403 无权限/仓库 404/push 失败）| ✅ **必须做（不得用「未配置」兜底）** |
@@ -111,7 +124,7 @@ tools:
 
 1. **敏感文件扫描（发布前必执行）**——扫描 skill 目录，发现以下文件直接终止该平台发布并 Issue 评论告警：`.env` / `.env.*`；`id_rsa` / `id_ed25519` / `*.pem` / `*.p12` / `*.keystore`；文件名含 key/secret 但实际非密钥（如 keyboard-config.json）→ grep 文件内容检测 AK/SK/token 模式，命中才拦截。
 2. **定位 skill + 读 frontmatter**：仓库内 `skills/{name}/` 或根目录 `{name}/`（含 SKILL.md）；version 取 SKILL.md frontmatter（默认 0.1.0）；slug = name 转小写连字符；**文件指纹 SHA-256**：skill 目录全部文件**按文件路径字典序排序**后读取拼接，计算哈希（排除 `.git/`、`__pycache__/`、`*.pyc`——包含会导致指纹不一致）。
-3. **读取各平台令牌**（优先项目知识 `.project-info/` 下 JSON 配置文件，缺失时回退环境变量）：环境变量和 JSON 均缺失 → 报告「未配置 {平台} 令牌，请到设置页配置」→ 跳过该平台；401/403 → 按硬约束④区分报告 → 跳过（不中断其他平台）。
+3. **读取各平台令牌**（`GRAPE_CF_MAP` 按 key 映射——custom_fields 配置）：映射缺失 → 报告「未配置 {平台} 令牌，请在场景 custom_fields 配置对应 key 后重试」→ 跳过该平台；401/403 → 按硬约束④区分报告 → 跳过（不中断其他平台）。
 4. **幂等探测**：
    - 计算 skill 文件指纹 SHA-256（字典序排序拼接）
    - ClawHub: `GET /api/v1/skills/{slug}`（组织配置时带 `?ownerHandle=`）——200（skill 存在）→ 比对版本/指纹——内容未变 → 跳过（报告「已是最新，无需发布」）——变了 → bump 后发布；404（不存在）→ 直接发布
@@ -131,7 +144,7 @@ tools:
      脚本输出 JSON：`{"PUSHED":1/0, "BACKUP_BRANCH":"", "TARGET_URL":"", "MESSAGE":""}`；一个平台失败不中断其他平台。
 7. **脚本内置安全备份**：目录已存在且内容不同时自动建 `backup/pre-sync-{skill_name}` 分支并推远端（用 skill name 命名，覆盖旧备份，每个 skill 只保留 1 个备份分支）；内容一致时跳过，不建备份；备份分支推送失败不阻断主流程。
 8. **校验**：SHA256 逐字节比对 + 平台 API 确认状态；ClawHub 校验时从 `GET /api/v1/skills/{slug}` 返回的 `owner.handle` 拼接页面 URL（`https://clawhub.ai/{owner.handle}/skills/{slug}`）。
-9. **目标仓库解析（GitHub/GitCode）**：默认读 `$GITCODE_PUBLISH_REPO` / `$GITHUB_PUBLISH_REPO`（格式 namespace/repo）；用户指令指定目标仓库 → **只接受 namespace/repo 格式，拒绝完整 git URL**（用户指令优先级高于环境变量）；未配置 → 报告「未配置发布目标仓库，请到设置页配置」→ 跳过该平台。
+9. **目标仓库解析（GitHub/GitCode）**：默认从项目知识 `.project-info/` config（member 文档——非凭据文件）解析 `GITCODE_PUBLISH_REPO` / `GITHUB_PUBLISH_REPO`（格式 namespace/repo）；用户指令指定目标仓库 → **只接受 namespace/repo 格式，拒绝完整 git URL**（用户指令优先级高于环境变量）；未配置 → 报告「未配置发布目标仓库，请到设置页配置」→ 跳过该平台。
 10. **多平台发布 + 汇总回复**：一个平台失败不中断其他平台；按 4.6 发布结果表格式发 Issue 评论（**必须发——见 4.8**）。
 
 #### 下架路径（action=unpublish）
@@ -154,7 +167,7 @@ tools:
 
 #### ClawHub OwnerHandle（组织发布——发布/下架共用）
 
-1. ownerHandle 来源优先级：**用户指令指定 > 环境变量 $CLAWHUB_OWNER_HANDLE > 空（个人账号发布）**
+1. ownerHandle 来源优先级：**用户指令指定 > `.project-info/` config 的 CLAWHUB_OWNER_HANDLE（member 文档）> 空（个人账号发布）**
 2. SKILL.md 不存储 ownerHandle——归属完全由 API 入参控制
 3. 探测 GET / 下架 DELETE 必须带 `?ownerHandle={ownerHandle}`（配置了组织时）——不带只查个人命名空间，会误判组织 skill 不存在（404）
 4. POST payload 可选字段 ownerHandle：非空 = 发布到指定组织；token 必须具备该组织 publisher 角色，否则 403
@@ -165,7 +178,7 @@ tools:
    - 个人发布：`https://clawhub.ai/{用户名}/skills/{slug}`；组织发布：`https://clawhub.ai/{org}/skills/{slug}`
    - ⚠️ **不是** `https://clawhub.ai/skills/{slug}`（307 重定向到 `/skills/skills/{slug}`，页面空 skeleton）
    - ⚠️ **不是** `https://clawhub.ai/{用户名}/{slug}`（少了 `/skills/` 段，307 重定向）
-   - ownerHandle 获取优先级：a. 发布时使用的（用户指令/环境变量/JSON config）→ b. `GET /api/v1/skills/{slug}` 返回的 `owner.handle` → c. `GET /api/v1/whoami` 返回的 `user.handle`（个人发布兜底——用 Bearer $CLAWHUB_TOKEN 调）
+   - ownerHandle 获取优先级：a. 发布时使用的（用户指令 / `.project-info/` config）→ b. `GET /api/v1/skills/{slug}` 返回的 `owner.handle` → c. `GET /api/v1/whoami` 返回的 `user.handle`（个人发布兜底——用 Bearer $CLAWHUB_TOKEN 调）
    - 拼好 URL 后必须 `GET /api/v1/skills/{slug}` 确认 skill 存在（200=URL 正确，404=发布失败）
    - **不得自己拼 URL**——必须用上述优先级获取 ownerHandle
 
