@@ -20,7 +20,7 @@ tools:
 3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）；token 不写文件/日志/评论，不 printenv 打印。
 4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
 5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
-6. **华为云查询可选**：`HUAWEI_AK/SK` 有值（GRAPE_CF_MAP 映射）→ 资源规格交叉验证；无值 → 报告中标注「资源规格未交叉验证」——**不寻找/不借用**，不阻塞。
+6. **华为云查询可选**：`HUAWEI_AK/SK` 有值（两个入口：①【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK/HUAWEI_SK，name 严格用约定名——平台按 name 直注同名环境变量；② 通用设置配置华为云 AK/SK，注入 `HUAWEICLOUD_SDK_AK/SK` 自动兜底）→ 资源规格交叉验证；无值 → 报告中标注「资源规格未交叉验证」——**不寻找/不借用**，不阻塞。
 7. **terraform 边界**：只执行 `terraform plan` 审查（只读）——**禁止 terraform apply / destroy**（SRE 职责）。
 8. **长命令/常驻命令纪律**：terraform init/plan 长耗时 → 加 `timeout`；常驻命令严禁前台执行。
 
@@ -34,20 +34,14 @@ tools:
 | `ISSUE_NUMBER` | Issue 编号 | A2A payload | 全部 |
 | `PR_NUMBER` | PR 编号 | pulls get/files/merge | 全部 |
 | `GRAPE_WORK_BRANCH` | 工作基线（terraform plan 用）| plan 分支 | 场景任务 |
-| `HUAWEI_AK/SK` | 华为云凭据（资源交叉验证——可选）| hcloud 查询 | 场景配置时 |
+| `HUAWEI_AK/SK` | 华为云凭据（资源交叉验证——可选；用户按本技能文档在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】配置 name=HUAWEI_AK/HUAWEI_SK 按 name 直注，`HUAWEICLOUD_SDK_AK/SK` 旧名兜底）| hcloud 查询 | 场景配置时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
 
-> **华为云凭据取值（GRAPE_CF_* 通道）**：场景 custom_fields 配置 `HUAWEI_AK`/`HUAWEI_SK` key → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`。技能不硬编码序号，按 key 动态取值：
+> **华为云凭据取值**：用户在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK/name=HUAWEI_SK → 平台**按 name 直注**同名环境变量 → 技能直接读取（兼容通用设置旧名 `HUAWEICLOUD_SDK_AK/SK` 兜底）：
 
 ```bash
-eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
-m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
-for var, key in m.items():
-    v = os.environ.get(var, "")
-    print("export %s=%r" % (key, v))
-')"
-HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+HUAWEI_AK="${HUAWEI_AK:-${HUAWEICLOUD_SDK_AK:-}}"; HUAWEI_SK="${HUAWEI_SK:-${HUAWEICLOUD_SDK_SK:-}}"
 ```
 （凭据值只进 env 不进 prompt——不回显到日志/评论）
 本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。

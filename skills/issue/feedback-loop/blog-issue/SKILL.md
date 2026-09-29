@@ -38,7 +38,7 @@ tools:
 | `BLOG_HOST` | 博客系统地址（**外部解析值，非平台注入**——从知识基线 project-info/member/blog-config.yaml 或 Issue 正文/评论解析）| 博客系统验证与 Spec 发布目标 | 博客场景解析 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
-本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（iac 域）与 `USER_GITCODE_TOKEN`（Chat 域）。`BLOG_HOST` 解析不到 → 博客链路 STOP 并在评论询问用户（见 runbook B1）。
+本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（iac 域）与 `USER_GITCODE_TOKEN`（Chat 域）。`BLOG_HOST` 解析不到 → 评论询问用户并**继续流程**（Spec 标注「发布目标待用户提供」——不阻塞内容生成交办——sre 发布前再落实，见 runbook B1）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 
@@ -119,7 +119,7 @@ tools:
 | 401/凭据失效（token 过期）| Optional | 说明「凭据已失效」即可——不替换/绕行（硬约束⑥）|
 | 命令失败（报错/参数不识别/字段错误）| — | **先看完整 stderr** → 按 runbook 错误排查速查处理 → 不反复盲试 |
 | A2A 失败（非 2xx/超时）| Required | 重试 ≤3 次 → 仍失败：评论说明 + next_step 标注人工介入 |
-| BLOG_HOST 解析不到 | Required | 博客链路 STOP——评论询问用户博客系统地址（runbook B1）|
+| BLOG_HOST 解析不到 | Required | 评论询问用户博客系统地址 + **流程继续**——Spec 标注「发布目标待用户提供」，A2A coding 照常交办（sre 发布前再落实，runbook B1）|
 | 博客系统 /health 不可达 | Required | 评论说明 + Spec 标注「发布目标待验证」——仍可先交办内容生成（不阻塞），发布前 sre 再验证 |
 | AI 模型配置缺失（ai-models.yaml 无 image/video key）| Optional | Spec 标注「模型配置待 Coding Agent 验证」——不阻塞不借用 |
 | notify 返回 `{ok:false}` | — | 评论说明「责任人未注册平台」——继续收尾（不阻塞）|

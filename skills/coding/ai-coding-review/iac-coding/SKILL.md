@@ -19,7 +19,7 @@ tools:
 3. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）；token 不写文件/日志/评论，不 printenv 打印。
 4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
 5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
-6. **AK/SK 纪律**：华为云凭据经场景 custom_fields 注入（`GRAPE_CF_MAP` 按 key 取 `HUAWEI_AK/HUAWEI_SK`——凭据走平台通道）；未配置 → 前置门 STOP 提示「在场景高级选项 custom_fields 配置 HUAWEI_AK/HUAWEI_SK」，**严禁从其他位置寻找凭证**；AK/SK 不得硬编码到任何 .tf 文件（一律环境变量映射 `HW_ACCESS_KEY`/`HW_SECRET_KEY`）。
+6. **AK/SK 纪律**：华为云凭据两个配置入口（提示用户任选其一）：①【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 `name=HUAWEI_AK`、`value=<AK>` 与 `name=HUAWEI_SK`、`value=<SK>`（**name 必须严格用这两个约定名**——平台按 name 直接注入同名环境变量，自定义其他名字技能读不到）；② 通用设置配置华为云 AK/SK（注入 `HUAWEICLOUD_SDK_AK/SK`，取值片段自动兜底兼容）。未配置 → 前置门 STOP 提示（含完整配置路径——见 4.3）；**严禁从其他位置寻找凭证**；AK/SK 不得硬编码到任何 .tf 文件（一律环境变量映射 `HW_ACCESS_KEY`/`HW_SECRET_KEY`）。
 7. **terraform 边界**：编码只执行到 `terraform plan`（只读预览）——**禁止 terraform apply / destroy**（部署是 SRE 职责）。
 8. **长命令/常驻命令纪律**：terraform init/plan 等可能长耗时 → 加 `timeout` 限制、一次只装必要依赖；常驻/服务命令严禁前台执行（后台 + 验证 + kill 或交 SRE）。
 
@@ -33,20 +33,14 @@ tools:
 | `ISSUE_NUMBER` | Issue 编号 | A2A payload / 分支名 feat/issue-{n} | 全部 |
 | `PR_NUMBER` | PR 编号（代码优化场景有）| A2A payload | 有 PR 时 |
 | `GRAPE_WORK_BRANCH` | 场景工作基线分支 | checkout 基座 | 场景任务 |
-| `HUAWEI_AK`/`HUAWEI_SK` | 华为云凭据（资源规格查询/plan 凭证——场景 custom_fields → `GRAPE_CF_MAP` 按 key 动态取值，**凭据走平台通道**）| hcloud/obsutil 查询 + terraform 凭证映射 | 场景配置时 |
+| `HUAWEI_AK`/`HUAWEI_SK` | 华为云凭据（资源规格查询/plan 凭证——用户按本技能文档在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】配置 name=HUAWEI_AK/HUAWEI_SK，平台按 name 直注同名 env；`HUAWEICLOUD_SDK_AK/SK` 旧名兜底）| hcloud/obsutil 查询 + terraform 凭证映射 | 场景配置时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
 
-> **华为云凭据取值（GRAPE_CF_* 通道）**：场景 custom_fields 配置 `HUAWEI_AK`/`HUAWEI_SK` key → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`。技能不硬编码序号，按 key 动态取值：
+> **华为云凭据取值**：用户在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK/name=HUAWEI_SK → 平台**按 name 直注**同名环境变量 → 技能直接读取（兼容通用设置旧名 `HUAWEICLOUD_SDK_AK/SK` 兜底）：
 
 ```bash
-eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
-m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
-for var, key in m.items():
-    v = os.environ.get(var, "")
-    print("export %s=%r" % (key, v))
-')"
-HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+HUAWEI_AK="${HUAWEI_AK:-${HUAWEICLOUD_SDK_AK:-}}"; HUAWEI_SK="${HUAWEI_SK:-${HUAWEICLOUD_SDK_SK:-}}"
 ```
 （凭据值只进 env 不进 prompt——不回显到日志/评论）
 本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。
@@ -59,7 +53,7 @@ HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
 | 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退内置快照）|
 | 任务上下文 | `grape tasks current` + `grape issues detail` | 拿到任务与上下文 | 定位不到 → STOP（不执行写操作）|
 | terraform 可用 | `terraform version` | ≥1.7.5 且 ≤1.10.5 | **自愈**：按官方源安装 → 再验；仍不可用 → 报告阻塞 |
-| 华为云凭据（资源规格查询前）| `${HUAWEI_AK:+ok}` 校验（GRAPE_CF_MAP 映射后）| 有值 | **STOP**：提示「请在场景高级选项 custom_fields 配置 HUAWEI_AK/HUAWEI_SK 后重试」——不寻找不借用（资源规格查询是 TF 生成前置——见 4.3）|
+| 华为云凭据（资源规格查询前）| `${HUAWEI_AK:+ok}` 校验 | 有值 | **STOP**：提示用户在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 `name=HUAWEI_AK`、`value=<AK>` 与 `name=HUAWEI_SK`、`value=<SK>`（name 严格用约定名）；或【通用设置】中配置华为云 AK/SK——后重试——不寻找不借用（资源规格查询是 TF 生成前置——见 4.3）|
 | 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
 ## 四、技能定义与执行
@@ -132,7 +126,7 @@ HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
 | 403/权限不足 | Required | **STOP**：按安全硬约束④回复用户，等待配置 |
 | 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
 | 命令失败（报错/字段错误）| — | **先看完整 stderr** → 按 runbook 错误排查速查处理 → 不反复盲试 |
-| 华为云查询失败 / 凭据缺失 | Required | **不降级继续**——STOP 提示「请在场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK 后重试」或报告阻塞（资源规格是 TF 生成前置）|
+| 华为云查询失败 / 凭据缺失 | Required | **不降级继续**——STOP 提示在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK、value=<AK> 与 name=HUAWEI_SK、value=<SK>（name 严格用约定名）；或【通用设置】配置华为云 AK/SK ——后重试或报告阻塞（资源规格是 TF 生成前置）|
 | terraform init/validate/plan 失败 | Required | 看完整错误定位（provider/镜像/flavor 等问题）→ 修后重试 ≤2 次 → 仍失败：不创建 PR，Issue 评论报告失败原因和修复建议 |
 | git push 失败 | — | 检查分支状态后重试 ≤1 次；仍失败报告 |
 | A2A 调用非 2xx / 超时 | Required | 自动重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入 |

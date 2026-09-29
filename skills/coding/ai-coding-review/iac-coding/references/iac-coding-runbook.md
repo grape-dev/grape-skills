@@ -47,7 +47,7 @@ mkdir -p docs tasks
 ### A3 · 资源规格查询验证（生成 TF 前必须执行——不可跳过）
 
 ```bash
-# 前置：${HUAWEI_AK:+ok} 校验——缺失 → STOP 提示配置（不寻找不借用——见 SKILL 4.5）
+# 前置：${HUAWEI_AK:+ok} 校验——缺失 → STOP 提示在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】配 name=HUAWEI_AK/HUAWEI_SK 或【通用设置】配置华为云 AK/SK（不寻找不借用——见 SKILL 4.5）
 # ECS flavor（确认所选 flavor 在目标区域可用——JMESPath 过滤，防上下文爆炸）：
 hcloud ECS ListFlavors --cli-region=cn-north-4 --cli-output=json \
   --cli-query="flavors[?contains(name, '{flavor}')].{name:name, vcpus:vcpus, ram:ram}" 2>&1 | head -30

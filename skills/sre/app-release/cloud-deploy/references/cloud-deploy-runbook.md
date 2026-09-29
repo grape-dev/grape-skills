@@ -10,7 +10,7 @@ grape refresh 2>&1 && echo REFRESH_OK          # 契约保鲜；失败重试 ≤
 grape tasks current --json-out                 # 当前任务（事件/Issue/Spec 指引）
 grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
 # AK/SK 未配置（HUAWEI_AK/SK 为空）且任务需要云资源部署
-# → STOP：提示「请在场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK 后重试」——不硬编码、不找替代（安全硬约束⑥/前置门）
+# → STOP：提示在【场景详情页 → 高级选项 → 自定义配置】配 name=HUAWEI_AK/HUAWEI_SK 或【通用设置】配置华为云 AK/SK 后重试——不硬编码、不找替代（安全硬约束⑥/前置门）
 #   并发出阻塞评论（含完整恢复路径——见场景 A「STOP 评论模板」）
 # 任务仅需构建验证（无需云资源）→ 走场景 A A4（构建+验证——不触云）
 ```
@@ -41,11 +41,11 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 #   [SRE Agent] 部署前置检查未通过：华为云 AK/SK 未配置。
 #   本次未执行任何云操作。
 #   👉 恢复路径：
-#   1. 在 场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK（个人设置 → 云凭据 → AK/SK）
+#   1. 在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK、value=<AK> 与 name=HUAWEI_SK、value=<SK>（name 严格用约定名）；或【通用设置】配置华为云 AK/SK
 #   2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』
 #   3. 平台将自动重新触发本部署任务——无需其他操作
 grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"body":"[SRE Agent] 部署前置检查未通过：华为云 AK/SK 未配置。本次未执行任何云操作。\n\n👉 恢复路径：\n1. 在 场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK（个人设置 → 云凭据 → AK/SK）\n2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』\n3. 平台将自动重新触发本部署任务——无需其他操作"}' --json-out
+  --json '{"body":"[SRE Agent] 部署前置检查未通过：华为云 AK/SK 未配置。本次未执行任何云操作。\n\n👉 恢复路径：\n1. 在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK、value=<AK> 与 name=HUAWEI_SK、value=<SK>（name 严格用约定名）；或【通用设置】配置华为云 AK/SK\n2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』\n3. 平台将自动重新触发本部署任务——无需其他操作"}' --json-out
 ```
 
 ## 场景 B：PR 合并自动部署（pull_request_merged）

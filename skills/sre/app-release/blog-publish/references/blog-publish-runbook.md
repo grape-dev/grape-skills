@@ -41,7 +41,7 @@ grape tasks current --json-out           # 当前任务上下文：A2A payload�
 curl -s "https://$BLOG_HOST/health"
 ```
 - 期望：`{"status":"ok","service":"blog-api","version":"1.0.0"}`
-- 失败：报告用户 + 重试 3 次（间隔 5s）→ 仍失败按 SKILL 4.5 停止（**不做后续任何发布操作**）
+- 失败 / BLOG_HOST 未提供：报告用户 + 重试 3 次（间隔 5s）→ 仍不可用 → **不 STOP 全链**：P3 内容 PR 合并照常（不依赖 BLOG_HOST）→ 博客 API 发布（P2/P4-P6）跳过 + 评论/result_text 如实注明「博客 API 未发布：BLOG_HOST 未提供/不可达」（对齐 SKILL 4.5）
 
 ---
 

@@ -20,7 +20,7 @@ tools:
 3. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
 4. **403/无权限**：立即停止并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁其他 token 或绕行。
 5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行。
-6. **AK/SK 纪律**：`HUAWEI_AK/SK` 经场景 custom_fields（GRAPE_CF_MAP 按 key 映射取得）；未配置 → 停止并提示用户配置，严禁硬编码或从他处寻找凭证。
+6. **AK/SK 纪律**：`HUAWEI_AK/SK` 两个配置入口——①【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 `name=HUAWEI_AK`/`name=HUAWEI_SK`（name 严格用约定名——平台按 name 直接注入同名环境变量）；② 通用设置配置华为云 AK/SK（注入 `HUAWEICLOUD_SDK_AK/SK`，取值片段自动兜底）。未配置 → 前置门 STOP 提示配置（完整路径见 4.3），严禁硬编码或从他处寻找凭证。
 7. **hcloud profile 隔离**：严禁 `hcloud configure set` 改 default profile——必须 `--cli-profile="task-$$"` 隔离，部署结束清理。
 8. **操作确认**：变更现有配置（安全组/资源配置等）与删除/释放云资源前，必须告知用户并取得确认；仅 A2A/PR 合并显式触发的部署写操作可自动执行。
 9. **长命令/常驻命令纪律**（sre 执行类必守）：构建/安装（npm/pip 编译）可能无输出 → 加 `timeout` 限制、一次只装必要依赖；`http.server` 等常驻验证命令严禁前台执行（用后台+curl 验证+kill 或一次 SSH 内完成）。
@@ -36,22 +36,16 @@ tools:
 | `PR_NUMBER` | PR 编号（PR 合并触发时）| 部署来源标记/汇报评论 | PR 合并时 |
 | `GRAPE_WORK_BRANCH` | 目标合入分支/工作基线（缺省仓库默认分支）| `grape git checkout` 部署分支 | 场景任务 |
 | `DEVOPS_EVENT_TYPE` | 事件类型（A2A 部署/资源释放/PR 合并）| 场景路由判断 | 全部 |
-| `HUAWEI_AK` / `HUAWEI_SK` | 华为云 AK/SK（场景 custom_fields → `GRAPE_CF_MAP` 按 key 动态取值——凭据走平台通道）| hcloud CLI 认证（`--cli-profile="task-$$"` 隔离）| SRE 任务 |
+| `HUAWEI_AK` / `HUAWEI_SK` | 华为云 AK/SK（用户按本技能文档在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】配置 name=HUAWEI_AK/HUAWEI_SK，平台按 name 直注同名 env；`HUAWEICLOUD_SDK_AK/SK` 旧名兜底）| hcloud CLI 认证（`--cli-profile="task-$$"` 隔离）| SRE 任务 |
 | `GRAPE_LINKED_REPOS` | 关联仓库列表 JSON（场景高级选项配置）| 多仓库构建部署（见 §4.9） | 场景配置了关联仓库时 |
 | `GRAPE_LINKED_WORKTREES` | 关联仓库 worktree 路径列表 JSON（平台自动初始化）| 读取关联仓库代码 | SRE/coding 任务且有 linked_repos 时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
 
-> **华为云凭据取值（GRAPE_CF_* 通道）**：场景 custom_fields 配置 `HUAWEI_AK`/`HUAWEI_SK` key → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`。技能不硬编码序号，按 key 动态取值：
+> **华为云凭据取值**：用户在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK/name=HUAWEI_SK → 平台**按 name 直注**同名环境变量 → 技能直接读取（兼容通用设置旧名 `HUAWEICLOUD_SDK_AK/SK` 兜底）：
 
 ```bash
-eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
-m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
-for var, key in m.items():
-    v = os.environ.get(var, "")
-    print("export %s=%r" % (key, v))
-')"
-HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+HUAWEI_AK="${HUAWEI_AK:-${HUAWEICLOUD_SDK_AK:-}}"; HUAWEI_SK="${HUAWEI_SK:-${HUAWEICLOUD_SDK_SK:-}}"
 ```
 （凭据值只进 env 不进 prompt——不回显到日志/评论）
 本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。流程内变量（`$ECS_IP`/`$INSTANCE_NAME` 等）为部署产物，非平台注入。
@@ -63,7 +57,7 @@ HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
 | CLI 可用 | `grape --version` | ≥0.3.2 | **自愈**：按 `references/grape-cli-installation.md` 自动安装/升级（`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`）→ 再验证；仍不可用 → 输出「前置检查未通过：<原因>」结束 |
 | 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退快照）|
 | 认证变量就绪 | `${VAR:+ok}` 校验（不打印值）| token/repo/issue 有值 | 缺失 → STOP「前置检查未通过」|
-| **华为云 AK/SK 就绪** | `${HUAWEI_AK:+ok}` 且 `${HUAWEI_SK:+ok}` | 均有值 | **STOP**：提示用户「请先在 场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK」——不硬编码、不找替代 |
+| **华为云 AK/SK 就绪** | `${HUAWEI_AK:+ok}` 且 `${HUAWEI_SK:+ok}` | 均有值 | **STOP**：提示用户在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 `name=HUAWEI_AK`、`value=<AK>` 与 `name=HUAWEI_SK`、`value=<SK>`（name 严格用约定名）；或【通用设置】配置华为云 AK/SK——后重试——不硬编码、不找替代 |
 | hcloud 可用 | `hcloud version --cli-profile="task-$$"` | 命令可用 | **自愈**：按 `references/deploy-guide.md` §2 自动安装（架构判定→下载→隐私确认）→ 再验 |
 | 瞬时失败（网络/限流）| — | — | **重试**：≤3 次（退避 1s/2s/4s）|
 
@@ -127,7 +121,7 @@ HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
 |------|------|------|
 | 403/权限不足（Required 操作）| Required | **STOP**：按安全硬约束④回复用户，等待配置 |
 | 401/凭据失效 | Optional | 说明「凭据已失效」即可——不尝试替换/绕行 |
-| AK/SK 未配置 | Required | **STOP**：提示「请先在 场景 custom_fields 配置 HUAWEI_AK/HUAWEI_SK」——不硬编码不找替代 |
+| AK/SK 未配置 | Required | **STOP**：提示在【场景详情页 → 高级选项 → 自定义配置】配置 name=HUAWEI_AK/HUAWEI_SK，或【通用设置】配置华为云 AK/SK——不硬编码不找替代 |
 | hcloud 缺失 | Required | **自愈**：按 deploy-guide §2 自动安装 → 再验 → 仍失败 STOP |
 | 命令失败（报错/参数/字段）| — | **先看完整 stderr** → 按 deploy-guide 排查 → 不反复盲试 |
 | 部署后 HTTP 非 200 | Required | 查端口/进程/安全组 → 修复重试（≤2 次）→ 仍失败 Issue 评论说明 + next_step 人工介入 |
