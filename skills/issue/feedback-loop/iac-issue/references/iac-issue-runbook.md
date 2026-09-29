@@ -62,11 +62,20 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 ```bash
 # 查看仓库结构（IaC 目录识别——terraform modules / pulumi stacks / cloudformation）：
 grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
-# 华为云资源现状查询（仅 AK/SK 已注入时——用 hcloud 查现有 VPC/ECS/RDS，避免 CIDR 冲突/重复创建/规格建议。命令族同 iac-coding A3/SRE A2）：
+# 华为云凭据取值（场景 custom_fields → GRAPE_CF_MAP 按 key）：
+#   eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
+#   m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
+#   for var, key in m.items():
+#       v = os.environ.get(var, "")
+#       print("export %s=%r" % (key, v))
+#   
+#   ')"
+#   HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+# 华为云资源现状查询（仅 HUAWEI_AK/SK 有值时——用 hcloud 查现有 VPC/ECS/RDS，避免 CIDR 冲突/重复创建/规格建议。命令族同 iac-coding A3/SRE A2）：
 #   hcloud VPC ListVpcs 2>&1 | grep -i "名称" || echo 无同名
 #   hcloud ECS ListServersDetails --limit 20 2>&1 | head -20
 #   hcloud RDS ListInstances 2>&1 | head -20
-# AK/SK 缺失 → 跳过，Spec 标注「待 Coding Agent 验证」，不寻找不借用）
+# HUAWEI_AK/SK 缺失 → 跳过，Spec 标注「待 Coding Agent 验证」，不寻找不借用）
 # Spec body 按 references/spec-generation.md 模板（需求描述/验收标准/技术方案/IaC 资源规划）写文件，再 @file（外层单引号防 shell 转义）：
 printf '%s' '{"body":"[Issue Agent] 📋 Spec Document\n\n{Spec 正文——按 spec-generation.md 模板}"}' > /tmp/iac-spec.json
 grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
@@ -132,5 +141,5 @@ grape tasks complete --json '{
 | `pulls list` / `issues list` 返回空 | 属正常（无 PR/无 Issue）——按「无历史」分支处理 |
 | 401 凭据失效 | 说明「凭据已失效」即可，不换 token（安全硬约束⑤）|
 | 403 账户/平台管理类 | 说明需管理员配置/`grape_` 级凭据，本技能不涉及——不绕行 |
-| 华为云查询失败 / AK/SK 缺失 | Spec 标注「待 Coding Agent 验证」——不阻塞不借用 |
+| 华为云查询失败 / 凭据缺失 | Spec 标注「待 Coding Agent 验证」——不阻塞不借用 |
 | 报「契约过期/命令不识别」| 先 `grape refresh` 再重试（前置门②）|

@@ -122,6 +122,10 @@ grape a2a handoff --json @/tmp/a2a-sre-payload.json --json-out
 #    > 请维护者操作：在 GitCode 页面点击【Merge】合并本 PR。"
 grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json @/tmp/review-body.json
+# ⚠️ 405（PR 已合并——pulls comments create 对已合并 PR 返回 405 Method Not Allowed）→ 降级：
+#   grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+#     --number "$ISSUE_NUMBER" --json @/tmp/review-body.json（发到关联 Issue，body 注明「PR #$PR_NUMBER 已合并——审查结论发至此」）
+#   PR 无关联 Issue 且 405 → 将结论写入 tasks complete result_text（不丢结论）
 ```
 
 > 跳过此步 = 事件未完成处理。例外：变更检视判定 SHA 未变更而跳过时，不发评论。
@@ -155,6 +159,7 @@ grape tasks complete --json '{
 | `unknown request field(s): ...` | `--json` 有契约不允许字段 → `--help` 看 Body fields 删多余 |
 | `pulls files` / `pulls get` 返回空 | 属正常（无变更/信息缺失）——按已获取信息出结论并标注 |
 | `pulls comments create` 报行内字段不支持 | 契约限制：只发普通 body——删掉 commit_id/path/position 字段（见 SKILL.md 安全硬约束⑦）|
+| `pulls comments create` 405（PR 已合并）| 降级 `issues comments create` 发关联 Issue（body 注明 PR 编号）；无关联 Issue → 结论写入 tasks complete result_text |
 | `issues update` 打标失败 | 先 `labels list` 确认 `bug`/`triaged` 标签存在（不存在先 create）|
 | `.sha` 文件不存在 | 属正常（首次审查）——按「有新变更」处理 |
 | 401 凭据失效 | 说明「凭据已失效」即可，不换 token（安全硬约束⑤）|

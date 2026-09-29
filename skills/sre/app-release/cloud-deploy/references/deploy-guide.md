@@ -31,13 +31,13 @@ hcloud version
 ```bash
 HC_PROFILE="task-$$"
 hcloud configure set --cli-profile="$HC_PROFILE" \
-  --cli-access-key="$HUAWEICLOUD_SDK_AK" \
-  --cli-secret-key="$HUAWEICLOUD_SDK_SK" \
+  --cli-access-key="$HUAWEI_AK" \
+  --cli-secret-key="$HUAWEI_SK" \
   --cli-region=cn-north-4 --cli-mode=AKSK
 
 # 包装函数：所有 hcloud 命令通过它执行
 hc() { hcloud "$@" --cli-profile="$HC_PROFILE"; }
-obs() { obsutil "$@" -i "$HUAWEICLOUD_SDK_AK" -k "$HUAWEICLOUD_SDK_SK" \
+obs() { obsutil "$@" -i "$HUAWEI_AK" -k "$HUAWEI_SK" \
   -e obs.cn-north-4.myhuaweicloud.com; }
 
 # 部署结束后清理

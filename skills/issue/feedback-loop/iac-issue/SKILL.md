@@ -21,7 +21,7 @@ tools:
 4. **403/无权限**：立即停止该操作并回复用户「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行。
 5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行（403=权限不足需配置；401=token 过期——区别处理）。
 6. **操作确认**：删除标签/评论、覆盖已有内容等流程外写操作前告知用户并确认（评论列 diff+理由）；分类、打标签、指派、评论、Spec 发布、A2A 交办属流程内声明（流水线显式触发），直接执行。
-7. **华为云查询可选**：`HUAWEICLOUD_SDK_AK/SK` 已注入 → 查询资源现状辅助 Spec；未注入 → **不寻找/不借用**——Spec 中标注「待 Coding Agent 验证」，不阻塞。
+7. **华为云查询可选**：华为云凭据经场景 custom_fields 注入（`GRAPE_CF_MAP` 按 key 取 `HUAWEI_AK/HUAWEI_SK`——凭据走平台通道）→ 有值则查询资源现状辅助 Spec；无值 → **不寻找/不借用**——Spec 中标注「待 Coding Agent 验证」，不阻塞。
 8. 本技能为纯平台交互（无长命令/常驻服务场景）：不执行 pip/npm 安装（CLI 自愈安装除外——加 `timeout 300` 防无输出误判）、不起服务、不跑测试。
 
 ## 二、环境变量表（平台注入，按 iac-issue Agent 类型）
@@ -34,9 +34,22 @@ tools:
 | `ISSUE_NUMBER` | Issue 编号 | --number / A2A payload | 全部 |
 | `PR_NUMBER` | PR 编号（有则填，无则不填）| A2A payload | 有 PR 时 |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 场景识别 | 全部 |
-| `HUAWEICLOUD_SDK_AK/SK` | 华为云凭据（辅助资源查询——可选）| huaweicloud_devkit 查询 | SRE 注入时 |
+| `HUAWEI_AK`/`HUAWEI_SK` | 华为云凭据（场景 custom_fields → `GRAPE_CF_MAP` 按 key 动态取值——**凭据走平台通道**，非 env 注入）| huaweicloud_devkit 查询（可选）| 场景配置时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token/AK/SK 类）**不 printenv、不落盘、不写评论**。
+
+> **华为云凭据取值（GRAPE_CF_* 通道）**：场景高级选项 `custom_fields` 配置 `{"key":"HUAWEI_AK","value":"..."}` / `{"key":"HUAWEI_SK","value":"..."}` → 平台注入 `GRAPE_CF_1..N` + `GRAPE_CF_MAP`（key 名→序号映射）。技能**不硬编码序号**，按 key 动态取值：
+
+```bash
+eval "$(printenv GRAPE_CF_MAP | python3 -c 'import json, os, sys
+m = json.load(sys.stdin) if os.environ.get("GRAPE_CF_MAP") else {}
+for var, key in m.items():
+    v = os.environ.get(var, "")
+    print("export %s=%r" % (key, v))
+')"
+HUAWEI_AK="${HUAWEI_AK:-}"; HUAWEI_SK="${HUAWEI_SK:-}"
+```
+（凭据值只进 env 不进 prompt——不回显到日志/评论）
 本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
@@ -46,7 +59,7 @@ tools:
 | CLI 可用 | `grape --version` | ≥0.3.2 | **自愈**：按 `references/grape-cli-installation.md` 自动安装/升级（`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`）→ 装好再验；仍不可用 → 结束任务并说明 |
 | 契约刷新 | `grape refresh` | 拉取最新契约成功 | **重试** ≤2 次；仍失败 → 继续（回退内置快照）|
 | 任务上下文 | `grape tasks current` + `grape issues detail` | 拿到任务与上下文 | 定位不到 → STOP（不执行写操作）|
-| 华为云凭据（仅资源查询用）| `${HUAWEICLOUD_SDK_AK:+ok}` 校验 | 有值才查 | 缺失 → 跳过查询，Spec 标注「待 Coding Agent 验证」——**不寻找/不借用** |
+| 华为云凭据（仅资源查询用）| `${HUAWEI_AK:+ok}` 校验（GRAPE_CF_MAP 映射后）| 有值才查 | 缺失 → 跳过查询，Spec 标注「待 Coding Agent 验证」——**不寻找/不借用** |
 | 瞬时失败（网络/限流）| — | — | **重试**：自动重试 ≤3 次（退避 1s/2s/4s）|
 
 ## 四、技能定义与执行
@@ -83,13 +96,13 @@ tools:
 
 ### 4.3 处理流程（统一骨架）
 
-**流程总览（一行）**：⓪ 任务上下文 → ① Issue 与历史（防重复/找模式）→ ② 分类+标签（diff 先行）→ ③ 指派 → ④ Spec（IaC 资源规划——AK/SK 有则查）→ ⑤ A2A coding（防重复）→ ⑥ 评论审核 → 收尾（4.8）
+**流程总览（一行）**：⓪ 任务上下文 → ① Issue 与历史（防重复/找模式）→ ② 分类+标签（diff 先行）→ ③ 指派 → ④ Spec（IaC 资源规划——HUAWEI_AK/SK 有则查）→ ⑤ A2A coding（防重复）→ ⑥ 评论审核 → 收尾（4.8）
 
 **执行规则**：
 - ⚠️ **启动即读 `references/iac-issue-runbook.md`**——每步具体命令按走查表照抄执行（不现场查 --help）
 - 标签变更先 diff 再提交；去除冗余标签评论列 diff + 理由
 - ⑤ 防重复 A2A：先 `issues pipeline` 查已含 `coding:a2a_event` 则不重复，只发评论
-- Spec 生成（feature 类必做）——IaC 资源规划需查询现状（AK/SK 有则查；无则标注待验证）
+- Spec 生成（feature 类必做）——IaC 资源规划需查询现状（HUAWEI_AK/SK 有则查；无则标注待验证）
 - MUST 硬性必经节点：⓪→②→④→⑤→收尾
 
 ### 4.4 命令标准（子集与坑点）
@@ -103,7 +116,7 @@ tools:
 | 评论前缀 | 全部评论 `[issue agent]` 开头；Spec 评论 `[Issue Agent] 📋 Spec Document` 开头 |
 | 标签变更 | 先 `labels list` 查存在性（不存在先 create）→ diff 后 update |
 | 防重复 A2A | A2A 前必查 `grape issues pipeline`（已含目标 agent 则不重复）|
-| 华为云查询 | 仅 AK/SK 已注入时用 **hcloud CLI** 查询资源现状（命令见 runbook Step 4）；缺失不寻找不借用 |
+| 华为云查询 | 仅 `HUAWEI_AK/SK` 有值（GRAPE_CF_MAP 映射）时用 **hcloud CLI** 查询资源现状（命令见 runbook Step 4）；缺失不寻找不借用 |
 
 ### 4.5 故障决策表
 
@@ -115,7 +128,7 @@ tools:
 | A2A 调用非 2xx / 超时 | Required | 自动重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入 |
 | `issues update` 失败（标签/分配不生效）| Required | 核对字段格式（labels 逗号分隔字符串、assignee 用 GitCode 用户名）|
 | `labels create` 失败 / 重复 | — | 先 list 确认存在（不存在才 create）——不重复创建 |
-| 华为云查询失败 / AK/SK 缺失 | Optional | Spec 标注「待 Coding Agent 验证」——不阻塞不借用 |
+| 华为云查询失败 / 凭据缺失 | Optional | Spec 标注「待 Coding Agent 验证」——不阻塞不借用 |
 | 知识基线 [degraded] | Optional | 降级分析 + 标注，不阻塞 |
 
 ### 4.6 输出格式（固定产物）

@@ -26,12 +26,12 @@ repo/
 
 ### AK/SK 来源
 
-华为云 AK/SK 从 Grape 控制台获取（与 SRE Agent 使用同一组凭证）。Grape 控制台注入的变量名是 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`，必须映射为 Terraform 期望的 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。Coding 执行 `terraform plan` 时需要 AK/SK 调用 provider API 验证资源规格，但**仅用于 plan（只读），不执行 apply/destroy**。
+华为云 AK/SK 从场景 custom_fields 获取（GRAPE_CF_MAP 映射）（与 SRE Agent 使用同一组凭证）。场景 custom_fields 配置的 key 是（经 GRAPE_CF_MAP 映射） `HUAWEI_AK`/`HUAWEI_SK`，必须映射为 Terraform 期望的 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。Coding 执行 `terraform plan` 时需要 AK/SK 调用 provider API 验证资源规格，但**仅用于 plan（只读），不执行 apply/destroy**。
 
 ```bash
-# Grape 控制台注入的变量名 → Terraform 期望的变量名映射
-export HW_ACCESS_KEY="${HUAWEICLOUD_SDK_AK}"
-export HW_SECRET_KEY="${HUAWEICLOUD_SDK_SK}"
+# 场景 custom_fields 配置的 key（经 GRAPE_CF_MAP 映射） → Terraform 期望的变量名映射
+export HW_ACCESS_KEY="${HUAWEI_AK}"
+export HW_SECRET_KEY="${HUAWEI_SK}"
 export HW_REGION="cn-north-4"
 export AWS_ACCESS_KEY_ID="$HW_ACCESS_KEY"
 export AWS_SECRET_ACCESS_KEY="$HW_SECRET_KEY"
@@ -161,13 +161,13 @@ resource "random_password" "ecs_password" {
 
 obsutil 使用 `~/.obsutilconfig` 中的凭证，与环境变量 `HW_ACCESS_KEY`/`HW_SECRET_KEY` **不是同一套**。`~/.obsutilconfig` 中的 SK 可能是 base64 编码的，不要尝试解码或混用。obsutil 仅用于 OBS 对象上传/下载，**不用于 Terraform 部署**。
 
-### Grape 控制台凭证变量名映射
+### 场景 custom_fields 凭据 key映射
 
-Grape 控制台注入的是 `HUAWEICLOUD_SDK_AK`/`HUAWEICLOUD_SDK_SK`，Terraform 期望的是 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。编码时生成的部署脚本/Makefile 中应包含变量映射：
+场景 custom_fields 配置的是（经 GRAPE_CF_MAP 映射） `HUAWEI_AK`/`HUAWEI_SK`，Terraform 期望的是 `HW_ACCESS_KEY`/`HW_SECRET_KEY`。编码时生成的部署脚本/Makefile 中应包含变量映射：
 
 ```bash
-export HW_ACCESS_KEY="${HUAWEICLOUD_SDK_AK}"
-export HW_SECRET_KEY="${HUAWEICLOUD_SDK_SK}"
+export HW_ACCESS_KEY="${HUAWEI_AK}"
+export HW_SECRET_KEY="${HUAWEI_SK}"
 export AWS_ACCESS_KEY_ID="$HW_ACCESS_KEY"
 export AWS_SECRET_ACCESS_KEY="$HW_SECRET_KEY"
 ```

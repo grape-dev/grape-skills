@@ -2,7 +2,7 @@
 
 > 目的：把 skill-publish 每一步**要做什么 + 用哪条确切命令 + 各平台 API 契约**固化下来，Agent **照着执行、不要查 `--help`**。
 > **域界纪律**：ClawHub/GitHub/GitCode = 外部平台——curl/脚本直连**合法**（本技能执行器域）；Grape 平台（评论/任务）交互**必须走 grape CLI**——**禁止 curl 直连 grape 平台 API**。
-> 环境变量直接使用：`$ACCOUNT`、`$REPO_NAME`、`$ISSUE_NUMBER`、`$PR_NUMBER`、`$CLAWHUB_TOKEN`、`$GITHUB_TOKEN`、`$GITCODE_TOKEN`、`$CLAWHUB_OWNER_HANDLE`（令牌优先从 `.project-info/` JSON 读——sync 脚本自动读，agent 无需 export）。
+> 任务变量：`$ACCOUNT`、`$REPO_NAME`、`$ISSUE_NUMBER`、`$PR_NUMBER` 平台注入；token（`CLAWHUB_TOKEN`/`GITHUB_TOKEN`/`GITCODE_TOKEN`）**仅从场景 custom_fields → `GRAPE_CF_MAP` 按 key 读取**（凭据走平台通道——sync 脚本自动解析，agent 无需 export）；发布配置（`CLAWHUB_OWNER_HANDLE`/`GITHUB_PUBLISH_REPO`/`GITCODE_PUBLISH_REPO`）从 `.project-info/` config（member 文档）解析。
 > **评论前缀硬规**：所有评论 body 一律以 `[SRE Agent]` 开头。
 
 ---
@@ -39,7 +39,8 @@ find skills/{name}/ -name ".env*" -o -name "id_rsa*" -o -name "id_ed25519*" -o -
 
 ### P3 · 读取各平台令牌
 
-- 优先项目知识 `.project-info/` 下 JSON 配置文件（secrets.CLAWHUB_TOKEN / GITHUB_TOKEN / GITCODE_TOKEN + config.GITHUB_PUBLISH_REPO / GITCODE_PUBLISH_REPO / CLAWHUB_OWNER_HANDLE），缺失回退环境变量
+- 凭据：`GRAPE_CF_MAP` 按 key 动态取值（场景 custom_fields 配置 CLAWHUB_TOKEN/GITHUB_TOKEN/GITCODE_TOKEN——服务端不向 .project-info 物化凭据）
+- 配置：项目知识 `.project-info/` 下 JSON 配置文件 config 字段（GITHUB_PUBLISH_REPO / GITCODE_PUBLISH_REPO / CLAWHUB_OWNER_HANDLE——member 非凭据文档），缺失 → 询问用户 / 用默认
 - 均缺失 → 报告「未配置 {平台} 令牌，请到设置页配置」→ **跳过该平台**（不中断其他平台）
 - 401/403 → 按硬约束④区分报告 → 跳过该平台
 
@@ -96,7 +97,7 @@ bash {{SKILL_DIR}}/skill-publish/scripts/sync_skill_platform.sh \
 
 ### P9 · 目标仓库解析（GitHub/GitCode）
 
-- 默认读 `$GITHUB_PUBLISH_REPO` / `$GITCODE_PUBLISH_REPO`（格式 namespace/repo）
+- 默认从 `.project-info/` config 解析 `GITHUB_PUBLISH_REPO` / `GITCODE_PUBLISH_REPO`（格式 namespace/repo）
 - 用户指令指定 → **只接受 namespace/repo 格式，拒绝完整 git URL**（用户指令优先级高于环境变量）
 - 未配置 → 报告「未配置发布目标仓库，请到设置页配置」→ 跳过该平台
 
@@ -161,7 +162,7 @@ bash {{SKILL_DIR}}/skill-publish/scripts/sync_skill_platform.sh \
 
 | 要点 | 规则 |
 |------|------|
-| 来源优先级 | **用户指令指定 > 环境变量 $CLAWHUB_OWNER_HANDLE > 空（个人账号发布）** |
+| 来源优先级 | **用户指令指定 > `.project-info/` config 的 CLAWHUB_OWNER_HANDLE（member 文档）> 空（个人账号发布）** |
 | 存储 | SKILL.md 不存储 ownerHandle——归属完全由 API 入参控制 |
 | 探测/下架 | 必须带 `?ownerHandle=`（配置了组织时）——不带只查个人命名空间会误判 404 |
 | POST payload | 可选 ownerHandle——非空 = 发布到组织；token 须具备该组织 publisher 角色否则 403 |
@@ -202,4 +203,4 @@ grape tasks complete --json '{
 | Grape 评论/任务命令报错 | 先 `grape refresh` 再重试；仍失败核对 cli-reference |
 | 跳过平台原因不明 | 按真实原因区分（令牌缺失/403 无权限/仓库 404/push 失败）——不得用「未配置」兜底 |
 | 下架前置校验指纹不匹配 | Issue 评论告警「远端版本与预期不一致，请人工确认」→ 终止下架 |
-| sync 脚本报「环境变量未设置」但 .project-info/ 有 | 脚本会自动读 .project-info/——先确认 JSON 字段名（secrets.{PLATFORM}_TOKEN / config.{PLATFORM}_PUBLISH_REPO）正确 |
+| sync 脚本报「{PLATFORM}_TOKEN 未设置」| 凭据需在场景 custom_fields 配置对应 key（GRAPE_CF_MAP 映射）——`.project-info/` 不读凭据（平台不物化）校对 key 后重试 |

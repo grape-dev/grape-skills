@@ -33,7 +33,7 @@ cat .last_pr_review/${PR_NUMBER}.sha 2>/dev/null && git log -1 --format=%H 2>/de
 
 ```bash
 # 代码质量 + 功能验证（按 references/code-review-checklist.md）——本地读 diff/源码
-# 资源规格交叉验证（IaC 专项——⚠️ 前置校验 ${HUAWEICLOUD_SDK_AK:+ok}：有值才查；缺失 → 报告标注「未交叉验证」，不阻塞不借用）：
+# 资源规格交叉验证（IaC 专项——⚠️ 前置校验 ${HUAWEI_AK:+ok}：有值才查；缺失 → 报告标注「未交叉验证」，不阻塞不借用）：
 #   ECS flavor / 镜像在目标区域可用性、VPC CIDR/安全组不冲突、OBS 桶名/EVS 类型可用（hcloud 查询——命令族同 iac-coding A3）：
 #   hcloud VPC ListVpcs 2>&1 | grep -i "名称" || echo 无同名
 #   hcloud ECS ListFlavors --cli-region=cn-north-4 --cli-output=json --cli-query="flavors[?contains(name, '{flavor}')].{name:name}" 2>&1 | head -10
@@ -57,7 +57,7 @@ tfsec iac/ 2>&1 | tail -30 || echo "tfsec 不可用——按 checklist 人工核
 ```bash
 # 完整报告写文件（结论 + P0-P3 问题表 + 资源交叉验证结果 + 安全扫描 + plan 摘要）→ Issue 评论 @file：
 cat > /tmp/qa-full-report.json << 'JSONEOF'
-{"body":"[qa Agent] 审查报告\n\n{结论 ✅ LGTM / ❌ Request Changes}\n\n## 问题清单（P0-P3）\n| 级别 | 文件 | 行号 | 问题 | 建议 |\n|--|--|--|--|--|\n{逐条}\n\n## 资源规格交叉验证\n{已查结果 / 未交叉验证（AK/SK 未注入）}\n\n## 安全扫描\n{结果}\n\n## terraform plan 摘要\n{create/update/destroy 资源数 + 验证项}"}
+{"body":"[qa Agent] 审查报告\n\n{结论 ✅ LGTM / ❌ Request Changes}\n\n## 问题清单（P0-P3）\n| 级别 | 文件 | 行号 | 问题 | 建议 |\n|--|--|--|--|--|\n{逐条}\n\n## 资源规格交叉验证\n{已查结果 / 未交叉验证（AK/SK 无值）}\n\n## 安全扫描\n{结果}\n\n## terraform plan 摘要\n{create/update/destroy 资源数 + 验证项}"}
 JSONEOF
 grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/qa-full-report.json --json-out
 # MR 评论（结论摘要——@file 或内联）：
@@ -120,7 +120,7 @@ grape tasks complete --json '{
 | pulls get/files 返回空 | PR 无 diff 或编号错 → 核对 PR 编号（pulls list --state open 查）|
 | merge 失败（冲突/403）| 分支 C：PR 评论告知等待人工处理——不提前交办 sre |
 | terraform plan 失败（OBS backend 不通/provider 下载）| 看完整错误定位 → 修后重试 ≤2 次 → 仍失败：报告标注「plan 未执行」+ 原因 |
-| 华为云查询失败 / AK/SK 缺失 | 报告标注「资源规格未交叉验证」——不阻塞不借用 |
+| 华为云查询失败 / 凭据缺失 | 报告标注「资源规格未交叉验证」——不阻塞不借用 |
 | `comments create` 失败（长 body 转义）| 改用 `--json @file` |
 | 401 凭据失效 | 说明「凭据已失效」即可，不换 token |
 | 403 权限不足 | 说明需管理员配置——不绕行 |
