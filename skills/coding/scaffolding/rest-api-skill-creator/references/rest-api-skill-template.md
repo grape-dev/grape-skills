@@ -664,7 +664,15 @@ Expected: `{"capability":"capability-list","subcommand_count":N,...}`
 
 ## 任务结束
 
-完成所有业务动作后，在最终答复末尾输出以下 JSON 块并结束任务：
+**统一收尾协议（每个任务都必须执行，两件事都要做）：**
+
+1. **先调 `grape tasks complete` 关闭当前任务**（任务中心闭环）：
+
+```bash
+grape tasks complete --json '{"result_text": "{处理结论，如 查询成功，返回 5 篇文章}", "actions": ["{具体执行的操作，如 list-articles: 返回 5 篇文章}"], "conclusion": "{处理结论，如 查询成功，返回 5 篇文章}", "artifacts": ["{产生的产物：写操作返回资源 ID 或操作结果 / 文件操作返回 URL / 只读查询无产物填空数组}"], "next_step": "{下一步建议，如 无 / 等待用户下一步指令}"}'
+```
+
+2. **再在最终答复末尾输出结构化 JSON 块**（平台读取）：
 
 ```json
 {
@@ -676,5 +684,5 @@ Expected: `{"capability":"capability-list","subcommand_count":N,...}`
 }
 ```
 
-注意：只输出一个 JSON 块，放在答复末尾。
+注意：只输出一个 JSON 块，放在答复末尾。tasks complete 的 payload 与 JSON 块内容一致（JSON 块多一个 issue_summary 字段）。
 ````

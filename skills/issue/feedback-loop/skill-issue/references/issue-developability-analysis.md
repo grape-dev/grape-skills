@@ -2,18 +2,13 @@
 
 ## 执行前提
 
-- 项目知识基线已建立（`data/workspaces/{owner}/{repo}/project-info/` 下文档已存在）
-- 当前事件为 `issue_opened` 或 `issue_updated`
+- 项目知识基线已由服务端内联注入（prompt「项目知识基线」章节；如需全文，读该章节标注的副本路径）
+- 当前事件为 `issue_updated` 或 A2A 交办/评论事件（`issue_opened` 已由 VOD Agent 接管——见 SKILL 4.2）
 - Issue 尚未被处理过（无标签且无负责人），或用户补充了信息需要重新分析
 
 ## 前置步骤：读取项目知识
 
-```bash
-cat data/workspaces/{owner}/{repo}/project-info/project-graph.md
-cat data/workspaces/{owner}/{repo}/project-info/project-capabilities.md
-```
-
-如果文档不存在，先执行 `references/codegraph-project-analysis.md` 生成。
+读取 prompt「项目知识基线」章节（服务端内联注入）；无基线/`[degraded]` → 降级：README + `grape git-repo tree`/`commits` 补足上下文（不阻塞分析）。
 
 ## 四维分析（按 1→2→3→4 顺序执行，每步必须输出结论）
 
@@ -187,7 +182,7 @@ ELSE (不通过维度数 <= 2 且均为 minor 缺失)
 
 **CODEOWNERS 匹配**：按 `references/assignee-guide.md` 的现有逻辑，基于 Issue 内容匹配 CODEOWNERS 中的模块负责人。
 
-**机器人分配**：使用 Grape 的 GitCode 用户名（从 `AGENT_NAME` 环境变量或 Grape 配置获取）作为 assignee。
+**机器人分配**：使用 Grape 的 GitCode 用户名（机器人账号——占位 `{BOT_USERNAME}`，平台注入——见 SKILL 二环境变量表；**不使用 `$AGENT_NAME` 环境变量**）作为 assignee。
 
 ## 追问策略
 
@@ -279,5 +274,5 @@ ELSE (不通过维度数 <= 2 且均为 minor 缺失)
 |---------|---------|--------|
 | 是否与仓库主题相关 | 技术可行性（前置） | 结合 project-graph 判断，不再仅凭 README |
 | 内容质量分析 | 需求完整性 | 按类型细化检查项，增加权重 |
-| 是否已实现 | 技术可行性（子步骤） | 结合 codegraph 分析 commit 内容 |
+| 是否已实现 | 技术可行性（子步骤） | 结合 git 提交/PR 历史判断 |
 | 是否重复 | 需求完整性（子步骤） | 保留原有逻辑 |

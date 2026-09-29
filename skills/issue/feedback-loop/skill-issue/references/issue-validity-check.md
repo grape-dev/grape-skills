@@ -23,14 +23,14 @@
 2. **README 内容**（信息不足时）
    - 如果 Session 历史信息不足或无历史记录，获取仓库 README：
      ```bash
-     GET /repos/{owner}/{repo}/readme
+     grape git-repo contents --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --path README.md --json-out
      ```
    - 返回 JSON，`content` 字段是 Base64 编码，解码后读取前 500 字判断项目主题
 
 3. **仓库信息**（最后兜底）
-   - 如 README 也不可用，获取仓库 `description` 和 `topics`：
+   - 如 README 也不可用，获取仓库信息（clone_url/default_branch）：
      ```bash
-     GET /repos/{owner}/{repo}
+     grape git-repo repo --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --json-out
      ```
 
 **完全不相关**（如 DevOps 工具仓库收到天气、闲聊、非技术内容）：
@@ -79,7 +79,7 @@
 基于对 Issue 的深入理解，用 API 获取最近 commit，搜索 commit message 是否匹配 Issue 标题和核心需求：
 
 ```bash
-GET /repos/{owner}/{repo}/commits?per_page=20
+grape git-repo commits --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --per_page 20 --json-out
 ```
 
 **匹配到相关 commit** → 回复并建议关闭：
@@ -91,7 +91,7 @@ GET /repos/{owner}/{repo}/commits?per_page=20
 基于对 Issue 的深入理解，用 API 搜索 open 状态的 Issue，检查标题/正文相似度：
 
 ```bash
-GET /repos/{owner}/{repo}/issues?state=open&per_page=20
+grape git-repo issues list --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --state open --per_page 20 --json-out
 ```
 
 **找到重复** → 在重复 Issue 中评论：

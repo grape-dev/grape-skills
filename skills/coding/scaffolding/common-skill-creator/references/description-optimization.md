@@ -1,6 +1,6 @@
 # Description Optimization Guide
 
-> How to write effective skill descriptions and optimize trigger accuracy. Read during Phase 4b.
+> How to write effective skill descriptions and optimize trigger accuracy. Read during Phase 4c.
 
 ## How Skill Triggering Works
 

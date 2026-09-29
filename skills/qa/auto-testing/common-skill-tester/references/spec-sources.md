@@ -6,9 +6,9 @@ common-skill-tester 的三份规范 JSON 全部**在线动态拉取**，不硬�
 
 | 套件 | 用途 | 文件 | raw URL（优先） | API v5（回退，base64 解码） |
 |------|------|------|-----------------|------------------------------|
-| lint | 结构合规/安全基线/资源限制检查点 | `common_skillslinter.json` | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_skillslinter.json` | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=members-contribution` |
-| test | 运行时功能测试点 | `common_functions.json` | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_functions.json` | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_functions.json?ref=members-contribution` |
-| audit | 恶意代码/CWE 安全审计规则 | `common_auditor.json` | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/members-contribution/tools/skills_checker/common_auditor.json` | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_auditor.json?ref=members-contribution` |
+| lint | 结构合规/安全基线/资源限制检查点 | `common_skillslinter.json` | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_skillslinter.json` | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_skillslinter.json?ref=update-audit-clearlist-20260924` |
+| test | 运行时功能测试点 | `common_functions.json` | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_functions.json` | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_functions.json?ref=update-audit-clearlist-20260924` |
+| audit | 恶意代码/CWE 安全审计规则 | `common_auditor.json` | `https://raw.gitcode.com/developer-skill/skills-group-contribution/raw/update-audit-clearlist-20260924/tools/skills_checker/common_auditor.json` | `https://gitcode.com/api/v5/repos/developer-skill/skills-group-contribution/contents/tools/skills_checker/common_auditor.json?ref=update-audit-clearlist-20260924` |
 
 拉取策略：raw URL 失败（403/超时/网络错误）→ 自动回退 API v5 → 仍失败则提示用户手动指定本地 JSON 文件（将文件路径作为 `--type` 对应的 URL 参数传入，脚本会对本地不存在的路径报错，此时由 agent 直接读取本地 JSON 内容执行）。
 
