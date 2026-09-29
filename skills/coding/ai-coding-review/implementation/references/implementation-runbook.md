@@ -85,6 +85,44 @@ grape a2a handoff --json '{"agent":"qa","payload":{"repository":"'"$ACCOUNT/$REP
 # A2A 失败 → 重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入
 ```
 
+### A9 · 关联仓库多仓库开发（必做，仅当 `$GRAPE_LINKED_REPOS` 非空时）
+
+> 主仓库开发 + 每个关联仓库开发（前端+后端等）。平台已为关联仓库初始化 worktree（`$GRAPE_LINKED_WORKTREES`）。
+
+```bash
+LINKED_WT="$GRAPE_LINKED_WORKTREES"
+if [ -z "$LINKED_WT" ]; then
+  echo "无关联仓库 worktree（$GRAPE_LINKED_REPOS）——跳过"
+else
+  echo "$LINKED_WT" | python3 -c "
+import json,sys
+for w in json.load(sys.stdin):
+    print(f\"{w['repo_key']}\t{w.get('branch','main')}\t{w['dir']}\")
+" | while IFS=$'\t' read -r rk base dir; do
+    cd "$dir"
+    # 分支纪律：必须在 feat/issue-{N}，严禁在基线分支上直接改动
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$CURRENT_BRANCH" != "feat/issue-$ISSUE_NUMBER" ]; then
+      git checkout -b "feat/issue-$ISSUE_NUMBER" "origin/$base"
+    fi
+    # 识别项目结构并实现（TDD + 原子提交；测试写法见 SKILL.md 六·Best Practices）
+    # mvn package / npm install / pip install ...
+    git add -A
+    git commit -m "feat(issue-$ISSUE_NUMBER): 关联仓库 $rk 实现"
+    git push origin "feat/issue-$ISSUE_NUMBER"
+    # 建 PR（必做！每个关联仓库都必须建 PR）
+    LINKED_REPO_PATH="${rk#gitcode:}"       # owner/repo
+    LINKED_OWNER="${LINKED_REPO_PATH%%/*}"
+    LINKED_REPO="${LINKED_REPO_PATH#*/}"
+    grape git-repo pulls create --owner "$LINKED_OWNER" --repo "$LINKED_REPO" \
+      --json "{\"title\":\"feat(issue-$ISSUE_NUMBER): 关联仓库实现\",\"head\":\"feat/issue-$ISSUE_NUMBER\",\"base\":\"$base\"}" --json-out
+  done
+fi
+```
+
+> ⚠️ 五条铁律：① 严禁直推基线分支（main/dev/lvjuntao）② 必须走 feat/issue-{N} ③ 每仓库必须建 PR ④ 禁止在部署机生产检出目录改动（必须在受控 worktree）⑤ 各仓库独立开发不混淆。
+> 主仓库 + 各关联仓库的 PR 编号，统一在 A8 的 A2A context 中列出。
+
 ---
 
 ## 场景 B · 代码优化（按顺序执行）
@@ -127,6 +165,7 @@ grape tasks complete --json '{
 ```
 
 > ⚠️ **结束信号**：tasks complete 后立即结束，不要继续思考或等待输入。A2A 交办成功 ≠ 任务结束。结构化字段 must 真实填充；某动作未完成（如 PR 创建失败）——actions/conclusion 如实说明，不伪造。
+> **多仓库场景**（`$GRAPE_LINKED_REPOS` 非空）：`actions[]`/`artifacts[]` 分别列出每个仓库的开发与 PR 结果（含 PR 编号）；`next_step` 仍为 `a2a_qa`；A2A context 已在 A8 列出全部仓库 PR。
 
 ---
 
@@ -140,6 +179,9 @@ grape tasks complete --json '{
 | `unknown request field(s): ...` | `--json` 有契约不允许字段（如 `pulls update` 的 `state`）→ `--help` 看 Body fields 删多余 |
 | `pulls create` 返回异常 | ①去掉 tail 看完整错误 ②核对 base（`$GRAPE_WORK_BRANCH`/跨依赖所依赖分支）③精简 JSON（去 `inner_issue_nums`/`close_related_issue`）再试 |
 | `pulls create` 成功但 head/base 不对 | 误建 PR → 不尝试 `state:closed`；`pulls update` 补 body 标注「误建/废弃」，另建正确 PR（见 A6）|
+| 关联仓库 no worktree / 已检出在基线分支 | 若 `$GRAPE_LINKED_WORKTREES` 为空 → `git clone` 到受控目录 + `git checkout -b feat/issue-{n}`；若当前在基线分支 → `git checkeout -b feat/issue-{n} origin/<base>`（严禁直接在基线分支改动）|
+| 关联仓库 `git push` 被拒 / 无权限 | 确认分支=feat/issue-{n}（非基线）；被 403 说明无该仓库写权限，评论告知 |
+| 关联仓库 `pulls create` 失败 | 同一仓库不能重复开同 head 的 PR——先 `pulls list` 查是否已建；核对 owner/repo/base 取值（LINKED_OWNER/LINKED_REPO 从 repo_key 解析）|
 | `git commit` 被拒（无 user.name/email）| 先 `grape git config user.name/user.email`（见 Step 0）再 commit |
 | `pulls comments list` 返回空 | 属正常（无行内评论）——按「无审查意见」处理不报错 |
 | 测试偶发失败（时间字段）| 按 SKILL.md 六·Best Practices：改范围断言/固定时钟——不修业务代码掩盖 |
