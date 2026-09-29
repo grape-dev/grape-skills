@@ -97,15 +97,84 @@ skill 合规检查器。接收 `skill_path` 参数，按 grape-cli-skill-authori
 完成全部检查后，**依次执行**：
 
 1. **输出人类可读的检查报告**：按 `references/checklist.md` 末尾格式，含总体结论 + 检查明细表 + 不合规项详情
-2. **调用 `grape tasks complete` 自报完成（必做）**：
+
+2. **发布审查评论（必做）**：在 PR 或 Issue 上发布检查报告评论
 
    ```bash
+   grape git-repo pulls comments create --owner {owner} --repo {repo} --number {pr_number} \
+     --json '{"body":"[QA Agent] 检查报告\n\n{报告内容}"}' --json-out
+   ```
+
+   PR 评论接口返回 405（PR 已合并）时，改发 Issue 评论：
+   ```bash
+   grape git-repo issues comments create --owner {owner} --repo {repo} --number {issue_number} \
+     --json '{"body":"[QA Agent] 检查报告\n\n{报告内容}"}' --json-out
+   ```
+
+3. **A2A 交棒（必做，按检查结果分流）**：
+
+   **情况 A — 检查不通过（发现不合规项）→ A2A 交棒 Coding Agent 修复**：
+
+   ```bash
+   grape a2a handoff --json '{
+     "agent": "coding",
+     "payload": {
+       "repository": "'"$REPO_FULL_NAME"'",
+       "account": "'"$ACCOUNT"'",
+       "issue_number": '"$ISSUE_NUMBER"',
+       "pr_number": "'"$PR_NUMBER"'",
+       "context": "QA 检查发现 N 项不合规，请修复以下问题后更新 PR：\n{不合规项清单，含文件:行号 + 问题 + 修正建议}"
+     }
+   }'
+   ```
+
+   **情况 B — 检查全部通过 + 事件类型为 `pull_request_merged`（PR 已合并）→ A2A 交棒 SRE 发布**：
+
+   ```bash
+   grape a2a handoff --json '{
+     "agent": "sre",
+     "payload": {
+       "repository": "'"$REPO_FULL_NAME"'",
+       "account": "'"$ACCOUNT"'",
+       "issue_number": '"$ISSUE_NUMBER"',
+       "pr_number": "'"$PR_NUMBER"'",
+       "context": "QA 合规检查全部通过（20/20），PR#'"$PR_NUMBER"' 已合并。请执行 skill 发布流程。"
+     }
+   }'
+   ```
+
+   **情况 C — 检查全部通过 + 事件类型为 `a2a_event`（PR 尚未合并）→ 不 A2A，等待人工合并**：
+
+   全部通过但 PR 未合并时，不发 A2A。在评论中告知用户「审查通过，待 PR 合并后将自动触发 SRE 部署」。
+
+4. **调用 `grape tasks complete` 自报完成（必做）**：
+
+   不合规（已 A2A coding）：
+   ```bash
    grape tasks complete --json '{
-     "result_text": "结论：{✅全部通过/❌N项不合规} | 动作：• 检查 {skill_path} • 按 §8 清单 20 项验证 • 交叉验证命令/schema/不存在能力 | 产出：检查报告 | 摘要：{不合规项摘要或全部通过}",
+     "result_text": "结论：❌ 发现 N 项不合规（{通过数}/20 通过）\n动作：• 检查 {skill_path} • 按 §8 清单 20 项验证 • 交叉验证命令/schema/不存在能力 • 发布审查评论 • A2A 交棒 Coding Agent 修复\n产出：审查评论 / 检查报告 / A2A 事件\n摘要：{不合规项摘要}，已交棒 Coding Agent 修复",
+     "next_step": "a2a_coding"
+   }'
+   ```
+
+   全部通过 + PR 已合并（已 A2A sre）：
+   ```bash
+   grape tasks complete --json '{
+     "result_text": "结论：✅ 全部通过（20/20），PR#{pr} 已合并\n动作：• 检查 {skill_path} • 按 §8 清单 20 项验证 • 交叉验证命令/schema/不存在能力 • 发布审查评论 • A2A 交棒 SRE 发布\n产出：审查评论 / 检查报告 / A2A 事件\n摘要：skill 合规，已交棒 SRE 发布",
+     "next_step": "a2a_sre"
+   }'
+   ```
+
+   全部通过 + PR 未合并：
+   ```bash
+   grape tasks complete --json '{
+     "result_text": "结论：✅ 全部通过（20/20），待 PR 合并后触发 SRE\n动作：• 检查 {skill_path} • 按 §8 清单 20 项验证 • 交叉验证命令/schema/不存在能力 • 发布审查评论\n产出：审查评论 / 检查报告\n摘要：skill 合规，等待 PR 合并",
      "next_step": "done"
    }'
    ```
 
 **next_step 合法值**：
-- `done` — 检查完毕，报告已输出
+- `done` — 检查完毕，全部通过（PR 未合并，等待人工合并）
+- `a2a_coding` — 发现不合规，已 A2A 交棒 Coding Agent 修复
+- `a2a_sre` — 全部通过且 PR 已合并，已 A2A 交棒 SRE 发布
 - `reply_comment` — 需等待用户回复（如 skill_path 不明确）
