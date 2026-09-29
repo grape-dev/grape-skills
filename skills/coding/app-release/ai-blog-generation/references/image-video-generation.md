@@ -1,8 +1,8 @@
 # 图片与视频生成
 
-> 本文件从 SKILL.md 步骤 4、5 拆分。包含配图生成、视频生成和音视频合成。
+> 本文件配套 `skills/coding/app-release/ai-blog-generation/SKILL.md`（步骤 ④⑤）。配图/视频生成 + 音视频合成——全部外部 AI 服务直连（合法——与 grape 平台 API 隔离）。
 
-## 4. 生成配图
+## 配图生成（对应 runbook A4）
 
 从项目知识中获取 qwen-image 的 API Key 和 URL，调用 ModelArts 图片生成 API：
 
@@ -19,7 +19,7 @@ headers = {"Authorization": f"Bearer {KEY_IMAGE}", "Content-Type": "application/
 IMG_DIR = f"/tmp/blog-gen-{os.getpid()}/images"
 os.makedirs(IMG_DIR, exist_ok=True)
 
-# 各配图 prompt 构造，优先使用步骤 3 提取的 visual_info
+# 各配图 prompt 构造，优先使用 A3（产品调研）提取的 visual_info
 themes = [
     # 如果 product_visual_info.json 存在，每个 prompt 自动嵌入实际产品特征
     {"prompt": "主题1的详细画面描述，须包含product品牌+型号+颜色等真实视觉特征", "file": "theme_1"},
@@ -52,12 +52,12 @@ for i, t in enumerate(themes):
     if i < len(themes) - 1: time.sleep(1)
 ```
 
-## 5. 生成视频
+## 视频生成（对应 runbook A5）
 
 从项目知识中获取视频生成模型的 API Key、URL 和 Model（`ai_models.video`）。
 ⚠️ **禁止使用 I2V（图生视频）模型**——只能使用 T2V（文生视频）模型。模型名中含 `I2V`（如 `Wan2.2-I2V-A14B`）的一律不得调用，需在项目知识中配置 T2V 模型（如 `Wan2.2-T2V-A14B`）。
 
-视频 prompt 必须基于步骤 3 提取的 `visual_info` 来构造准确的产品外观描述：
+视频 prompt 必须基于 A3（产品调研）提取的 `visual_info` 来构造准确的产品外观描述：
 
 ```python
 import requests, json, time

@@ -1,6 +1,6 @@
 # HTML 文章模板与样式
 
-> 本文件从 SKILL.md 步骤 2 拆分。提供博客文章的 HTML 模板和内联样式。
+> 本文件配套 `skills/coding/app-release/ai-blog-generation/SKILL.md`（步骤 ②）。提供博客文章的 HTML 模板和内联样式。
 
 ## 推荐内联样式结构
 
