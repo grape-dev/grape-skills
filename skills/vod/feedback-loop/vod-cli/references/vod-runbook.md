@@ -51,6 +51,7 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 grape issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
 grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 10 --json-out
 ```
+- ⚠️ **重复判断命令注解**：用上面的 `issues list --state all`（含 open/closed）即可；**不要用 `issues mine` / `tasks mine`**（那是"我的任务"视图，不是历史全貌，命令也不属 issues 组）。
 - 已处理/已解决/重复 → 发一条说明评论（Step 4c 模板）→ **进入 Step 6，`next_step=reply_comment`**。
 - 否则继续 Step 3。
 
@@ -69,6 +70,11 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 # 或长文用 @file：先转成 {"body":"..."} 的 json 文件再 --json @file
 ```
 > 更稳：`printf '{"body":"%s"}' "$(cat /tmp/vod-body-N.md)" > /tmp/body.json` 再 `--json @/tmp/body.json`。
+
+> ⚠️ **`issues update` 字段说明（已确认契约）**：`git-repo issues update` 的请求体允许字段 = `labels` / `assignee` / `milestone_id` / `state` / **`body`**。
+> - **只收敛 body 时只传 `body`**，不要顺带 `state`/`labels` 等无关字段；
+> - `--json-out` 校验返回值（成功返回更新后的 Issue 对象）。
+> - **一次成功即可**，失败先核对字段是否在允许集（`unknown request field` 会提示），**不要无限重试同一命令**；必要时 `grape git-repo issues update --help` 看 Body fields。
 - 收敛后 **进入 Step 5**（如 pipeline 已有 `issue:a2a_event` 则跳过 A2A，直接 Step 6 + `next_step=reply_comment`）。
 
 ### Step 4b · 需求不清晰 → 澄清追问
@@ -89,7 +95,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 
 ### Step 5 · A2A 交办（仅 Step 4a 收敛后，必须严格按以下三步）
 
-> ⚠️ **本步为强制流程，不得跳过**：交办前必须先用 `$GRAPE_SCENE_ID` 取当前场景，据此确定目标节点，再发起 A2A；**禁止不查场景直接照抄默认 `issue`**。
+> ⚠️ **本步为强制流程，不得跳过**：交办前**必须执行下方第 1 步的 `grape scenes detail`**（即使 `$GRAPE_SCENE_ID` 为空也先调用一次，空结果按第 2 步"场景未绑定"处理），据结果确定目标节点，再发起 A2A；**禁止不执行场景核验就直接 A2A 默认 `issue`**——跳过一次即视为违规，可能交办给场景中不存在的 Agent。
 
 **第 1 步：取当前场景节点，并显式解析出"可用 Agent 集合"**
 ```bash
