@@ -1,4 +1,4 @@
-# IaC 代码实现执行走查表（runbook）
+﻿# IaC 代码实现执行走查表（runbook）
 
 > 目的：把 iac-coding 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部平台交互命令（issues / git-repo pulls/issues / a2a / tasks）——**禁止 curl 直连平台 API（读操作也一样）**——每个节点需要的命令已写在该节点——按节点照抄；命令失败才看「错误排查速查」。
@@ -16,7 +16,7 @@ grape --version
 terraform version
 grape refresh 2>&1 && echo REFRESH_OK
 grape tasks current --json-out
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
 printenv GRAPE_WORK_BRANCH 2>/dev/null
 git status 2>&1 | head -5        # 确认 worktree 与分支（feat/issue-{n} 已就绪）
 ```
@@ -97,15 +97,15 @@ timeout 300 terraform plan -out=tfplan 2>&1 | tail -30
 git add -A && git commit -m "feat(issue-$ISSUE_NUMBER): {变更说明}" 2>&1 | tail -3
 git push -u origin feat/issue-$ISSUE_NUMBER 2>&1 | tail -3
 # ⚠️ 先查同分支 open MR（防重复创建）：
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -20
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -20
 # 创建 PR（契约字段：title/head/base/inner_issue_nums/close_related_issue——create 无 body 字段，@file 防转义）：
 printf '%s' '{"title":"feat(issue-{n}): {变更说明}","head":"feat/issue-{n}","base":"'"$GRAPE_WORK_BRANCH"'","inner_issue_nums":"'"$ACCOUNT/$REPO_NAME"'#{n}","close_related_issue":true}' > /tmp/pr-body.json
-grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json @/tmp/pr-body.json --json-out 2>&1 | head -30
 # 从返回取 PR 编号（$PR_NUMBER 未注入时）——后续 update 与 A8 交办必须用真实编号
 # PR 描述四段（变更说明/资源清单/文件变更/后续步骤）——create 后 pulls update 补 body：
 printf '%s' '{"body":"### 变更说明\n{...}\n\n### 资源清单\n{...}\n\n### 文件变更\n{...}\n\n### 后续步骤\n{...}"}' > /tmp/pr-body-desc.json
-grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number {真实 PR 编号} --json @/tmp/pr-body-desc.json --json-out 2>&1 | head -20
+grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {真实 PR 编号} --json @/tmp/pr-body-desc.json --json-out 2>&1 | head -20
 # PR 链接用 Web 页面 /pull/（单数）markdown 格式——不得用 API 路径
 ```
 
@@ -113,10 +113,10 @@ grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number {真
 
 ```bash
 # Issue 评论告知（长 body 用 @file）：
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[coding Agent] ✅ 已完成实现，请审查 PR [#{n}](https://gitcode.com/'"$ACCOUNT/$REPO_NAME"'/pull/{n})。{实现内容摘要}"}' --json-out
 # ⚠️ 防重复：先查 pipeline，已含 qa:a2a_event 则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（issue_number 必填；pr_number 有则填，严禁混用）：
 grape a2a handoff --json '{"agent":"qa","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"'"$ACCOUNT"'","issue_number":{真实编号},"pr_number":{真实编号},"context":"PR #{n} 已创建（{实现摘要}），请审查"}}'
 # A2A 失败 → 重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入
@@ -128,11 +128,11 @@ grape a2a handoff --json '{"agent":"qa","payload":{"repository":"'"$ACCOUNT/$REP
 
 ```bash
 # PR_NUMBER 缺失时先定位（评论/复审触发可能不带 PR 编号——不能默认有值）：
-[ -n "$PR_NUMBER" ] || grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -30
+[ -n "$PR_NUMBER" ] || grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -30
 # 定位不到 open PR → Issue/PR 评论询问「请提供 PR 编号」，不猜测
 # 读 PR 审查评论/反馈（逐条核对是否已修改、问题是否解决）：
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
-grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
+grape git-repo pulls comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
 ```
 
 ### B2 · 制定修改方案 + 实施（原子提交）
@@ -146,7 +146,7 @@ git add {变更文件} && git commit -m "fix(issue-{n}): {修复点}" && git pus
 ### B3 · PR 评论告知（必做）
 
 ```bash
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json '{"body":"[coding Agent] 已按审查意见修改：{修改摘要}"}' --json-out
 ```
 

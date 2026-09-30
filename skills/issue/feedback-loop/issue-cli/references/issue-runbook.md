@@ -1,7 +1,7 @@
-# Issue-CLI 执行走查表（runbook）
+﻿# Issue-CLI 执行走查表（runbook）
 
 > 目的：把 Issue Agent 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
-> 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。`ACCOUNT`（触发人 actor）一般不作 --owner。
 > **评论前缀硬规**：所有 Issue 评论 body 一律以 `[issue agent]` 开头。
 > 命令取舍速查：读 Issue 聚合用 `issues detail`；原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth single`（`tree` 无 `--path`）。
 
@@ -14,20 +14,20 @@
 ### Step 1 · 读 Issue 上下文（首次必做）
 ```bash
 # 聚合视图（含阶段/状态/事件/路线图）+ 评论
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 
 ### Step 2 · 项目知识基线 + Agent 知识 + 目标分支（首次必做，后续按需——由 agent 自判是否需要）
 ```bash
 # ① 解析目标分支（目标合入分支/工作基线）：优先 $GRAPE_WORK_BRANCH；未注入则取仓库默认分支（不要写死 main/master）
-WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 echo "work_branch=$WORK_BRANCH"   # 后续「是否已实现」判断、范围预估、Spec 基准、A2A 交接都以它为准
-grape git-repo branches --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 50 --json-out   # 确认 $WORK_BRANCH 存在
+grape git-repo branches --owner "$REPO_OWNER" --repo "$REPO_NAME" --per_page 50 --json-out   # 确认 $WORK_BRANCH 存在
 
 # ② 项目知识基线（project-graph.md + project-capabilities.md 全文 + meta）
-grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape repos project info --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 
 # ③ 仓库沉淀知识（前序经验）
 grape knowledge stats --repo "$REPO_FULL_NAME" --json-out
@@ -47,7 +47,7 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
   `ready` / `almost-ready` / `needs-discussion` / `not-feasible`。
 - **技术可行性·是否已实现**：先核对**目标分支 `$WORK_BRANCH`**（Step 2 ① 解析，缺省仓库默认分支）commit 是否已实现本需求（标题/正文关键字匹配 feature/fix 等）：
   ```bash
-  grape git-repo commits --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 20 --json-out   # 结合 $WORK_BRANCH 的 commit 核对
+  grape git-repo commits --owner "$REPO_OWNER" --repo "$REPO_NAME" --per_page 20 --json-out   # 结合 $WORK_BRANCH 的 commit 核对
   ```
   已实现 → 回复建议关闭（引用 commit sha），不进入评级。
 - 细则见 `references/issue-developability-analysis.md`；评论事件同样重新分析（用户补充信息会改变评级）。
@@ -56,15 +56,15 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
 ```bash
 # ready → 生成 Spec（→ Step 5）；贴 Issue 评论；打 spec-ready；A2A 交办 coding
 #   ⚠️ Spec 中注明目标分支（开发基准 = $WORK_BRANCH，Step 2 ① 解析），供 coding 在正确分支开发
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{原有标签},spec-ready","assignee":"{BOT_USERNAME}"}'
 # almost-ready → 分配责任人（CODEOWNERS）→ 精确追问 1-2 个问题
 # needs-discussion → 分配责任人 → 逐维度追问 → 标记 need-info
 # not-feasible → 评论说明不可行 → 标记 invalid
 
 # 打标签（先确保标签存在再设置）
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"feature","color":"#a2eeef"}'
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"feature","color":"#a2eeef"}'
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"feature,triaged"}'
 ```
 
@@ -134,7 +134,7 @@ grape tasks notify --json '{
 **① 核对需求是否已实现（目标分支 `$WORK_BRANCH`，Step 2 ① 解析）——避免重复开发/误判**：
 ```bash
 grape git log --oneline -20 --all                                     # 本地裸库核对合并历史
-grape git-repo commits --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 20 --json-out   # 平台 commit
+grape git-repo commits --owner "$REPO_OWNER" --repo "$REPO_NAME" --per_page 20 --json-out   # 平台 commit
 ```
 - 已实现 → 回复说明已实现（引用 commit sha）并建议关闭；用户是请求关闭 → 关 + `grape tasks close`。
 - 未实现 → 继续分析/动作。

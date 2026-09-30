@@ -1,4 +1,4 @@
-# 深度可开发性分析指南
+﻿# 深度可开发性分析指南
 
 ## 执行前提
 
@@ -9,7 +9,7 @@
 ## 前置步骤：读取项目知识（用 grape CLI，见 runbook Step 2）
 
 ```bash
-grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape repos project info --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 ```
 
 无基线 / `[degraded]` → 降级用 `grape git-repo repo` / `tree --depth single` / `contents README --raw`。

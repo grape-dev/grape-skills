@@ -1,4 +1,4 @@
-# IaC 部署执行走查表（runbook）
+﻿# IaC 部署执行走查表（runbook）
 
 > 目的：把 iac-sre 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部平台交互命令（issues / git-repo issues / git / tasks）——**禁止 curl 直连平台 API（读操作也一样）**；华为云资源操作走 terraform/hcloud/obsutil（云资源工具）——每个节点需要的命令已写在该节点——按节点照抄；命令失败才看「错误排查速查」。
@@ -16,7 +16,7 @@ grape --version
 terraform version
 grape refresh 2>&1 && echo REFRESH_OK          # 契约保鲜；失败重试 ≤2 次后回退内置快照继续
 grape tasks current --json-out
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
 # AK/SK 前置校验（缺失 → STOP 提示在【场景详情页→高级选项→自定义配置】配 name=HUAWEI_AK/HUAWEI_SK 或【通用设置】配置华为云 AK/SK——不寻找不借用；HUAWEI_AK/SK 两入口取值，HW_ACCESS_KEY 为 A3 才派生，此处不查它）：
 if [ -z "${HUAWEI_AK}" ] || [ -z "${HUAWEI_SK}" ]; then echo "AK_SK_MISSING"; else echo "AK_SK_OK"; fi
 # 评论告知（缺失时必发——含完整恢复路径）——命令见「STOP 评论模板」
@@ -81,7 +81,7 @@ obsutil cp /tmp/inventory.json "obs://{bucket}/inventory/inventory.json" 2>&1 | 
 cat > /tmp/sre-comment.json << 'JSONEOF'
 {"body":"[sre Agent] 部署完成\n\n## 资源清单\n| 资源 | 信息 |\n|--|--|\n| ECS | {公网 IP} |\n| RDS | {私网 IP} |\n| VPC/子网/安全组 | {名称} |\n\n敏感凭证存储：obs://{bucket}/inventory/inventory.json（使用 AK/SK 通过 obsutil 或 OBS API 访问）\n基础设施验证：{ECS ACTIVE / RDS 可用 / OBS 上传成功}"}
 JSONEOF
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/sre-comment.json --json-out
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/sre-comment.json --json-out
 # ⚠️ 资源清单输出完成前，不得执行任何其他动作（含 A2A）
 ```
 
@@ -95,7 +95,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 #   1. 在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK、name=HUAWEI_SK，或【通用设置】配置华为云 AK/SK
 #   2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』
 #   3. 平台将自动重新触发本部署任务——无需其他操作
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[sre Agent] 部署前置检查未通过：华为云 AK/SK 未配置。本次未执行任何云操作。\n\n👉 恢复路径：\n1. 在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK、value=<AK> 与 name=HUAWEI_SK、value=<SK>（name 严格用约定名）；或【通用设置】配置华为云 AK/SK\n2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』\n3. 平台将自动重新触发本部署任务——无需其他操作"}' --json-out
 ```
 

@@ -1,4 +1,4 @@
-# PR 审查执行走查表（runbook）
+﻿# PR 审查执行走查表（runbook）
 
 > 目的：把 pr 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量直接使用：`$ACCOUNT`、`$REPO_NAME`、`$PR_NUMBER`、`$ISSUE_NUMBER`（能确定时）、`$DEVOPS_EVENT_TYPE`。
@@ -12,8 +12,8 @@
 ```bash
 grape refresh                        # 契约刷新（前置门②）
 grape tasks current --json-out
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 能确定关联 Issue 时
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 能确定关联 Issue 时
 ```
 
 > CLI 自愈安装（仅未装/版本低时）：`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`。
@@ -26,9 +26,9 @@ grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMB
 # 按 references/pr-config-check.md 检查 Title/Description/Labels/Assignee 等
 # 不通过项记录到 review_comments（暂不评论——统一到最后）
 # 有关联 Issue → Issue 评论「📌 关联 PR #{pr_number}」+ bug 则打标：
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"📌 关联 PR #'"$PR_NUMBER"'"}'
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"bug,triaged"}'    # 仅当对应 Issue 是 bug
 ```
 
@@ -56,10 +56,10 @@ cat ../.last_pr_review/$PR_NUMBER.sha 2>/dev/null
 
 ```bash
 # ① 先核对上次问题是否已修复（获取已有行内评论）：
-grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+grape git-repo pulls comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
 # ② 核对修复情况（pulls get + pulls files）：
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
-grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+grape git-repo pulls files --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
 #   已修复 → 记入 review_comments「已修复」清单；未修复 → 保留问题
 # ③ 审查新变更（diff 从 pulls files 返回）：按 5 轴找问题 → 记录 review_comments（级别/文件/行号/问题/建议）
 # ④ 发现 Critical/Required 级别问题 → 记录摘要（供能力四 A2A）
@@ -93,7 +93,7 @@ grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_
 ```bash
 # ⚠️ 防重复（分支 A/B 都要）：先查 pipeline，已含目标 agent（coding:a2a_event /
 #   sre:a2a_event status≠failed）则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 
 # ── 分支 A：交办 coding（有问题时；issue_number 必填——无法确定则不调用，
 #    最终评论说明；pr_number 有则填，严禁混用）──
@@ -120,10 +120,10 @@ grape a2a handoff --json @/tmp/a2a-sre-payload.json --json-out
 #   "## ⚠️ 请合并本 PR
 #    > 审查已通过，但流水线需要 PR 合并才能继续（合并后将自动触发 SRE 部署验证）。
 #    > 请维护者操作：在 GitCode 页面点击【Merge】合并本 PR。"
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json @/tmp/review-body.json
 # ⚠️ 405（PR 已合并——pulls comments create 对已合并 PR 返回 405 Method Not Allowed）→ 降级：
-#   grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+#   grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
 #     --number "$ISSUE_NUMBER" --json @/tmp/review-body.json（发到关联 Issue，body 注明「PR #$PR_NUMBER 已合并——审查结论发至此」）
 #   PR 无关联 Issue 且 405 → 将结论写入 tasks complete result_text（不丢结论）
 ```

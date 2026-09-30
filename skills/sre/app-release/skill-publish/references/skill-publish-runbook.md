@@ -1,4 +1,4 @@
-# Skill 发布执行走查表（skill-publish runbook）
+﻿# Skill 发布执行走查表（skill-publish runbook）
 
 > 目的：把 skill-publish 每一步**要做什么 + 用哪条确切命令 + 各平台 API 契约**固化下来，Agent **照着执行、不要查 `--help`**。
 > **域界纪律**：ClawHub/GitHub/GitCode = 外部平台——curl/脚本直连**合法**（本技能执行器域）；Grape 平台（评论/任务）交互**必须走 grape CLI**——**禁止 curl 直连 grape 平台 API**。
@@ -121,7 +121,7 @@ printf '%s' '{"body":"[SRE Agent] ✅ Skill 发布完成
 
 **版本号说明**：ClawHub 可能因版本占用自动 bump，版本号与其他平台不同。跳过的平台版本填「—」。"}' \
   > /tmp/skill-publish-comment.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$ISSUE_NUMBER" --json @/tmp/skill-publish-comment.json --json-out
 # ⚠️ ClawHub 状态报「✅ 已提交（安全扫描中，通过后公开）」而不是「✅ 成功」——扫描中用户还不能安装
 # 失败平台加行：| ClawHub | 🔴 失败 | — | — | 令牌无效，请到设置页更新 |

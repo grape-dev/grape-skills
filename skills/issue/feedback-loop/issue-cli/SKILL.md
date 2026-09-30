@@ -1,4 +1,4 @@
----
+﻿---
 name: issue-cli
 version: 3.1.0
 description: |
@@ -45,8 +45,9 @@ tools:
 | `GRAPE_SERVER_URL` | 服务端地址 | `grape` 自动读取（`--base-url` 可覆盖） |
 | `GRAPE_SESSION_TOKEN` | 会话级临时 token（`tk_`，任务生命周期有效） | `grape` 自动认证；终态后失效 |
 | `REPO_FULL_NAME` | `owner/repo` 仓库全名 | A2A 交办 `repository` / 知识/场景查询 |
-| `ACCOUNT` | 仓库属主（owner） | `grape ... --owner "$ACCOUNT"` |
+| `REPO_OWNER` | **仓库属主（owner，组织或个人泛化，不含 `/repo`）** | `grape ... --owner "$REPO_OWNER"` |
 | `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
+| `ACCOUNT` | **个人账号（webhook 触发人 `actor`，与仓库属主解耦）** | A2A payload `account` 字段（一般不用作 `--owner`） |
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | `--number "$ISSUE_NUMBER"` / A2A `issue_number` |
 | `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空） | A2A `pr_number`（无则不填） |
 | `GRAPE_WORK_BRANCH` | 目标合入分支 / 工作基线（缺省则取仓库默认分支，如 main/master） | **贯穿全流程的开发基准**：runbook Step 2 ① 解析为 `$WORK_BRANCH`；判断"需求是否已实现"、深度分析范围预估、Spec 基准、A2A 交接给 coding 的目标分支 |
@@ -66,7 +67,7 @@ tools:
 在 Issue 上发评论/答复评论时，**所有评论 body 一律以 `[issue agent]` 开头**：
 
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body": "[issue agent] 这是 Issue Agent 的答复内容。"}'
 ```
 

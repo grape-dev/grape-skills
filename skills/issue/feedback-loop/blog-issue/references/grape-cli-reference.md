@@ -1,4 +1,4 @@
-# grape CLI 命令参考（blog-issue 子集）
+﻿# grape CLI 命令参考（blog-issue 子集）
 
 > 配套 `skills/issue/feedback-loop/blog-issue/SKILL.md`。只列本技能真实用到的命令；完整命令面以 `grape commands` / `grape <group> --help` 为准。
 
@@ -17,29 +17,29 @@ grape --version                                             # CLI 可用性（�
 grape refresh                                               # 契约刷新（失败重试 ≤2 次后继续）
 grape tasks current --json-out                              # 当前任务上下文（前序 A2A payload 在这里）
 grape events detail --seq {seq} --json-out             # 前序事件详情（参数是 --seq 不是 --event_id）
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Issue 全貌
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Issue 全貌
 ```
 
 ### 读操作
 
 ```bash
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 评论历史
-grape git-repo issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 20 --json-out            # 历史 Issue
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 10 --json-out             # 历史 PR
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out                                     # 标签查重
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out            # CODEOWNERS（指派依据）
-grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out                                             # 仓库信息（基线降级）
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out                  # 流水线（防重复 A2A）
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 评论历史
+grape git-repo issues list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --per_page 20 --json-out            # 历史 Issue
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --per_page 10 --json-out             # 历史 PR
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out                                     # 标签查重
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out            # CODEOWNERS（指派依据）
+grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out                                             # 仓库信息（基线降级）
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out                  # 流水线（防重复 A2A）
 ```
 
 ### 写操作
 
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[blog-issue Agent] ..."}'   # 发评论（长 body 用 --json @file）
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}'                              # 建标签（先查重）
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"labels":"spec-ready,blog-issue"}'            # 打标（整体替换）
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"assignee":"{user}"}'                          # 指派
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"state":"closed"}'                             # 关闭 Issue（流程外——先确认）
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[blog-issue Agent] ..."}'   # 发评论（长 body 用 --json @file）
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}'                              # 建标签（先查重）
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"labels":"spec-ready,blog-issue"}'            # 打标（整体替换）
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"assignee":"{user}"}'                          # 指派
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"state":"closed"}'                             # 关闭 Issue（流程外——先确认）
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"...","account":"...","issue_number":N,"context":"..."}}'                         # A2A 交办
 grape tasks notify --json '{"assignee":"{user}","repo_key":"owner/repo","issue_number":N,"task_description":"..."}'                                  # 任务通知（assignee 最终确定后）
 grape tasks complete --json '{...}'                            # 任务收尾（4.8 结构）

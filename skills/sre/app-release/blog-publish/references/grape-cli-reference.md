@@ -1,4 +1,4 @@
-# grape CLI 命令参考（blog-publish 子集）
+﻿# grape CLI 命令参考（blog-publish 子集）
 
 > 配套 `skills/sre/app-release/blog-publish/SKILL.md`。只列本技能真实用到的平台命令；完整命令面以 `grape commands` / `grape <group> --help` 为准。**博客系统 API 不在此表**（外部 BLOG_HOST——curl 直连合法——见 runbook P1-P6）。
 
@@ -21,16 +21,16 @@ grape tasks current --json-out                              # 当前任务上下
 ### 平台写操作
 
 ```bash
-grape git-repo pulls merge --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER"   # 合并 PR（A2A 链路第一步）
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[blog-publish Agent] ..."}'   # 发布结果反馈（长 body 用 --json @file）
+grape git-repo pulls merge --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER"   # 合并 PR（A2A 链路第一步）
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[blog-publish Agent] ..."}'   # 发布结果反馈（长 body 用 --json @file）
 grape tasks complete --json '{...}'                            # 任务收尾（4.8 结构）
 ```
 
 ### 平台读操作
 
 ```bash
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number {n} --json-out   # PR 状态核查（P3 前可选——确认未合并）
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Issue 全貌（上下文兜底）
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {n} --json-out   # PR 状态核查（P3 前可选——确认未合并）
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Issue 全貌（上下文兜底）
 ```
 
 ## ❌ 不存在的命令（警示表——防误用，勿执行）

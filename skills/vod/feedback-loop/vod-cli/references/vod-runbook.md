@@ -1,4 +1,4 @@
-# VOD 执行走查表（runbook）
+﻿# VOD 执行走查表（runbook）
 
 > 目的：把 VOD 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
@@ -16,7 +16,7 @@
 
 ```bash
 # ① 项目知识基线：project-graph.md + project-capabilities.md 全文 + meta（degraded/commit/branches）
-grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape repos project info --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 
 # ② Agent/仓库沉淀知识（前序经验、系统注入说明）
 grape knowledge stats --repo "$REPO_FULL_NAME" --json-out          # 各类知识数量，判断是否有沉淀
@@ -30,9 +30,9 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out  # 系�
   ```bash
   # 目标分支：$GRAPE_WORK_BRANCH → repos project info 的 branches_analyzed 首个 → main/master 探测
   TARGET_BRANCH="${GRAPE_WORK_BRANCH:-}"
-  grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out   # 取 default_branch（若有）
-  grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "${TARGET_BRANCH:-main}" --depth single --json-out
-  grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md --raw
+  grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out   # 取 default_branch（若有）
+  grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --ref "${TARGET_BRANCH:-main}" --depth single --json-out
+  grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path README.md --raw
   # 若 main 不存在（404）→ 用 master 重试：--ref master
   ```
   （相关结论标注 `[degraded]`）。
@@ -41,15 +41,15 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out  # 系�
 ### Step 1 · 读 Issue 上下文（必做）
 ```bash
 # 聚合视图（含阶段/状态/事件/路线图），首选
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 需要评论/讨论细节时再取评论（按需，不必每次都调）
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 
 ### Step 2 · 项目历史全貌（判断重复/已解决/已有方案）
 ```bash
-grape issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 10 --json-out
+grape issues list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --per_page 10 --json-out
 ```
 - ⚠️ **重复判断命令注解**：用上面的 `issues list --state all`（含 open/closed）即可；**不要用 `issues mine` / `tasks mine`**（那是"我的任务"视图，不是历史全貌，命令也不属 issues 组）。
 - 已处理/已解决/重复 → 发一条说明评论（Step 4c 模板）→ **进入 Step 6，`next_step=reply_comment`**。
@@ -65,7 +65,7 @@ grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --p
 按 §四 模板写 body 到文件，再更新 Issue：
 ```bash
 # 先写 /tmp/vod-body-N.md（模板见 requirement-elicit-guide.md §四），再转 JSON 提交
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json "{\"body\":\"$(jq -Rs . < /tmp/vod-body-N.md)\"}" --json-out
 # 或长文用 @file：先转成 {"body":"..."} 的 json 文件再 --json @file
 ```
@@ -80,14 +80,14 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 ### Step 4b · 需求不清晰 → 澄清追问
 ```bash
 # body 以 [VOD Agent] 开头，1-3 个具体问题；长文用 @file
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[VOD Agent] 您指的是……？请补充：1) … 2) …"}'
 ```
 - **直接进入 Step 6，`next_step=a2a_need_clarify`**（不要等待用户回复，也不要 A2A）。
 
 ### Step 4c · 纯咨询 / 已解决 / 无需动作 → 回复说明
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[VOD Agent] <项目介绍 / 已解决说明 / 无需动作说明>"}'
 ```
 - **直接进入 Step 6，`next_step=reply_comment`**。

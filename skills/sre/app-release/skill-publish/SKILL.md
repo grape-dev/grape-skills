@@ -1,4 +1,4 @@
----
+﻿---
 name: skill-publish
 version: 2.1.0
 description: |
@@ -40,7 +40,7 @@ tools:
 |------|------|------|-----|
 | `GRAPE_SESSION_TOKEN` | 系统注入（grape 自动读取）| 平台评论/任务用，**无需手动配置** | grape 平台 |
 | `REPO_FULL_NAME` | 系统注入 | 当前仓库全名（评论拆 owner/repo）| grape 平台 |
-| `ACCOUNT` / `REPO_NAME` | 派生（`${REPO_FULL_NAME%/*}` / `${REPO_FULL_NAME#*/}`）| 评论 --owner/--repo 参数 | grape 平台 |
+| `REPO_OWNER` / `REPO_NAME` | 派生（`${REPO_FULL_NAME%/*}` / `${REPO_FULL_NAME#*/}`）| 评论 --owner/--repo 参数 | grape 平台 |
 | `ISSUE_NUMBER` | 系统注入 | Issue 编号 | grape 平台 |
 | `PR_NUMBER` | 系统注入（A2A 时）| PR 编号追溯 | 有 PR 时 |
 | `GITHUB_TOKEN` | 场景高级选项 custom_fields 配置 name=GITHUB_TOKEN（平台按 name 直注同名 env）；GitHub 托管任务由平台 `BOT_GITHUB_TOKEN` 自动兜底 | GitHub PAT（x-access-token 格式）| 外部 GitHub |
@@ -181,7 +181,7 @@ GITHUB_TOKEN="${GITHUB_TOKEN:-${BOT_GITHUB_TOKEN:-}}"; CLAWHUB_TOKEN="${CLAWHUB_
 
 ```bash
 grape --version / grape refresh                                  # 前置门自愈
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[SRE Agent] ..."}'  # 评论（长 body 用 --json @file）
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[SRE Agent] ..."}'  # 评论（长 body 用 --json @file）
 grape tasks complete --json '{"result_text":"...","actions":[...],"conclusion":"...","artifacts":[...],"next_step":"..."}'   # 收尾（4.8）
 ```
 

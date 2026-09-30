@@ -1,4 +1,4 @@
----
+﻿---
 name: qa-cli
 version: 2.1.0
 description: |
@@ -47,8 +47,9 @@ tools:
 | `GRAPE_SERVER_URL` | 服务端地址 | `grape` 自动读取（`--base-url` 可覆盖） |
 | `GRAPE_SESSION_TOKEN` | 会话级临时 token（`tk_`，任务生命周期有效） | `grape` 自动认证；终态后失效 |
 | `REPO_FULL_NAME` | `owner/repo` 仓库全名 | A2A 交办 `repository` / 场景查询 |
-| `ACCOUNT` | 仓库属主（owner） | `grape ... --owner "$ACCOUNT"` |
+| `REPO_OWNER` | **仓库属主（owner，组织或个人泛化，不含 `/repo`）** | `grape ... --owner "$REPO_OWNER"` |
 | `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
+| `ACCOUNT` | **个人账号（webhook 触发人 `actor`，与仓库属主解耦）** | A2A payload `account` 字段（一般不用作 `--owner`） |
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | A2A `issue_number` |
 | `PR_NUMBER` | PR 编号 | `--number "$PR_NUMBER"` / A2A `pr_number` |
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标 |

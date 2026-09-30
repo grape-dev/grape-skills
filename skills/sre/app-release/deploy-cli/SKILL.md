@@ -1,4 +1,4 @@
----
+﻿---
 name: deploy-cli
 version: 2.0.0
 description: |
@@ -48,8 +48,9 @@ tools:
 | `GRAPE_SERVER_URL` | 服务端地址 | `grape` 自动读取 |
 | `GRAPE_SESSION_TOKEN` | 会话级临时 token（`tk_`） | `grape` 自动认证 |
 | `REPO_FULL_NAME` | `owner/repo` | A2A `repository` / 知识基线 / 场景 |
-| `ACCOUNT` | owner | `--owner "$ACCOUNT"` |
+| `REPO_OWNER` | **仓库属主（owner，组织或个人泛化，不含 `/repo`）** | `--owner "$REPO_OWNER"` |
 | `REPO_NAME` | repo 名 = `${REPO_FULL_NAME#*/}` | `--repo "$REPO_NAME"` |
+| `ACCOUNT` | **个人账号（webhook 触发人 `actor`，与仓库属主解耦）** | A2A payload `account` 字段（一般不用作 `--owner`） |
 | `ISSUE_NUMBER` | Issue 编号 | `--number` / A2A |
 | `PR_NUMBER` | PR 编号（可选） | PR 分支定位 / A2A |
 | `HUAWEICLOUD_SDK_AK` / `HUAWEICLOUD_SDK_SK` | 华为云凭证 | hcloud 认证 |
@@ -67,7 +68,7 @@ tools:
 
 所有 Issue 评论 body 一律以 `[SRE Agent]` 开头：
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body": "[SRE Agent] 这是 SRE 的答复内容。"}'
 ```
 

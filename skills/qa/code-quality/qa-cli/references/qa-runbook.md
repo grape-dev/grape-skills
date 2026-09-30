@@ -1,4 +1,4 @@
-# QA-CLI 执行走查表（runbook）
+﻿# QA-CLI 执行走查表（runbook）
 
 > 目的：把 QA Agent 审查 PR 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$PR_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_WORK_BRANCH`（目标分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。目标合入分支统一解析为 `$WORK_BRANCH`（Step A1 取 PR base，缺省仓库默认分支）。
@@ -16,8 +16,8 @@
 ### Step A1 · PR 配置检查（仅首次 `pull_request_opened`）
 ```bash
 # 取 PR 详情；同时解析目标合入分支（PR 的 base）供 Step 4 工作流审查核对基准
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 取 head.sha / base.ref
-WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out | jq -r '.base.ref // "main"')}"
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 取 head.sha / base.ref
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out | jq -r '.base.ref // "main"')}"
 echo "work_branch=$WORK_BRANCH"   # 缺省仓库默认分支，不要写死 main
 ```
 - ⚠️ **`$GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能叫长期分支（`dev`/`weekly-xx`）**或 `feat/issue-N`（N 不一定等于当前 Issue/PR 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
@@ -48,14 +48,14 @@ cat ../.last_pr_review/{$PR_NUMBER}.sha 2>/dev/null   # 本机标记文件
 
 ### Step 1 · 常规审查（5 轴：正确性/可读性/架构/安全/性能）
 ```bash
-grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 既有行内评论
-grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out           # 变更文件 + diff
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out             # PR 详情（head.sha）
+grape git-repo pulls comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 既有行内评论
+grape git-repo pulls files --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out           # 变更文件 + diff
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out             # PR 详情（head.sha）
 ```
 - 对每条既有评论：若问题已修复 → 标记 resolved（⚠️ 契约当前无 `pulls comments update`，先 `grape commands pulls` 确认；不存在则在汇总评论说明"已在当前 PR 修复"，不拼不存在命令）。
 - 新问题 → 行内评论：
   ```bash
-  grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+  grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
     --json '{"body":"[$AGENT_NAME] 🔴 Critical: 硬编码密钥，建议使用环境变量","commit_id":"'"$HEAD_SHA"'","path":"src/config.py","position":42}'
   ```
   - `commit_id` = PR 最新 head.sha；`path` = 文件路径；`position` = diff 行号。
@@ -69,13 +69,13 @@ grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NU
 
 ### Step 4 · 工作流审查（Agent Work Loop 五维：任务理解/受控执行/变更验证/可靠交付/经验沉淀）
 ```bash
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth single --json-out                          # 目录树（无基线降级时；$WORK_BRANCH 见 Step A1）
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path AGENTS.md --raw                                # 任务理解/受控执行
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path spec --raw                                      # 任务理解
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path tests --raw                                    # 变更验证
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path .github/workflows --json-out                   # CI 门禁
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out                     # 审查/合并记录
-grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth single --json-out                          # 目录树（无基线降级时；$WORK_BRANCH 见 Step A1）
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path AGENTS.md --raw                                # 任务理解/受控执行
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path spec --raw                                      # 任务理解
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path tests --raw                                    # 变更验证
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path .github/workflows --json-out                   # CI 门禁
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out                     # 审查/合并记录
+grape git-repo pulls files --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
 ```
 - 证据来源标注 **observed / unobserved**；未观察显式标注、不得推断/评分。
 - 发现按 `references/findings-format.md` 契约记录（维度/证据/严重度/影响/修复/验收）。
@@ -111,7 +111,7 @@ grape a2a handoff --json '{
 
 ### Step 6 · 评论回复（⚠️ 所有能力项执行完毕最后统一发，不得中间单独发）
 ```bash
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json '{"body":"[$AGENT_NAME] 审查报告\n\n## 配置检查\n- ✅ Title：通过\n...\n## 代码审查\n✅ 通过\n\n## 工作流审查\n⚠️ 2 项发现（见下）\n\n## 安全扫描\n✅ 安全\n\n## 合并检查\n⚠️ 测试未确认"}'
 ```
 - body 以 `[$AGENT_NAME]` 开头；按「输出规范」逐节组织；全部通过则评论「审查通过，所有检查项均正常」。

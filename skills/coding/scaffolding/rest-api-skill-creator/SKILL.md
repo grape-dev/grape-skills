@@ -1,4 +1,4 @@
----
+﻿---
 name: rest-api-skill-creator
 version: 2.1.0
 description: |
@@ -92,7 +92,7 @@ Don't use for: 测试 skill（tester 职责）/ 发布 skill（publish 职责）
 
 **Step 0：查重**——检查目标仓库 skills/ 目录是否已有同名 skill：
 ```bash
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --path skills --json-out
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --path skills --json-out
 ```
 - 远程已存在 → 回复「已存在——可复用/更新」——不重复造
 - 不存在 → 继续
@@ -179,7 +179,7 @@ grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --path skills --json-
 ⚠️ **创建 PR 后必须发 Issue 评论告知**：
 ```bash
 grape git-repo issues comments create \
-  --owner "$ACCOUNT" --repo "$REPO_NAME" \
+  --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$ISSUE_NUMBER" \
   --json '{"body": "[Coding Agent] ✅ Skill 已创建并提交 PR\n\n**Skill 名称**：{name}\n**功能摘要**：{一句话描述}\n**API 端点数**：{N} 个\n**认证方式**：{AUTH_TYPE}\n**PR 链接**：{PR_URL}\n**测试状态**：已 A2A 交棒 QA Agent，测试中\n\n**下一步**：\n- 测试通过后自动合并 → 发布"}'
 ```
@@ -205,8 +205,8 @@ grape a2a handoff --json '{
 **grape CLI（平台交互）**——见 `references/grape-cli-reference.md` 完整子集 + ❌ 警示表。核心：
 ```bash
 grape --version / grape refresh                                        # 前置门
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --path skills --json-out   # Step 0 查重
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[Coding Agent] ..."}'   # Step 4 评论
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --path skills --json-out   # Step 0 查重
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[Coding Agent] ..."}'   # Step 4 评论
 grape a2a handoff --json '{"agent":"qa","payload":{...}}'              # Step 6 交棒
 grape tasks complete --json '{...}'                                    # 收尾（4.8）
 ```

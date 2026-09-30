@@ -29,7 +29,10 @@ tools:
 | 变量 | 语义 | 用在哪 | 何时有 |
 |------|------|--------|--------|
 | `GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` | 服务端地址 / 会话 token（tk_）| grape CLI 自动读取 | 全部任务 |
-| `REPO_FULL_NAME` / `ACCOUNT` | 仓库全名 / 属主 | CLI 的 --owner/--repo 参数 | 全部 |
+| `REPO_FULL_NAME` | 仓库全名（owner/repo） | A2A 交办 `repository`；repo_key 拼装 | 全部 |
+| `REPO_OWNER` | 仓库属主（owner，不含 /repo） | CLI 用 --owner | 全部 |
+| `REPO_NAME` | 仓库名 | CLI 用 --repo | 全部 |
+| `ACCOUNT` | 个人账号（触发人 actor，与仓库属主解耦） | A2A payload `account`（一般不用作 --owner） | 全部 |
 | `REPO_NAME` | 仓库名（派生：`${REPO_FULL_NAME#*/}`）| --repo 参数 | 全部 |
 | `ISSUE_NUMBER` | Issue 编号 | A2A payload | 全部 |
 | `PR_NUMBER` | PR 编号 | pulls get/files/merge | 全部 |

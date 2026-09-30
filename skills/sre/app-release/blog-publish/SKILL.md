@@ -1,4 +1,4 @@
----
+﻿---
 name: blog-publish
 description: "Use when publishing, editing, deleting, or listing blog posts via the Blog System API. Also handles mood publishing, comments, messages, labels, and media uploads. Invoked via A2A by the coding Agent after blog content generation."
 author: Hermes Agent
@@ -93,7 +93,7 @@ metadata:
 | `GRAPE_SERVER_URL` | 平台服务地址（CLI 自动读）| CLI 域 |
 | `GRAPE_SESSION_TOKEN` | 会话令牌（CLI 自动读）| CLI 域 |
 | `REPO_FULL_NAME` | 仓库全名（派生 `REPO_NAME`）| 派生之源 |
-| `ACCOUNT` / `REPO_NAME` | 平台操作实参（--owner/--repo）| 使用 |
+| `REPO_OWNER` / `REPO_NAME` | 平台操作实参（--owner/--repo）| 使用 |
 | `ISSUE_NUMBER` | 结果汇报落点 | 使用 |
 | `PR_NUMBER` | 待合并 PR 编号（A2A 注入）| 使用 |
 | `BLOG_HOST` | **外部博客系统地址**（外部解析值——非平台注入）| 使用 |
@@ -184,7 +184,7 @@ grape tasks complete --json '{"result_text":..., "actions":[...], ...}'  # 收�
 ### 4.8 任务收尾（必做）
 收尾顺序：**先 Issue 评论反馈发布结果 → 再 `grape tasks complete`**（评论确保用户可追溯）：
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[blog-publish Agent] 博客已发布：{标题} | article_id={n} | {BLOG_HOST}/article/{n}（{媒体统计/pending}）"}' --json-out
 grape tasks complete --json '{
   "result_text": "结论：博客发布成功（article_id={n} | {BLOG_HOST}/article/{n} | 媒体 {n} 个）",

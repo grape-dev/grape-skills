@@ -1,4 +1,4 @@
-# implementation 执行走查表（runbook）
+﻿# implementation 执行走查表（runbook）
 
 > 目的：把 implementation 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量直接使用：`$ACCOUNT`、`$REPO_NAME`、`$ISSUE_NUMBER`、`$PR_NUMBER`（有则填）、`$GRAPE_WORK_BRANCH`、`$BOT_USERNAME`。
@@ -11,7 +11,7 @@
 ```bash
 grape refresh                        # 契约刷新（前置门②）
 grape tasks current --json-out
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 grape events detail --seq {seq} --json-out   # 能定位到前序 A2A seq/id 时读取
 # git 身份预置（进入 worktree 后、首次 commit 前执行一次）：
 grape git config user.name  "$BOT_USERNAME"
@@ -26,8 +26,8 @@ grape git config user.email "$BOT_USERNAME@noreply.git.com"
 
 ### A1 · 需求理解（必做）
 ```bash
-grape git-repo issues get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 需求不明确 → 先评论确认（[Coding Agent] 追问）
 # 需外部 API/第三方服务 → 先获取 API 文档确认接口存在且参数明确；缺失 → 评论说明暂缓实施
 ```
@@ -41,7 +41,7 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 - `references/planning-and-task-breakdown.md` → 写 `tasks/plan.md` + `tasks/todo.md`
 - Issue 评论告知方案：
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[Coding Agent] 方案已输出：docs/spec.md（需求文档）+ tasks/plan.md（任务拆解）"}'
 ```
 
@@ -59,10 +59,10 @@ git push origin feat/issue-$ISSUE_NUMBER
 
 ### A6 · 创建 PR（必做）
 ```bash
-grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json '{"title":"feat: #'$ISSUE_NUMBER' {标题}","head":"feat/issue-'$ISSUE_NUMBER'","base":"'${GRAPE_WORK_BRANCH:-main}'","inner_issue_nums":"#'"$ACCOUNT/$REPO_NAME"'#'$ISSUE_NUMBER'","close_related_issue":true}'
 # 补充 PR body 与 label：
-grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${PR_NUMBER:-$PR_NUMBER_FROM_CREATE}" \
+grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${PR_NUMBER:-$PR_NUMBER_FROM_CREATE}" \
   --json '{"body":"## 概述\n\n自动实现 Issue #'$ISSUE_NUMBER'","labels":"auto-pr"}'
 # 从 pulls create 返回值取 PR 编号（若 $PR_NUMBER 未注入）
 ```
@@ -70,7 +70,7 @@ grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${P
 ### A7 · Issue 评论告知（必做，不可跳过）
 ```bash
 # ⚠️ PR 链接用 Web 页面 /pull/（单数）markdown 格式——不得用 API 路径
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[Coding Agent] ✅ 已完成实现，请审查 PR [#'"$PR_NUMBER"'](https://gitcode.com/'"$ACCOUNT/$REPO_NAME"'/pull/'"$PR_NUMBER"')。"}'
 ```
 
@@ -79,7 +79,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 # ⚠️ 防悬空：$GRAPE_SCENE_ID 非空时先查场景节点——确认 qa 节点存在再交办
 grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out    # 仅 ${GRAPE_SCENE_ID:-} 非空时执行；无 qa 节点 → 评论说明不交办
 # ⚠️ 防重复：先查 pipeline，已含 qa:a2a_event 则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（issue_number 必填；pr_number 有则填、无则不填，严禁混用）
 grape a2a handoff --json '{"agent":"qa","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"{user}","issue_number":'"$ISSUE_NUMBER"',"pr_number":'"${PR_NUMBER:-0}"',"context":"Issue #'"$ISSUE_NUMBER"' 开发已完成，PR #'"${PR_NUMBER:-0}"' 已创建。请对该 PR 进行代码审查。原始需求：{简要摘要}"}}'
 # A2A 失败 → 重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入
@@ -129,7 +129,7 @@ fi
 
 ### B1 · 理解审查反馈（必做）
 ```bash
-grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+grape git-repo pulls comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
 # 逐条核对代码是否已修改、问题是否解决；不明确处 PR 评论追问
 ```
 
@@ -145,7 +145,7 @@ git add -A && git commit -m "fix: #{n} 修复 {问题描述}" && git push origin
 
 ### B4 · PR 评论告知（必做）
 ```bash
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json '{"body":"[Coding Agent] 已根据审查意见完成修改，请重新审查。"}'
 ```
 

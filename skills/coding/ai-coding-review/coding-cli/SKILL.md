@@ -1,4 +1,4 @@
----
+﻿---
 name: coding-cli
 version: 3.0.0
 description: |
@@ -60,8 +60,9 @@ tools:
 | `GRAPE_SERVER_URL` | 服务端地址 | `grape` 自动读取（`--base-url` 可覆盖） |
 | `GRAPE_SESSION_TOKEN` | 会话级临时 token（`tk_`，任务生命周期有效） | `grape` 自动认证；终态后失效 |
 | `REPO_FULL_NAME` | `owner/repo` 仓库全名 | A2A 交办 `repository` / 知识/场景查询 |
-| `ACCOUNT` | 仓库属主（owner） | `grape ... --owner "$ACCOUNT"` |
+| `REPO_OWNER` | **仓库属主（owner，组织或个人泛化，不含 `/repo`）** | `grape ... --owner "$REPO_OWNER"` |
 | `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
+| `ACCOUNT` | **个人账号（webhook 触发人 `actor`，与仓库属主解耦）** | A2A payload `account` 字段（一般不用作 `--owner`） |
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | `--number "$ISSUE_NUMBER"` / A2A `issue_number` / 分支 `feat/issue-{n}` |
 | `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空） | `--number "$PR_NUMBER"` / A2A `pr_number`（无则不填） |
 | `GRAPE_WORK_BRANCH` | 目标合入分支（工作基线；服务端注入，缺省则取仓库默认分支，如 main/master） | 建 PR 的 `base`；开发分支 `feat/issue-{issue_number}` 基于它创建，本地 push/同步均以它为基线 |
@@ -117,11 +118,11 @@ Grape 已在当前工作目录准备好该 Issue 的 **git worktree**（分支 `
 
 ```bash
 # Issue 评论（CLI，body 以 [Coding Agent] 开头；token/base_url 取已注入的 $GRAPE_SESSION_TOKEN/$GRAPE_SERVER_URL）
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body": "[Coding Agent] 这是 Coding 的答复内容。"}'
 
 # PR 评论
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json '{"body": "[Coding Agent] 已根据审查意见完成修改，请重新审查。"}'
 ```
 

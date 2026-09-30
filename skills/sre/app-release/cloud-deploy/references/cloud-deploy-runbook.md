@@ -1,4 +1,4 @@
-# 部署执行走查表（runbook）
+﻿# 部署执行走查表（runbook）
 
 > 目的：把 cloud-deploy 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名 = `${REPO_FULL_NAME#*/}`）、`$ISSUE_NUMBER`、`$PR_NUMBER`（有则填）、`$DEVOPS_EVENT_TYPE`、`$GRAPE_WORK_BRANCH`（部署拉取分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
@@ -8,7 +8,7 @@
 ```bash
 grape refresh 2>&1 && echo REFRESH_OK          # 契约保鲜；失败重试 ≤2 次后回退内置快照继续
 grape tasks current --json-out                 # 当前任务（事件/Issue/Spec 指引）
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
 # AK/SK 未配置（HUAWEI_AK/SK 为空）且任务需要云资源部署
 # → STOP：提示在【场景详情页 → 高级选项 → 自定义配置】配 name=HUAWEI_AK/HUAWEI_SK 或【通用设置】配置华为云 AK/SK 后重试——不硬编码、不找替代（安全硬约束⑥/前置门）
 #   并发出阻塞评论（含完整恢复路径——见场景 A「STOP 评论模板」）
@@ -30,7 +30,7 @@ git checkout "$GRAPE_WORK_BRANCH" 2>&1 || git checkout main
 # A5 云资源部署（仅当：AK/SK 已配置 且 需求明确要求）→ deploy-guide.md：hcloud 安装→profile 隔离→幂等检查→建 ECS→SSH 上传→启动→验证
 # A5.1 关联仓库部署（当 $GRAPE_LINKED_REPOS 非空时）→ deploy-guide.md §4.0：遍历关联仓库 worktree→构建→部署到同 ECS 不同目录/端口→验证
 # A6 发验证结论评论（唯一通道——禁止 curl）：
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[SRE Agent] 部署验证结论：{验证清单表格 + 结论 / 阻塞原因 + 恢复路径}"}' --json-out
 ```
 
@@ -44,7 +44,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 #   1. 在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK、value=<AK> 与 name=HUAWEI_SK、value=<SK>（name 严格用约定名）；或【通用设置】配置华为云 AK/SK
 #   2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』
 #   3. 平台将自动重新触发本部署任务——无需其他操作
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[SRE Agent] 部署前置检查未通过：华为云 AK/SK 未配置。本次未执行任何云操作。\n\n👉 恢复路径：\n1. 在【项目场景 → 点击单个场景 → 场景详情页 → 高级选项 → 自定义配置】添加 name=HUAWEI_AK、value=<AK> 与 name=HUAWEI_SK、value=<SK>（name 严格用约定名）；或【通用设置】配置华为云 AK/SK\n2. 配置完成后，在本 Issue 评论：『已配置 AK/SK，请重新部署』\n3. 平台将自动重新触发本部署任务——无需其他操作"}' --json-out
 ```
 

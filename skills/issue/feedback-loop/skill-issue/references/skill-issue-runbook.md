@@ -1,4 +1,4 @@
-# Issue 运营执行走查表（skill-issue runbook）
+﻿# Issue 运营执行走查表（skill-issue runbook）
 
 > 目的：把 skill-issue 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部平台交互命令（issues / pipeline / a2a / tasks）——**禁止 curl 直连平台 API**。
@@ -16,14 +16,14 @@
 grape --version
 grape refresh 2>&1 && echo REFRESH_OK        # 契约保鲜；失败重试 ≤2 次后回退内置快照继续
 grape tasks current --json-out               # 任务上下文（事件 payload / A2A context 在这里）
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
 ```
 
 ## 步骤 0 · 前置判断：危险操作确认检查（⚠️ 必须最先执行——在任何分析之前）
 
 ```bash
 # 读 Issue 评论历史，找自己之前的「⚠️ 危险操作确认」标记 + 后续用户「确认」回复：
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 - **找到标记 且 有用户「确认」** → **已确认** → 跳到步骤 7 直接 A2A coding（context 带「用户已确认危险操作」）
 - **找到标记 但 无用户「确认」** → 回复「仍在等待确认，请回复'确认'继续」→ 任务结束（4.8）
@@ -33,9 +33,9 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 
 - 从事件 payload 提取 issue 编号（`$ISSUE_NUMBER`）；缺失时定位：
 ```bash
-grape git-repo issues get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 或
-grape git-repo issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --state open --json-out | head -60
+grape git-repo issues list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out | head -60
 ```
 - 读取该 Issue 全部评论/标签/关联 PR（`git-repo issues comments list`——步骤 0 已拉）了解完整上下文。
 
@@ -45,8 +45,8 @@ grape git-repo issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --state open -
 - **不再自行生成**（服务端统一维护）。
 - 无基线 / `[degraded]` → 降级分析（README + git-repo contents），不阻塞：
 ```bash
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md --json-out
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --path skills --json-out | head -60
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path README.md --json-out
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --path skills --json-out | head -60
 ```
 
 ## 步骤 3 · 深度可开发性分析（⚠️ 每次处理都执行）
@@ -69,7 +69,7 @@ grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --path skills --json-
 
 ```bash
 # 打标签 + 分配（整体替换语义——必须携带既有标签；labels 字符串逗号分隔；assignee 用 GitCode 用户名）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"feature,triaged,spec-ready","assignee":"<用户名 或 $BOT_USERNAME>"}' --json-out
 ```
 
@@ -87,7 +87,7 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 ```bash
 # 前缀固定 [Issue Agent]；长 body 先写文件再 --json @file（防转义）：
 printf '%s' '{"body":"[Issue Agent] <评论内容>"}' > /tmp/skill-issue-comment.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$ISSUE_NUMBER" --json @/tmp/skill-issue-comment.json --json-out
 ```
 
@@ -95,7 +95,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
 
 ```bash
 # 先防重复：查 pipeline 是否已含目标 agent 的 a2a 记录：
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | head -40
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | head -40
 # 交办（agent 名从 prompt 底部 Agent 列表取——勿凭记忆；issue_number 必填；已确认危险时 context 带"用户已确认危险操作"）：
 grape a2a handoff --json '{
   "agent": "<coding/qa/sre/vod>",

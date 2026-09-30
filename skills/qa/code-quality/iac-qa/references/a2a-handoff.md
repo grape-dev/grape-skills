@@ -1,4 +1,4 @@
-# A2A 交办 SRE Agent（QA Agent 用）
+﻿# A2A 交办 SRE Agent（QA Agent 用）
 
 ## 触发时机
 
@@ -7,7 +7,7 @@ QA 审查通过后，**自动合并 PR**，合并成功后 **必须** A2A 交办
 ### 触发步骤（按顺序执行）
 
 1. QA 审查结论为 ✅ LGTM（无 P0/P1 阻塞项）
-2. QA 通过 grape CLI 自动合并 PR：`grape git-repo pulls merge --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out`（命令见 iac-qa-runbook Step 5）
+2. QA 通过 grape CLI 自动合并 PR：`grape git-repo pulls merge --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out`（命令见 iac-qa-runbook Step 5）
 3. PR 合并确认后，通过 A2A 交办 SRE Agent
 
 ### 不触发的情况

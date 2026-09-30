@@ -1,4 +1,4 @@
-# 博客 Spec 生成指南（内容规格）
+﻿# 博客 Spec 生成指南（内容规格）
 
 > 配套 `skills/issue/feedback-loop/blog-issue/SKILL.md`（B 链路）与 runbook Step B2。所有平台操作用 grape CLI，禁止 curl 直连平台 API；curl 仅限外部博客系统（BLOG_HOST）验证。
 
@@ -97,7 +97,7 @@
 ```bash
 # 长 body 先写文件再 @file（外层单引号防 shell 转义）：
 printf '%s' '{"body":"[blog-issue Agent] 📋 博客 Spec Document\n\n{Spec 正文}"}' > /tmp/blog-spec.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json @/tmp/blog-spec.json --json-out
 ```
 
@@ -109,18 +109,18 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 
 ```bash
 # 幂等——先 list 查重，缺失才 create：
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"spec-ready","color":"#0e8a16"}'
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"blog-issue","color":"#f9d0c4"}'
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"spec-ready","color":"#0e8a16"}'
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"blog-issue","color":"#f9d0c4"}'
 # 打标（整体替换语义——携带既有标签）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{既有标签,}spec-ready,blog-issue"}' --json-out
 ```
 
 ### 分配给机器人
 
 ```bash
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"assignee":"{GitCode 用户名}"}' --json-out
 ```
 

@@ -1,4 +1,4 @@
-# REST API Skill 测试执行走查表（rest-api-skill-tester runbook）
+﻿# REST API Skill 测试执行走查表（rest-api-skill-tester runbook）
 
 > 目的：把 rest-api-skill-tester 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：平台交互（读 Issue/PR/评论/合并/A2A/任务）一律走 grape CLI——**禁止 curl 直连平台 API**；curl 仅用于**被测 skill 目标系统探测**（测试执行域——合法）。
@@ -20,14 +20,14 @@ python3 -c "import requests" 2>&1 && echo REQUESTS_OK   # Python 环境（≥3.8
 command -v gitleaks && echo GITLEAKS_OK || echo "gitleaks 未装——降级人工检查（非阻断）"
 [ -n "$PR_NUMBER" ] && echo PR_OK || echo "PR_NUMBER 缺失——停下说明（测试必须知道 PR）"
 grape tasks current --json-out               # A2A payload 在这里（skill 名称/PR 编号——creator 交棒信息）
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -80   # 读 PR 确认被测对象
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -80   # 读 PR 确认被测对象
 ```
 
 ## 前置判断（仅 pull_request_merged 事件时执行）
 
 ```bash
 # 读 Issue 评论历史，找自己之前的「[QA Agent] ✅ 测试通过」标记：
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | head -120
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | head -120
 # 找到标记 → PR 之前已测试通过 → 直接 A2A SRE Agent（跳流程 1-5——见下）
 # 找不到 → 正常测试流程
 ```
@@ -91,10 +91,10 @@ printf '%s' '{"body":"[QA Agent] ✅ 测试通过
 
 ## 结论
 ✅ 测试通过，可合并发布"}' > /tmp/tester-issue-comment.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$ISSUE_NUMBER" --json @/tmp/tester-issue-comment.json --json-out
 # PR 评论：
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$PR_NUMBER" --json '{"body": "[QA Agent] ✅ 测试通过"}' --json-out
 # 失败时同样两条评论（[QA Agent] 🔴 测试失败 + 失败原因/证据/修复建议）
 ```

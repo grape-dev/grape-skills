@@ -1,4 +1,4 @@
-# grape CLI 命令参考（skill-issue 专用）
+﻿# grape CLI 命令参考（skill-issue 专用）
 
 > 来源：cli-code-analysis-spec.md（CLI v0.3.x，契约经 `grape commands` 核对）
 > 本文件只列 skill-issue 实际用到的命令子集 + 平台交互纪律。云资源操作（terraform/hcloud/obsutil）非本技能范围。git 操作用原生命令 + GIT_ASKPASS。
@@ -25,31 +25,31 @@ grape tasks current --json-out
 ### 3.2 Issue 读取
 
 ```bash
-grape git-repo issues get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 全部评论（Step 0 危险操作确认检查用）：
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 可用标签（判断标签缺失/更新）：
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 ```
 
 ### 3.3 Issue 写操作
 
 ```bash
 # 打标签 / 指派 / 更新：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"labels": "triaged", "assignee": "<模块负责人用户名（从 CODEOWNERS 匹配结果取）>"}'
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"labels": "triaged", "assignee": "<模块负责人用户名（从 CODEOWNERS 匹配结果取）>"}'
 # 关闭（含"关闭 Issue 后刷新任务"场景）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"state": "closed"}'
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"state": "closed"}'
 # 里程碑（Issue 正文提及版本号时）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"milestone_id": <id>}'
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"milestone_id": <id>}'
 # 评论回复（前缀 [Issue Agent]）：
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body": "[Issue Agent] <正文>"}'
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body": "[Issue Agent] <正文>"}'
 ```
 
 ### 3.4 关联 PR / 提交历史（验证外部 claim、关闭建议）
 
 ```bash
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --json-out
-grape git-repo commits --owner "$ACCOUNT" --repo "$REPO_NAME" --per_page 20 --json-out
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --json-out
+grape git-repo commits --owner "$REPO_OWNER" --repo "$REPO_NAME" --per_page 20 --json-out
 # 或本地 git（GIT_ASKPASS 已注入）：git log --oneline -20 --all
 ```
 

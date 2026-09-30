@@ -1,4 +1,4 @@
-# IaC QA 执行走查表（runbook）
+﻿# IaC QA 执行走查表（runbook）
 
 > 目的：把 iac-qa 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部平台交互命令（issues / git-repo pulls/issues / a2a / tasks）——**禁止 curl 直连平台 API（读操作也一样）**——每个节点需要的命令已写在该节点——按节点照抄；命令失败才看「错误排查速查」。
@@ -14,7 +14,7 @@
 grape --version
 grape refresh 2>&1 && echo REFRESH_OK
 grape tasks current --json-out
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -80
 printenv GRAPE_WORK_BRANCH 2>/dev/null
 cd /root/grape-workspaces/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/qa 2>/dev/null && git status 2>&1 | head -3 || true
 ```
@@ -23,8 +23,8 @@ cd /root/grape-workspaces/$REPO_FULL_NAME/issues/$ISSUE_NUMBER/qa 2>/dev/null &&
 
 ```bash
 # PR 信息 + 变更文件 + diff：
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -60
-grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -60
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -60
+grape git-repo pulls files --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -60
 # 变更新鲜度断点（.sha——与上次审查对比，SHA 未变更 → 沿用上次结论）：
 cat .last_pr_review/${PR_NUMBER}.sha 2>/dev/null && git log -1 --format=%H 2>/dev/null || true
 ```
@@ -59,9 +59,9 @@ tfsec iac/ 2>&1 | tail -30 || echo "tfsec 不可用——按 checklist 人工核
 cat > /tmp/qa-full-report.json << 'JSONEOF'
 {"body":"[qa Agent] 审查报告\n\n{结论 ✅ LGTM / ❌ Request Changes}\n\n## 问题清单（P0-P3）\n| 级别 | 文件 | 行号 | 问题 | 建议 |\n|--|--|--|--|--|\n{逐条}\n\n## 资源规格交叉验证\n{已查结果 / 未交叉验证（AK/SK 无值）}\n\n## 安全扫描\n{结果}\n\n## terraform plan 摘要\n{create/update/destroy 资源数 + 验证项}"}
 JSONEOF
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/qa-full-report.json --json-out
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/qa-full-report.json --json-out
 # MR 评论（结论摘要——@file 或内联）：
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json '{"body":"[qa Agent] {结论}——{摘要}"}' --json-out
 ```
 
@@ -74,15 +74,15 @@ grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --nu
 
 ```bash
 # ⚠️ 防重复（分支 A/B 都要）：先查 pipeline，已含目标 agent（coding:a2a_event / sre:a2a_event status≠failed）则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 
 # ── 分支 A：交办 coding（有 P0/P1 时；issue_number 必填，pr_number 有则填，严禁混用）──
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"'"$ACCOUNT"'","issue_number":'"$ISSUE_NUMBER"',"pr_number":'"$PR_NUMBER"',"context":"PR #'"$PR_NUMBER"' 审查发现 {P0/P1 问题清单}，请修复"}}'
 
 # ── 分支 B：先自动合并（幂等——已合并跳过；失败走分支 C）──
-grape git-repo pulls merge --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -30
+grape git-repo pulls merge --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | head -30
 # 合并确认（state=merged 后再 A2A sre——防未合并就交办空转）：
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | grep -E '"state"|merged' | head -3
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out 2>&1 | grep -E '"state"|merged' | head -3
 # ── 分支 B 续：交办 sre（通过 + 已合并；payload 用 @file 避免转义）──
 cat > /tmp/a2a-sre-payload.json << EOF
 {"agent":"sre","payload":{"repository":"$ACCOUNT/$REPO_NAME","account":"$ACCOUNT","issue_number":$ISSUE_NUMBER,"pr_number":$PR_NUMBER,"context":"PR #$PR_NUMBER 已合并，QA 审查通过（含资源规格交叉验证），交办部署验证"}}

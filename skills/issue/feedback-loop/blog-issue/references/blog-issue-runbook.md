@@ -1,4 +1,4 @@
-# blog-issue 执行走查表（runbook）
+﻿# blog-issue 执行走查表（runbook）
 
 > 目的：把 blog-issue 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部平台操作命令（issues / git-repo 含 labels/pulls/contents/comments / a2a / tasks）——**禁止 curl 直连平台 API**；curl 仅用于**外部博客系统**（BLOG_HOST）验证探测。
@@ -21,7 +21,7 @@ grape tasks current --json-out               # 前序 A2A payload/上下文在�
 #    （如需前序事件详情——如 a2a_event 的 payload 不在 current 里——用 grape events detail --seq {seq} 读；seq 为事件编号——从 tasks current 输出/当前事件上下文取，平台不单独注入 $SEQ）
 # ISSUE_NUMBER 缺失 → 先用 `git-repo issues get`/`git-repo issues list` 定位；定位不到 → STOP（不执行任何写操作）
 if [ -n "$ISSUE_NUMBER" ]; then
-  grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
+  grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
 fi
 ```
 
@@ -34,7 +34,7 @@ fi
 - **关闭请求** → 验证已完成（博客场景：BLOG_HOST 文章可见；通用：git log/PR 合并状态）→ 已达成 → 评论说明 + `grape git-repo issues update --json '{"state":"closed"}'`（流程外——先确认）→ tasks notify 收尾；未达成 → 回复当前进展
 
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[blog-issue Agent] {回复}"}' --json-out
 ```
 
@@ -50,7 +50,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 ## Step 2 · 知识基线（分析前提）
 
 - 知识基线由服务端在 prompt「项目知识基线」章节内联注入（主路径——**无需命令**，Agent 不自取/不自行生成；不存在 `grape knowledge context` 命令——见 grape-cli-reference 警示表）
-- 标注「无基线」/`[degraded]` → 降级：`grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out` + README（`grape git-repo contents --path README.md --raw`），不阻塞
+- 标注「无基线」/`[degraded]` → 降级：`grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out` + README（`grape git-repo contents --path README.md --raw`），不阻塞
 - 博客场景注意从基线提取：`project-info/member/blog-config.yaml`（BLOG_HOST）、`project-info/member/ai-models.yaml`（qwen-image / Wan2.2 配置）
   - **提取到 BLOG_HOST 值后先导出** `export BLOG_HOST="<取到的值>"`——后续 `curl https://$BLOG_HOST/...`（B4/B5）直接引用，未导出则 URL 为空
 
@@ -91,7 +91,7 @@ curl -s --max-time 10 "https://$BLOG_HOST/api/articles?page=1&size=2"
 # 按 references/blog-spec-generation.md 模板组织（主题/风格/结构/配图规格/视频规格/发布目标/验收标准）
 # 长 body 先写文件再 @file（外层单引号防 shell 转义）：
 printf '%s' '{"body":"[blog-issue Agent] 📋 博客 Spec Document\n\n{Spec 正文}"}' > /tmp/blog-spec.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json @/tmp/blog-spec.json --json-out
 ```
 
@@ -99,15 +99,15 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 
 ```bash
 # 标签（幂等——先 list 再 create 缺失项）：
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"blog-issue","color":"#f9d0c4"}'
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"spec-ready","color":"#0e8a16"}'
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"blog-issue","color":"#f9d0c4"}'
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"spec-ready","color":"#0e8a16"}'
 # 打标（整体替换语义——携带既有标签）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{既有标签,}spec-ready,blog-issue"}' --json-out
 # 分配（CODEOWNERS 优先——见 references/assignee-guide.md；博客链路缺省分配机器人 sts 账号）：
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out 2>&1 | head -30
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out 2>&1 | head -30
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"assignee":"{GitCode 用户名}"}' --json-out
 ```
 
@@ -125,7 +125,7 @@ VOD（需求澄清）→ A2A → blog-issue（本技能：分析→博客 Spec�
 
 ```bash
 # ⚠️ 防重复：先查 pipeline，已含 coding:a2a_event 则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（context 明确指定博客内容生成技能 + 提示完成后 A2A sre、跳过 QA）：
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'$ACCOUNT/$REPO_NAME'","account":"'$ACCOUNT'","issue_number":'$ISSUE_NUMBER',"pr_number":null,"context":"博客需求已分析（评级 ready），博客 Spec 已发布（评论位置见前序评论）。请使用【博客内容生成技能】生成正文+配图+视频并提交 PR。发布目标: '$BLOG_HOST'。完成后请 A2A 通知 sre 使用博客发布技能发布（跳过 QA——内容产物无需代码审查）。"}}'
 # ⚠️ 字段规则：pr_number 字段——$PR_NUMBER 非空时填其值，无则 null（严禁将 PR 编号填入 issue_number）
@@ -153,19 +153,19 @@ grape tasks notify --json '{"assignee":"{最终 assignee 用户名——机器�
 ### G1 · 分类与打标
 
 ```bash
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 # 缺失标签按 references/labeling-guide.md 规范创建（type:/priority:/status: 前缀）：
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}' --json-out
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}' --json-out
 # 打标（整体替换——携带既有标签）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{原有标签},type:feature,status:triaged"}' --json-out
 ```
 
 ### G2 · 指派
 
 ```bash
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out 2>&1 | head -30
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out 2>&1 | head -30
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"assignee":"{GitCode 用户名}"}' --json-out
 ```
 
@@ -174,14 +174,14 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 ```bash
 # 按 references/spec-generation.md 模板（需求描述/技术方案/范围/依赖/测试策略/风险）：
 printf '%s' '{"body":"[Issue Agent] 📋 Spec Document\n\n{Spec 正文}"}' > /tmp/gen-spec.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json @/tmp/gen-spec.json --json-out
 ```
 
 ### G4 · A2A 交办 coding（防重复）
 
 ```bash
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'$ACCOUNT/$REPO_NAME'","account":"'$ACCOUNT'","issue_number":'$ISSUE_NUMBER',"pr_number":null,"context":"{分类}，评级 ready，通用 Spec 已发布（评论位置见前序评论）。请按 Spec 开发提交 PR。"}}'
 # 失败重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入
 ```

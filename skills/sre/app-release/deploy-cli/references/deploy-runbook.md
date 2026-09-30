@@ -1,4 +1,4 @@
-# Deploy-CLI 执行走查表（runbook）
+﻿# Deploy-CLI 执行走查表（runbook）
 
 > 目的：把 SRE Agent 部署/资源释放的**每一步要做什么 + 用哪条命令**固化下来，Agent **照着执行、不要逐条探索**。
 > 环境变量：`$ACCOUNT` / `$REPO_NAME` / `$REPO_FULL_NAME` / `$ISSUE_NUMBER` / `$PR_NUMBER`（可选）/ `$HUAWEICLOUD_SDK_AK`/`$HUAWEICLOUD_SDK_SK`（华为云）/ `$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
@@ -22,7 +22,7 @@
 
 > **目标合入分支解析（必做，入口判定与 Step 2 用）**：优先 `$GRAPE_WORK_BRANCH`；未注入取仓库默认分支（不要写死 main/master）：
 > ```bash
-> WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
+> WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 > echo "work_branch=$WORK_BRANCH"
 > ```
 
@@ -32,9 +32,9 @@
 
 ### Step 1 · 理解项目结构（判断构建方式）
 ```bash
-grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out   # 项目知识基线（优先）
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth single --json-out
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path README.md --raw
+grape repos project info --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out   # 项目知识基线（优先）
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --ref "$WORK_BRANCH" --depth single --json-out
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path README.md --raw
 ```
 | 文件标记 | 推断 |
 |----------|------|
@@ -86,7 +86,7 @@ curl -s -o /dev/null -w '%{http_code}' "http://$ECS_IP:5000/post/1"
 ### Step 1 · 收集资源信息
 从 Issue 正文/评论提取：ECS 名称/IP、RDS 实例名、OBS 桶名、安全组/密钥对/EIP。
 ```bash
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 仍无法确定 → Issue 回帖追问用户。
 

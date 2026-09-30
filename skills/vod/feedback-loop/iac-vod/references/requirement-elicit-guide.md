@@ -1,4 +1,4 @@
-# IaC 需求引导与 Issue 审视指南（iac-vod）
+﻿# IaC 需求引导与 Issue 审视指南（iac-vod）
 
 > 配套 `skills/vod/feedback-loop/iac-vod/SKILL.md`（v2.2）。覆盖：清晰度四要素 + IaC 特化要素、引导漏斗、IaC Issue 审视流程、结构化模板、A2A 交办。
 
@@ -49,7 +49,7 @@
   ```
 - **Issue 评论追问格式**（body 以 `[iac-vod Agent]` 开头）：
   ```bash
-  grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
     --json '{"body": "> 用户的问题原文\n\n[iac-vod Agent] 您需要的是哪种 RDS 引擎？……"}' --json-out
   ```
 

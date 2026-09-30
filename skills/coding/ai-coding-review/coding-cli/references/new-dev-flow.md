@@ -1,4 +1,4 @@
-# 新开发流程（Coding-CLI）
+﻿# 新开发流程（Coding-CLI）
 
 从 issue skill 通过 A2A 触发的新功能/fix 开发。**全部操作走 `grape` CLI**（命令见 `references/grape-cli-reference.md`）。
 
@@ -78,7 +78,7 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {nu
 grape git status
 
 # worktree 未就绪（降级）：克隆到当前目录再建分支（基于目标合入分支，不要写死 main/master；除非确有跨 PR 依赖，不基于上个 issue 分支）
-WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 grape git clone https://gitcode.com/"$REPO_FULL_NAME".git . 2>/dev/null || true
 grape git checkout "feat/issue-{number}" 2>/dev/null \
   || grape git checkout -b "feat/issue-{number}" "origin/$WORK_BRANCH"
@@ -127,7 +127,7 @@ grape git push origin feat/issue-{number}
 
 ```bash
 # 创建 PR（base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支），不要写死 main）
-WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 grape git-repo pulls create --owner {owner} --repo {repo} \
   --json '{
     "title": "feat: #{number} 标题",

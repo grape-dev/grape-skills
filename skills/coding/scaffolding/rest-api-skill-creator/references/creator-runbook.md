@@ -1,4 +1,4 @@
-# REST API Skill 生成执行走查表（rest-api-skill-creator runbook）
+﻿# REST API Skill 生成执行走查表（rest-api-skill-creator runbook）
 
 > 目的：把 rest-api-skill-creator 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：平台交互（查重/评论/A2A/任务）一律走 grape CLI——**禁止 curl 直连平台 API**；curl 仅用于**目标系统探测**（生成器执行域——被创建的 REST API skill 要管理的系统）——`curl -s --max-time 30`。
@@ -24,7 +24,7 @@ grape tasks current --json-out               # A2A payload 在这里（需求描
 
 ```bash
 # 检查目标仓库 skills/ 目录是否已有同名 skill：
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --path skills --json-out | head -80
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --path skills --json-out | head -80
 # 远程已存在 → 回复「已存在——可复用/更新」——不重复造；不存在 → 继续
 ```
 
@@ -139,7 +139,7 @@ printf '%s' '{"body":"[Coding Agent] ✅ Skill 已创建并提交 PR
 
 **下一步**：
 - 测试通过后自动合并 → 发布"}' > /tmp/creator-comment.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$ISSUE_NUMBER" --json @/tmp/creator-comment.json --json-out
 ```
 

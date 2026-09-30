@@ -1,4 +1,4 @@
----
+﻿---
 name: skill-issue
 version: 2.1.0
 description: |
@@ -31,7 +31,10 @@ tools:
 | 变量 | 语义 | 用在哪 | 何时有 |
 |------|------|--------|--------|
 | `GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` | 服务端地址 / 会话 token（tk_）| grape CLI 自动读取 | 全部任务 |
-| `REPO_FULL_NAME` / `ACCOUNT` | 仓库全名 / 属主 | CLI 的 --owner/--repo 参数（派生见下）| 全部 |
+| `REPO_FULL_NAME` | 仓库全名（owner/repo） | A2A 交办 `repository`；repo_key 拼装 | 全部 |
+| `REPO_OWNER` | 仓库属主（owner，不含 /repo） | CLI 用 --owner | 全部 |
+| `REPO_NAME` | 仓库名 | CLI 用 --repo | 全部 |
+| `ACCOUNT` | 个人账号（触发人 actor，与仓库属主解耦） | A2A payload `account`（一般不用作 --owner） | 全部 |
 | `REPO_NAME` | 仓库名（派生：`${REPO_FULL_NAME#*/}`）| --repo 参数 | 全部 |
 | `ISSUE_NUMBER` | Issue 编号 | --number / A2A payload / notify | 事件任务 |
 | `PR_NUMBER` | PR 编号（A2A 交办 coding 时透传）| A2A payload（有则填，无则 0/不填）| 有 PR 时 |
@@ -99,7 +102,7 @@ tools:
    - 找到标记 **但** 无用户"确认" → 等待确认中 → 回复"仍在等待确认，请回复'确认'继续" → 任务结束（4.8）
    - 未找到标记 → 正常流程继续步骤 1
    ```bash
-   grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+   grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
    ```
 1. **确定 Issue 与上下文（必须最先）**——从事件 payload 提取 issue 编号；缺失则用 `git-repo issues get`/`issues list` 定位；读取该 Issue 全部评论/标签/关联 PR 了解完整上下文。
 2. **项目知识基线（⚠️ 必须执行）**——基线由 Grape 服务端在 prompt「项目知识基线」章节**内联注入**；如需全文读取该章节末尾标注的副本路径；**不再自行生成**（服务端统一维护）；无基线/降级 → README + `git-repo contents`，不阻塞。
@@ -129,14 +132,14 @@ tools:
 ```bash
 grape --version / grape refresh                          # 前置自愈（见三）
 grape tasks current --json-out                           # 任务上下文（前置门）
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 grape git-repo issues get / issues list --state open     # Issue 定位（编号缺失时）
 grape git-repo issues comments list --number "$ISSUE_NUMBER" --json-out
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[Issue Agent] ..."}' --json-out   # 长 body 用 --json @file
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"labels":"feature,triaged,spec-ready","assignee":"<用户名>"}' --json-out   # 打标/分配/关闭（整体替换语义——携带既有标签）
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[Issue Agent] ..."}' --json-out   # 长 body 用 --json @file
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"labels":"feature,triaged,spec-ready","assignee":"<用户名>"}' --json-out   # 打标/分配/关闭（整体替换语义——携带既有标签）
 grape git-repo issues create --json '{"title":"...","body":"..."}'     # 引导 Issue（CODEOWNERS 场景）
 grape git-repo repo / contents --path README.md / commits --per_page 20   # 降级分析/claim 核对
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 防重复 A2A
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 防重复 A2A
 grape a2a handoff --json '{"agent":"...","payload":{...}}'               # A2A 交办（4.3 步骤 7）
 grape tasks notify --json '{"assignee":"<责任人或 grape_bot>","repo_key":"'$REPO_FULL_NAME'","issue_number":'$ISSUE_NUMBER',"task_description":"..."}'   # 任务通知（硬约束⑧——处理结束必做）
 grape tasks complete --json '{...}'                                       # 任务收尾（4.8 结构）

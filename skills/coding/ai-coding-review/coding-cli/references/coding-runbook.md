@@ -1,7 +1,7 @@
-# Coding 执行走查表（runbook）
+﻿# Coding 执行走查表（runbook）
 
 > 目的：把 Coding 处理 Issue / PR 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
-> 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$PR_NUMBER`、`$GRAPE_WORK_BRANCH`（工作基线分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$PR_NUMBER`、`$GRAPE_WORK_BRANCH`（工作基线分支）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。`ACCOUNT`（触发人 actor）一般不作 --owner。
 > **评论前缀硬规**：所有 Coding 评论 body 一律以 `[Coding Agent]` 开头（用 `grape git-repo issues comments create` / `grape git-repo pulls comments create ... --json '{"body":"[Coding Agent] ..."}'`）。
 > 命令取舍速查：读 Issue 聚合用 `issues detail`；取原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth single`（**`tree` 无 `--path`**）。
 
@@ -16,7 +16,7 @@
 
 ```bash
 # ① 解析目标合入分支（工作基线）：优先 $GRAPE_WORK_BRANCH；未注入则取仓库默认分支（不要写死 main/master）
-WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
+WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 echo "work_branch=$WORK_BRANCH"   # 后续建 PR 的 base、分支创建/切换、基线同步一律用这个值
 
 # ② 确认本地开发分支：应为 feat/issue-{issue_number}（服务端通常已按 $WORK_BRANCH 备好 worktree）
@@ -49,7 +49,7 @@ grape git status
 
 ```bash
 # ④ 项目知识基线（解题背景；meta.degraded=false 且 files 非空 → 基于它分析，不再逐文件探索）
-grape repos project info --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape repos project info --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 
 # ⑤ Agent/仓库沉淀知识（前序经验，按需）
 grape knowledge stats --repo "$REPO_FULL_NAME" --json-out
@@ -61,15 +61,15 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source agent --json-out
 
 ### Step 1 · 读 Issue 上下文（首次必做）
 ```bash
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 路线图：判断已有规格
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out  # 按需
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 路线图：判断已有规格
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out  # 按需
 ```
 
 ### Step 2 · 需求分析与任务类型（对照 `references/new-dev-flow.md`）
 - **需求理解**：目标 / 范围 / 关键功能点；不明确 → 发评论向用户确认后继续：
   ```bash
-  grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
     --json '{"body":"[Coding Agent] <澄清问题，1-3 个>"}'
   ```
 - **技术可行性**：需外部 API / 第三方服务 → 先取 API 文档；文档缺失 → **评论说明暂缓，等待补充**。
@@ -98,7 +98,7 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 
 ```bash
 # 默认路径：base = $WORK_BRANCH
-grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json '{
     "title": "feat: #'"$ISSUE_NUMBER"' 标题",
     "head": "feat/issue-'"$ISSUE_NUMBER"'",
@@ -108,7 +108,7 @@ grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
   }'
 
 # 跨 PR 依赖路径：base = 所依赖未合入 PR 的 head 分支（如 feat/issue-4）；inner_issue_nums/close_related_issue 字段可不带
-grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json '{
     "title": "feat: #'"$ISSUE_NUMBER"' 标题",
     "head": "feat/issue-'"$ISSUE_NUMBER"'",
@@ -120,14 +120,14 @@ grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
 - ⚠️ **误建 PR 处理**：若创建出 base 错误的 PR（如 base=main 而应依赖未合入 PR），**不要**尝试 `pulls update {"state":"closed"}`（`state` 不在更新允许集）——用 `pulls update` 只补一条 body 说明「误建/废弃」，随后用正确 base 另建新 PR，并在最终评论中说明。
 
 # PATCH 补充 body（pulls update 仅允许 body/labels 等字段，不传 state）
-grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${PR_NUMBER:-$PR_NUMBER_FROM_CREATE}" \
+grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${PR_NUMBER:-$PR_NUMBER_FROM_CREATE}" \
   --json '{"body":"## 概述\n\n自动实现 Issue #'"$ISSUE_NUMBER"'","labels":"auto-pr"}'
 
 > `$PR_NUMBER` 取 `pulls create` 返回值中的 PR 编号；若该变量未注入则从返回结果取。
 
 **⚠️ 创建 PR 后必须在 Issue 发评论告知（跳过 = 事件未完成）**；PR 链接用 Web 页面 `/pull/`（单数）markdown 格式：
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[Coding Agent] ✅ 已完成实现，请审查 PR [#${PR_NUMBER}](https://gitcode.com/'"$REPO_FULL_NAME"'/pull/${PR_NUMBER})。"}'
 ```
 
@@ -193,9 +193,9 @@ grape git config user.email "$BOT_USERNAME@noreply.git.com"
 
 ### Step 1 · 读审查反馈（必做）
 ```bash
-grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out     # 按需：PR 当前状态
-grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 按需：变更清单
+grape git-repo pulls comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out     # 按需：PR 当前状态
+grape git-repo pulls files --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 按需：变更清单
 ```
 对每条评论检查代码是否已修改；不明确 → PR 评论追问。
 
@@ -209,7 +209,7 @@ grape git-repo pulls files --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_
 
 ### Step 3 · PR 评论告知（必须执行）
 ```bash
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json '{"body":"[Coding Agent] 已根据审查意见完成修改，请重新审查。"}'
 ```
 

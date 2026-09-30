@@ -1,4 +1,4 @@
-# grape CLI 命令参考（ai-blog-generation 子集）
+﻿# grape CLI 命令参考（ai-blog-generation 子集）
 
 > 配套 `skills/coding/app-release/ai-blog-generation/SKILL.md`。只列本技能真实用到的命令；完整命令面以 `grape commands` / `grape <group> --help` 为准。
 
@@ -16,26 +16,26 @@
 grape --version                                             # CLI 可用性（前置门）
 grape refresh                                               # 契约刷新（失败重试 ≤2 次后继续）
 grape tasks current --json-out                              # 当前任务上下文（前序 A2A payload 在这里）
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Issue 全貌（Spec 评论位置）
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Issue 全貌（Spec 评论位置）
 ```
 
 ### 读操作
 
 ```bash
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Spec/评论历史
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state open --json-out                          # 防重复 PR 检查
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number {n} --json-out                            # PR 详情（优化场景）
-grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number {n} --json-out                  # PR 审查反馈（优化场景）
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out                  # 流水线（防重复 A2A）
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # Spec/评论历史
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out                          # 防重复 PR 检查
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {n} --json-out                            # PR 详情（优化场景）
+grape git-repo pulls comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {n} --json-out                  # PR 审查反馈（优化场景）
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out                  # 流水线（防重复 A2A）
 ```
 
 ### 写操作
 
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[coding Agent] ..."}'   # 发评论（长 body 用 --json @file）
-grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"title":"docs(blog): {主题}","head":"feat/blog-{slug}-{date}","base":"dev","inner_issue_nums":"owner/repo#{n}","close_related_issue":true}'   # 创建 PR（无 body 字段）
-grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number {n} --json '{"body":"### 变更说明\n{...}"}'                          # 补 PR 描述（四段）
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number {n} --json '{"body":"[coding Agent] ..."}'                    # PR 评论（优化场景）
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[coding Agent] ..."}'   # 发评论（长 body 用 --json @file）
+grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"title":"docs(blog): {主题}","head":"feat/blog-{slug}-{date}","base":"dev","inner_issue_nums":"owner/repo#{n}","close_related_issue":true}'   # 创建 PR（无 body 字段）
+grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {n} --json '{"body":"### 变更说明\n{...}"}'                          # 补 PR 描述（四段）
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {n} --json '{"body":"[coding Agent] ..."}'                    # PR 评论（优化场景）
 grape a2a handoff --json '{"agent":"sre","payload":{"repository":"owner/repo","account":"owner","issue_number":N,"pr_number":N,"context":"..."}}'   # A2A 交办 SRE（跳过 QA）
 grape tasks complete --json '{...}'                            # 任务收尾（4.8 结构）
 ```

@@ -1,4 +1,4 @@
----
+﻿---
 name: rest-api-skill-tester
 version: 2.1.0
 description: |
@@ -120,12 +120,12 @@ gitleaks detect --source <skill_dir> --no-git     # 已装时
 ```bash
 # Issue 评论（固定标记开头——保证可检索性）：
 grape git-repo issues comments create \
-  --owner "$ACCOUNT" --repo "$REPO_NAME" \
+  --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$ISSUE_NUMBER" \
   --json '{"body": "[QA Agent] ✅ 测试通过\n\n## Skill 测试报告：{name} v{version}\n\n## 功能验证\n| 检查项 | 状态 | 证据 | 说明 |\n|--------|------|------|------|\n| API 调用 | ✅ | 返回 N 条数据 | 真实调用成功 |\n\n## 结论\n✅ 测试通过，可合并发布"}'
 # PR 评论：
 grape git-repo pulls comments create \
-  --owner "$ACCOUNT" --repo "$REPO_NAME" \
+  --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --number "$PR_NUMBER" \
   --json '{"body": "[QA Agent] ✅ 测试通过"}'
 ```
@@ -149,8 +149,8 @@ bash {{SKILL_DIR}}/rest-api-skill-tester/scripts/merge_skill_pr.sh $PR_NUMBER
 **grape CLI（平台交互）**——见 `references/grape-cli-reference.md` 完整子集 + ❌ 警示表。核心：
 ```bash
 grape --version / grape refresh                              # 前置门
-grape git-repo issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 读 Issue 全文
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out            # 读 PR
+grape git-repo issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 读 Issue 全文
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out            # 读 PR
 grape git-repo issues comments list / create                 # 前置判断 / 报告
 grape git-repo pulls comments create                         # PR 报告
 grape a2a handoff --json '{"agent":"sre/coding","payload":{...}}'   # 交棒

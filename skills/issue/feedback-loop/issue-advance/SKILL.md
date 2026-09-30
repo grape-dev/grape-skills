@@ -32,7 +32,10 @@ tools:
 | 变量 | 语义 | 用在哪 | 何时有 |
 |------|------|--------|--------|
 | `GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` | 服务端地址 / 会话 token（tk_）| grape CLI 自动读取 | 全部任务 |
-| `REPO_FULL_NAME` / `ACCOUNT` | 仓库全名 / 属主 | CLI 的 --owner/--repo 参数 | 事件任务 |
+| `REPO_FULL_NAME` | 仓库全名（owner/repo） | A2A 交办 `repository`；repo_key 拼装 | 全部 |
+| `REPO_OWNER` | 仓库属主（owner，不含 /repo） | CLI 用 --owner | 全部 |
+| `REPO_NAME` | 仓库名 | CLI 用 --repo | 全部 |
+| `ACCOUNT` | 个人账号（触发人 actor，与仓库属主解耦） | A2A payload `account`（一般不用作 --owner） | 全部 |
 | `ISSUE_NUMBER` | Issue 编号（无 # 前缀）| --number 参数 / A2A payload | 事件任务 |
 | `PR_NUMBER` | PR 编号（有则注入）| A2A pr_number（无则不填）| 有 PR 时 |
 | `DEVOPS_EVENT_TYPE` | 事件类型（issue_updated 等）| 场景路由判断 | 全部 |

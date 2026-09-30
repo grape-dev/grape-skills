@@ -1,4 +1,4 @@
-# IaC-VOD 执行走查表（runbook）
+﻿# IaC-VOD 执行走查表（runbook）
 
 > 目的：把 iac-vod 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部日常操作命令（issues / git-repo / a2a / tasks）——**禁止 curl 直连平台 API（读操作也一样）**——按节点照抄即可；命令失败才看「错误排查速查」。
@@ -20,7 +20,7 @@ grape tasks current --json-out               # 前序 A2A payload/上下文在�
 # 场景 B 才执行下行（场景 A 无 ISSUE_NUMBER——跳过）：ISSUE_NUMBER 缺失 → 先用 `git-repo issues get`/`git-repo issues list` 定位；
 #    定位不到 → STOP——不执行任何写操作
 if [ -n "$ISSUE_NUMBER" ]; then
-  grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
+  grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
 fi
 ```
 
@@ -32,8 +32,8 @@ fi
 # 知识基线 = prompt 内联注入的「项目知识基线」章节（主路径，无需命令——基线由平台服务端维护，Agent 不自取/不自行生成）
 # 需全文时读 prompt 标注的 project-info/ 路径
 # 降级（仅当 prompt 标注「无项目知识基线」/ [degraded]）：
-grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
+grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --depth 2 --json-out
 # IaC 场景特别关注：IaC 目录结构（terraform modules / pulumi stacks / cloudformation templates）——从 tree 输出里识别
 ```
 
@@ -41,9 +41,9 @@ grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
 
 ```bash
 # 近期 Issue（判断重复/已解决）：
-grape git-repo issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 20 --json-out
+grape git-repo issues list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --per_page 20 --json-out
 # 近期 PR（是否已有 IaC 方案）：
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 10 --json-out
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --per_page 10 --json-out
 # 历史反馈画像：聚类此前 auto-submitted by iac-vod Agent 的 Issue——从 list 结果按标题/正文标注筛选
 ```
 
@@ -55,7 +55,7 @@ grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --p
 ```bash
 # 待澄清建档：git-repo issues create 只建档不触发流水线（已清晰需求才走 A4 的 issues create 进流水线）
 printf '%s' '{"title":"[IaC-VOD][待澄清] <问题简述>","body":"已获取：{已获取信息清单}\n缺失：{缺失信息清单}\n请开发者补充后，iac-vod 将按场景 B 接管。"}' > /tmp/iac-vod-clarify-issue.json
-grape git-repo issues create --owner "$ACCOUNT" --repo "$REPO_NAME" --json @/tmp/iac-vod-clarify-issue.json --json-out 2>&1 | head -30
+grape git-repo issues create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json @/tmp/iac-vod-clarify-issue.json --json-out 2>&1 | head -30
 ```
 
 ### A4 · 结构化建 Issue（必做）
@@ -64,7 +64,7 @@ grape git-repo issues create --owner "$ACCOUNT" --repo "$REPO_NAME" --json @/tmp
 # body 按 requirement-elicit-guide §四 IaC 模板（目标/现状/期望/验收/优先级/来源/目标云服务/IaC 工具链/目标区域/资源规模/安全约束）写文件，再 @file
 # ⚠️ 统一入口 grape issues create：同时创建 GitCode Issue 并在平台触发流水线（git-repo issues create 仅用于 A3 待澄清建档；已清晰需求一律走本命令进流水线）
 printf '%s' '{"title":"[IaC-VOD] <聚类标签>: <问题简述>","description":"{模板结构化 body，标注 auto-submitted by iac-vod Agent（Feishu）}"}' > /tmp/iac-vod-issue.json
-grape issues create --owner "$ACCOUNT" --repo "$REPO_NAME" --json @/tmp/iac-vod-issue.json --json-out 2>&1 | head -30
+grape issues create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json @/tmp/iac-vod-issue.json --json-out 2>&1 | head -30
 # 从返回取 issue_number（$ISSUE_NUMBER 未注入时）——后续 A5 交办必须用真实编号
 # 403（任务 token 无建 Issue 权限——契约标注）：不重试、不降级直连——评论说明「平台任务 token 无建 Issue 权限，需平台配置」后按错误排查速查 403 行 STOP
 ```
@@ -73,7 +73,7 @@ grape issues create --owner "$ACCOUNT" --repo "$REPO_NAME" --json @/tmp/iac-vod-
 
 ```bash
 # ⚠️ 防重复：先查 pipeline，已含 iac-issue:a2a_event 则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（必须携带真实 issue_number；无法确定则不调用，评论说明）：
 grape a2a handoff --json '{"agent":"iac-issue","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"'"$ACCOUNT"'","issue_number":{真实编号},"pr_number":null,"context":"iac-vod 已完成 IaC 需求收敛与结构化，请继续 spec 设计/打标/分配"}}'
 # ⚠️ 交办返回 not_in_scene（目标 agent 名不在本场景流水线——场景实际用通用 agent 名挂 iac 技能）：
@@ -100,8 +100,8 @@ grape a2a handoff --json '{"agent":"iac-issue","payload":{"repository":"'"$ACCOU
 
 ```bash
 # 读 Issue 完整内容（title/body/标签/评论）：
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 对照四要素 + IaC 特化要素判断清晰度/可执行性/重复
 # IaC 相关性判定：涉及 terraform/hcl/pulumi/cloudformation/云资源编排 → 本技能管辖；
 # 纯应用层 Issue → 回退通用 vod 流程（不强行接管）
@@ -111,7 +111,7 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 
 ```bash
 # 渠道：Issue 评论——引原文 + 1-3 个具体澄清问题（结合知识基线；IaC 场景：目标区域？实例规格？网络隔离层数？状态后端？）
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[iac-vod Agent] > {原文}\n\n{1-3 个澄清问题}"}'
 # 超限 → 评论列出已获取/缺失信息，标记「待澄清」
 ```
@@ -121,7 +121,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 ```bash
 # 将 body 收敛为 IaC 模板结构（来源标注「iac-vod 审视结构化」；不修改标签/分配——IaC Issue Agent 职责）
 printf '%s' '{"body":"[iac-vod Agent] 审视结构化：目标云服务 / IaC 工具链 / 目标区域 / 资源规模 / 安全约束——{收敛后需求}"}' > /tmp/iac-vod-body.json
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/iac-vod-body.json --json-out
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/iac-vod-body.json --json-out
 ```
 
 ### B6 · A2A 交办 IaC Issue Agent（同 A5，含防重复检查）

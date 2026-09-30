@@ -1,4 +1,4 @@
-# 评论与标签规范（blog-vod Agent 用）
+﻿# 评论与标签规范（blog-vod Agent 用）
 
 > 配套 `skills/vod/feedback-loop/blog-vod/SKILL.md`。覆盖：Issue 评论礼仪、评论类型与格式、标签体系与管理规则。
 > 所有 GitCode 操作用 grape CLI 完成（`grape git-repo ...`），禁止 curl 直连平台 API。
@@ -31,7 +31,7 @@
 cat > /tmp/blog_vod_comment.json << 'EOF'
 {"body": "> {用户评论原文}\n\n[blog-vod Agent] {答复/追问正文}"}
 EOF
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/blog_vod_comment.json
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/blog_vod_comment.json
 ```
 
 ### 4. 评论幂等
@@ -39,7 +39,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 - 发布前先查是否已有同前缀评论，避免重复追问/重复确认：
 
 ```bash
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 
 - 内容唯一性检查以「评论前缀 + 本技能标记」为准，防止 Issue 重新打开触发重复评论。
@@ -76,14 +76,14 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 
 ```bash
 # 查重（幂等——已存在则跳过创建）
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 
 # 创建缺失标签
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"blog-vod","color":"#f9d0c4"}'
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}'
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"blog-vod","color":"#f9d0c4"}'
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}'
 
 # 给 Issue 打标（整体替换语义——携带既有标签）
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{既有标签列表,}blog-vod,type:feature"}'
 ```
 

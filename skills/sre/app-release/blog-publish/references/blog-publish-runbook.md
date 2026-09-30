@@ -1,4 +1,4 @@
-# blog-publish 执行手册（runbook）· grape CLI + 外部 BLOG_HOST API
+﻿# blog-publish 执行手册（runbook）· grape CLI + 外部 BLOG_HOST API
 
 > 配套 `../SKILL.md`。**平台侧命令**用 `grape`（A2A 接收 / PR 合并 / Issue 评论 / 收尾）；**博客系统命令**用 curl 直连外部 `BLOG_HOST`（合法——硬约束②）。完整命令面查询见 `grape-cli-reference.md`。
 
@@ -61,7 +61,7 @@ curl -s "https://$BLOG_HOST/api/lables"
 ## P3 · 合并 PR（A2A 链路——grape CLI）
 
 ```bash
-grape git-repo pulls merge --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" 2>&1 | tail -3
+grape git-repo pulls merge --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" 2>&1 | tail -3
 ```
 - 成功 → 继续 P4；失败/PR 不存在/编号缺失 → 报告用户（建议人工合并）→ **跳过合并步骤直接发布**（SKILL 4.5——发布链路优先，不阻塞）
 - 说明：合并动作是发布链路的第一步（保证产物入库可追溯）；失败不中断发布（内容产物已在工作区本地）
@@ -184,7 +184,7 @@ echo "https://$BLOG_HOST/article/$ARTICLE_ID"
 
 **1. 发布结果 → Issue 评论**（grape CLI——确保用户可追溯）：
 ```bash
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[blog-publish Agent] 博客已发布：{标题} | article_id='$ARTICLE_ID' | $BLOG_HOST/article/'$ARTICLE_ID'\n媒体上传 {成功数} 个（{pending 清单——从 P4 输出取,非空时列出}）（PR #{PR_NUMBER} 已合并）"}' --json-out
 ```
 

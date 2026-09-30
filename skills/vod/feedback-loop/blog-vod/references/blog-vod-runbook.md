@@ -1,4 +1,4 @@
-# blog-vod 执行走查表（runbook）
+﻿# blog-vod 执行走查表（runbook）
 
 > 目的：把 blog-vod 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量直接使用：`$ACCOUNT`、`$REPO_NAME`（= `${REPO_FULL_NAME#*/}`）、`$ISSUE_NUMBER`、`$DEVOPS_EVENT_TYPE`。
@@ -21,7 +21,7 @@ grape tasks current --json-out               # 前序 A2A payload/上下文在�
 #    无法判断 → 按事件 payload 内容判定，仍不明 → STOP 评论说明
 # ISSUE_NUMBER 缺失 → 先用 `git-repo issues get`/`git-repo issues list` 定位；定位不到 → STOP（不执行任何写操作）
 if [ -n "$ISSUE_NUMBER" ]; then
-  grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
+  grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
 fi
 ```
 
@@ -38,14 +38,14 @@ fi
 ### B2 · 项目知识基线（分析前提）
 
 - 知识基线由服务端在 prompt「项目知识基线」章节内联注入（主路径——**无需命令**，Agent 不自取/不自行生成；不存在 `grape knowledge context` 命令——见 grape-cli-reference 警示表）
-- 标注「无基线」/`[degraded]` → 降级：`grape git-repo repo --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out` + README（`grape git-repo contents --raw`），不阻塞
+- 标注「无基线」/`[degraded]` → 降级：`grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out` + README（`grape git-repo contents --raw`），不阻塞
 
 ### B3 · 三轮递进收敛（博客维度问卷，≤3 轮）
 
 - 读既有评论（幂等/续跑检查，避免重复提问已确认项）：
 
 ```bash
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 
 - **第一轮（大方向）**：主题聚焦 / 参考风格 / 标签分类——每次只问 2-4 个问题：
@@ -55,7 +55,7 @@ grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --num
 cat > /tmp/blog_vod_q1.json << 'EOF'
 {"body": "[blog-vod Agent] 收到博客需求，先确认几个方向：\n- 主题聚焦：您提到「{产品/概念}」，想从哪个角度切入？\n- 参考风格：有没有想模仿的文章链接？或想要什么风格（科技评测/轻松科普/营销推广）？\n- 标签分类：这篇文章发到博客的哪个分类？（现有标签：1=技术、2=生活、3=随笔、4=教程，也可新建）"}
 EOF
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/blog_vod_q1.json
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/blog_vod_q1.json
 ```
 
 - **第二轮（内容细节）**：文章结构（章节/表格/引用块）/ 配图风格（数量/封面）/ 视频方向（画面/旁白）——同 Q1 模式（`/tmp/blog_vod_q2.json` 写好后 `comments create`）
@@ -71,19 +71,19 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 cat > /tmp/blog_vod_summary.json << 'EOF'
 {"body": "[blog-vod Agent] 博客需求清单已收敛（未回复维度已用默认值填充并标注）：\n{topic}: {主题}\n{focus}: {切入点}\n{reference_style}: {风格描述}\n{structure}: {章节/特殊元素}\n{images}: {张数/风格/封面}\n{video}: {画面/旁白语调}\n{labels}: {分类}\n{length}: {标准/深度}\n{tone}: {语调}\n（完整 JSON 见下方代码块）\n```json\n{requirement_summary JSON}\n```"}
 EOF
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/blog_vod_summary.json
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json @/tmp/blog_vod_summary.json
 ```
 
 ### B5 · 标签 + 评论确认（blog-vod / type:feature）
 
 ```bash
 # ① 查重（幂等）：已存在则跳过创建
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 # ② 缺失的创建（blog-vod + type:feature 各查一次，缺失才建）：
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"blog-vod","color":"#f9d0c4"}'
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}'
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"blog-vod","color":"#f9d0c4"}'
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"type:feature","color":"#0e8a16"}'
 # ③ 给 Issue 打标（整体替换语义——先取既有标签再拼上新标签）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{既有标签列表,}blog-vod,type:feature"}'
 ```
 
@@ -93,7 +93,7 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 
 ```bash
 # ⚠️ 防重复：先查 pipeline，已含 issue:a2a_event 则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（必须携带真实 issue_number；无 pr_number 则不传，严禁将 PR 编号填入 issue_number）
 grape a2a handoff --json '{"agent":"issue","payload":{"repository":"$ACCOUNT/$REPO_NAME","account":"{user}","issue_number":$ISSUE_NUMBER,"context":"博客需求已收敛。标签已添加 blog-vod/type:feature，需求清单已发布到 Issue 评论（供继承）。请 Issue Agent 接力进行分类确认、Spec 生成、指派并触发 Coding Agent。"}}'
 # 成功判定：status=ok 且 seq 非零 = 交办成功；seq=0/skipped = 被去重跳过（检查目标 Agent subscribe_events 配置）

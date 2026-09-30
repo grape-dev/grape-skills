@@ -1,8 +1,8 @@
-# IaC Issue 运营执行走查表（runbook）
+﻿# IaC Issue 运营执行走查表（runbook）
 
 > 目的：把 iac-issue 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部日常操作命令（issues / git-repo 含 labels/pulls/contents/comments / a2a / tasks）——**禁止 curl 直连平台 API（读操作也一样）**——每个节点需要的命令已写在该节点——按节点照抄即可；命令失败才看「错误排查速查」。
-> 环境变量直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名 = `${REPO_FULL_NAME#*/}`）、`$ISSUE_NUMBER`、`$PR_NUMBER`（有则填）、`$DEVOPS_EVENT_TYPE`、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> 环境变量直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名 = `${REPO_FULL_NAME#*/}`）、`$ISSUE_NUMBER`、`$PR_NUMBER`（有则填）、`$DEVOPS_EVENT_TYPE`、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。`ACCOUNT`（触发人 actor）一般不作 --owner。
 > **评论前缀硬规**：所有评论 body 一律以 `[issue agent]` 开头；Spec 文档评论以 `[Issue Agent] 📋 Spec Document` 开头。
 
 ---
@@ -17,7 +17,7 @@ grape tasks current --json-out
 # 入口事件识别（$DEVOPS_EVENT_TYPE）：issue_opened → 全流程 Step 1→6；评论/交互类事件（comment 等）→ 直接走 Step 6 评论进件分流；a2a_event → 按 payload 上下文定位续做
 # ISSUE_NUMBER 缺失 → 先用 `git-repo issues get`/`issues list` 定位；定位不到 → STOP（不执行写操作）
 if [ -n "$ISSUE_NUMBER" ]; then
-  grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+  grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 fi
 ```
 
@@ -27,22 +27,22 @@ fi
 
 ```bash
 # 读 Issue 详情 + 评论：
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 历史 Issue/PR（识别同类处理模式——原始职责内化）：
-grape git-repo issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 20 --json-out
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --per_page 10 --json-out
+grape git-repo issues list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --per_page 20 --json-out
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --per_page 10 --json-out
 ```
 
 ## Step 2 · 分类与标签（必做——diff 先行）
 
 ```bash
 # 查现有标签（确定存在性 before create）：
-grape git-repo labels list --owner "$ACCOUNT" --repo "$REPO_NAME" --json-out
+grape git-repo labels list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out
 # 不存在 → 创建（按 references/labeling-guide.md 规范——type:/priority:/status: 前缀）：
-grape git-repo labels create --owner "$ACCOUNT" --repo "$REPO_NAME" --json '{"name":"{标签名}","color":"#0e8a16"}' --json-out
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"{标签名}","color":"#0e8a16"}' --json-out
 # 更新 Issue 标签（labels 逗号分隔字符串——先 diff 再提交）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"labels":"{原有标签},新标签"}' --json-out
 # 去除冗余/冲突标签 → 评论列 diff + 理由（见 Step 6 命令）
 ```
@@ -51,9 +51,9 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 
 ```bash
 # CODEOWNERS 读取（分配依据）：
-grape git-repo contents --owner "$ACCOUNT" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out 2>&1 | head -30
+grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path CODEOWNERS --ref main --json-out 2>&1 | head -30
 # 指派（按 references/assignee-guide.md——CODEOWNERS 优先→模块专家→默认流转人）：
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"assignee":"{GitCode 用户名}"}' --json-out
 ```
 
@@ -61,7 +61,7 @@ grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$I
 
 ```bash
 # 查看仓库结构（IaC 目录识别——terraform modules / pulumi stacks / cloudformation）：
-grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
+grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --depth 2 --json-out
 # 华为云凭据取值（两个入口：①场景高级选项 name=HUAWEI_AK/HUAWEI_SK 按 name 直注；②通用设置注入 HUAWEICLOUD_SDK_AK/SK 自动兜底）：
 #   HUAWEI_AK="${HUAWEI_AK:-${HUAWEICLOUD_SDK_AK:-}}"; HUAWEI_SK="${HUAWEI_SK:-${HUAWEICLOUD_SDK_SK:-}}"
 # 华为云资源现状查询（仅 HUAWEI_AK/SK 有值时——用 hcloud 查现有 VPC/ECS/RDS，避免 CIDR 冲突/重复创建/规格建议。命令族同 iac-coding A3/SRE A2）：
@@ -71,7 +71,7 @@ grape git-repo tree --owner "$ACCOUNT" --repo "$REPO_NAME" --depth 2 --json-out
 # HUAWEI_AK/SK 缺失 → 跳过，Spec 标注「待 Coding Agent 验证」，不寻找不借用）
 # Spec body 按 references/spec-generation.md 模板（需求描述/验收标准/技术方案/IaC 资源规划）写文件，再 @file（外层单引号防 shell 转义）：
 printf '%s' '{"body":"[Issue Agent] 📋 Spec Document\n\n{Spec 正文——按 spec-generation.md 模板}"}' > /tmp/iac-spec.json
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json @/tmp/iac-spec.json --json-out
 ```
 
@@ -79,7 +79,7 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 
 ```bash
 # ⚠️ 防重复：先查 pipeline，已含 coding:a2a_event 则不重复 A2A，只发评论（场景节点存在性与防悬空也由该检查覆盖）
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（必须携带真实 issue_number；pr_number 有则填——$PR_NUMBER 非空时填其值，无则删该字段；严禁混用）：
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$ACCOUNT/$REPO_NAME"'","account":"'"$ACCOUNT"'","issue_number":{真实编号},"pr_number":{有则填=$PR_NUMBER 值},"context":"{分类 + Spec 摘要 + Spec 评论位置}"}}'
 # A2A 失败（非 2xx/超时）→ 重试 ≤3 次 → 仍失败：评论说明 + next_step 标注人工介入
@@ -99,7 +99,7 @@ grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$ACCOUNT/
 
 ```bash
 # 回复命令（长文用 @file 同 Step 4；短评直接内联）：
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[issue agent] {回复}"}' --json-out
 ```
 

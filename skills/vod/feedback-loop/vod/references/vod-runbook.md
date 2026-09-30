@@ -1,4 +1,4 @@
-# VOD 执行走查表（runbook）
+﻿# VOD 执行走查表（runbook）
 
 > 目的：把 VOD 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量直接使用：`$ACCOUNT`、`$REPO_NAME`（= `${REPO_FULL_NAME#*/}`）、`$ISSUE_NUMBER`、`$DEVOPS_EVENT_TYPE`。
@@ -12,7 +12,7 @@
 grape refresh                        # 契约刷新（前置门②）——失败重试 ≤2 次后继续（回退内置快照）
 grape tasks current --json-out       # 前序 A2A payload/上下文在这里（平台不注入 $SEQ——不依赖它）
 # 场景 B：读 Issue 全貌
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 
 > CLI 自愈安装（仅未装/版本低时）：`timeout 300 pip install git+https://gitcode.com/grape-dev/grape-cli.git`（安装可能无输出——加 timeout 防误判，等待完成）。
@@ -29,8 +29,8 @@ grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMB
 
 ```bash
 grape issues mine --json-out
-grape git-repo issues list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --json-out
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --json-out
+grape git-repo issues list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --json-out
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --json-out
 # 历史反馈画像：聚类此前 auto-submitted by VOD Agent 的 Issue，识别高频主题
 ```
 
@@ -43,7 +43,7 @@ grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state all --j
 
 ```bash
 # body 按 requirement-elicit-guide §四 模板（目标/现状/期望/验收/优先级/来源）写文件，再 @file
-grape issues create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape issues create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json '{"title":"{标题}","description":"{模板结构化 body，标注 auto-submitted by VOD Agent（Feishu）}"}'
 ```
 
@@ -51,7 +51,7 @@ grape issues create --owner "$ACCOUNT" --repo "$REPO_NAME" \
 
 ```bash
 # ⚠️ 防重复：先查 pipeline，已含 issue:a2a_event 则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办（必须携带真实 issue_number）
 grape a2a handoff --json '{"agent":"issue","payload":{"repository":"$ACCOUNT/$REPO_NAME","account":"{user}","issue_number":$ISSUE_NUMBER,"context":"VOD 已完成需求收敛与结构化，请继续 spec 设计/打标签/分配"}}'
 # A2A 失败 → 重试 ≤3 次 → 仍失败：评论说明「A2A 服务不可达，待恢复后重试」+ next_step 人工介入
@@ -71,14 +71,14 @@ grape a2a handoff --json '{"agent":"issue","payload":{"repository":"$ACCOUNT/$RE
 - 结合知识基线判断：可执行性 / 是否重复 / 是否有歧义
 
 ```bash
-grape git-repo issues comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 ```
 
 ### B4 · 与开发者沟通澄清（不清晰时，≤3 轮）
 
 ```bash
 # 引原文 + 1-3 个具体澄清问题，结合知识基线提问
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[VOD Agent] > {用户原文}\n\n{澄清问题}"}'
 # 超限 → 评论列出已获取/缺失信息，标记「待澄清」
 ```
@@ -87,14 +87,14 @@ grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --n
 
 ```bash
 # 收敛 body 为模板结构（来源标注「VOD 审视结构化」；不修改标签/分配——Issue Agent 职责）
-grape git-repo issues update --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"state":"open","body":"{按模板结构化的 body}"}'
 ```
 
 ### B6 · A2A 交办 Issue Agent（同 A5，含防重复检查）
 
 ```bash
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 grape a2a handoff --json '{"agent":"issue","payload":{"repository":"$ACCOUNT/$REPO_NAME","account":"{user}","issue_number":$ISSUE_NUMBER,"context":"VOD 已完成审视与结构化，请继续 spec 设计/打标签/分配"}}'
 ```
 

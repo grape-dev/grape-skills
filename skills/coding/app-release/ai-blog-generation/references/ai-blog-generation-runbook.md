@@ -1,4 +1,4 @@
-# 博客内容生成执行走查表（runbook）
+﻿# 博客内容生成执行走查表（runbook）
 
 > 目的：把 ai-blog-generation 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > **CLI 纪律**：本表已覆盖本技能全部平台交互命令（issues / git-repo pulls / a2a / tasks）——**禁止 curl 直连平台 API**；curl/requests 仅用于**外部服务**：AI 模型 API（qwen-image/Wan2.2——从 ai-models.yaml 读 url/key/model）、参考文章/官网页面、媒体文件下载。
@@ -18,7 +18,7 @@ grape --version
 git --version && ffmpeg -version 2>&1 | head -1 && python3 --version
 grape refresh 2>&1 && echo REFRESH_OK        # 契约保鲜；失败重试 ≤2 次后回退内置快照继续
 grape tasks current --json-out               # 前序 A2A payload/上下文在这里（Spec 摘要/发布目标）
-grape issues detail --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out 2>&1 | head -120
 git status 2>&1 | head -5                    # 确认 worktree 与分支状态
 ```
 
@@ -96,15 +96,15 @@ git add "blog/$TOPIC_SLUG/"
 git commit -m "docs(blog): add article '$TOPIC_SLUG'" 2>&1 | tail -2
 git push -u origin "$BRANCH_NAME" 2>&1 | tail -3
 # ⚠️ 先查同分支 open PR（防重复创建）：
-grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -20
+grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -20
 # 创建 PR（契约字段：title/head/base/inner_issue_nums——create 无 body 字段，@file 防转义）：
 printf '%s' '{"title":"docs(blog): {主题}","head":"'$BRANCH_NAME'","base":"dev","inner_issue_nums":"'$ACCOUNT/$REPO_NAME'#'$ISSUE_NUMBER'","close_related_issue":true}' > /tmp/pr-body.json
-grape git-repo pulls create --owner "$ACCOUNT" --repo "$REPO_NAME" \
+grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json @/tmp/pr-body.json --json-out 2>&1 | head -30
 # 从返回取 PR 编号（$PR_NUMBER 未注入时）——后续 update 与 A8 交办必须用真实编号
 # PR 描述四段（变更说明/产物清单/文件变更/后续步骤）——create 后 pulls update 补 body：
 printf '%s' '{"body":"### 变更说明\n新增博客文章：{主题}\n\n### 产物清单\n- HTML 文章：blog/{slug}/index.html\n- 封面+配图：{N} 张（cover.png + images/）\n- 介绍视频：intro.mp4（{有/无}）\n- 元数据：meta.json\n\n### 文件变更\n| 文件 | 说明 |\n|------|------|\n| `blog/{slug}/` | 博客产物目录 |\n| `blog/_tools/` | 博客通用工具（首次创建时）|\n\n### 后续步骤\n创建后 A2A 交办 SRE Agent 发布博客（跳过 QA——内容产物无需代码审查）。"}' > /tmp/pr-body-desc.json
-grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number {真实 PR 编号} --json @/tmp/pr-body-desc.json --json-out 2>&1 | head -20
+grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {真实 PR 编号} --json @/tmp/pr-body-desc.json --json-out 2>&1 | head -20
 # PR 链接用 Web 页面 /pull/（单数）markdown 格式——不得用 API 路径
 ```
 
@@ -112,10 +112,10 @@ grape git-repo pulls update --owner "$ACCOUNT" --repo "$REPO_NAME" --number {真
 
 ```bash
 # Issue 评论告知（长 body 用 @file）：
-grape git-repo issues comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[coding Agent] ✅ 博客内容已生成，请 SRE 发布 PR [#{n}](https://gitcode.com/'$ACCOUNT/$REPO_NAME'/pull/{n})。\n\n- 目录：blog/{slug}/\n- 配图：{N} 张\n- 视频：{有/无（降级原因）}\n- 博客主题:{主题}"}' --json-out
 # ⚠️ 防重复：先查 pipeline，已含 sre:a2a_event 则不重复 A2A，只发评论
-grape issues pipeline --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
 # 交办 SRE（issue_number/pr_number 必填真实值——跳过 QA）：
 grape a2a handoff --json '{"agent":"sre","payload":{"repository":"'$ACCOUNT/$REPO_NAME'","account":"'$ACCOUNT'","issue_number":{真实编号},"pr_number":{真实编号},"context":"博客内容已生成并提交 PR #{n}。博客目录: blog/{topic-slug}/。请使用博客发布技能：1. 合并 PR 2. 从 blog/ 目录读取文章+媒体 3. 上传媒体到博客服务器 4. 发布文章 5. 在 Issue 评论反馈发布结果。"}}'
 # A2A 失败 → 重试 ≤3 次 → 仍失败：评论说明 + next_step 人工介入
@@ -127,11 +127,11 @@ grape a2a handoff --json '{"agent":"sre","payload":{"repository":"'$ACCOUNT/$REP
 
 ```bash
 # PR_NUMBER 缺失时先定位（评论/复审触发可能不带 PR 编号——不能默认有值）：
-[ -n "$PR_NUMBER" ] || grape git-repo pulls list --owner "$ACCOUNT" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -30
+[ -n "$PR_NUMBER" ] || grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -30
 # 定位不到 open PR → Issue/PR 评论询问「请提供 PR 编号」，不猜测
 # 读 PR 审查评论/反馈（逐条核对：图片/文字/排版问题）：
-grape git-repo pulls get --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
-grape git-repo pulls comments list --owner "$ACCOUNT" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
+grape git-repo pulls comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${PR_NUMBER:-{定位到的编号}}" --json-out 2>&1 | head -60
 ```
 
 ### B2 · 制定修改方案 + 实施（原子提交）
@@ -147,7 +147,7 @@ git add {变更文件} && git commit -m "fix(blog): {修复点}" && git push 2>&
 ### B3 · PR 评论告知（必做）
 
 ```bash
-grape git-repo pulls comments create --owner "$ACCOUNT" --repo "$REPO_NAME" --number "$PR_NUMBER" \
+grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" \
   --json '{"body":"[coding Agent] 已按审查意见修改：{修改摘要}"}' --json-out
 ```
 
