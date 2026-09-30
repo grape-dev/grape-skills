@@ -278,6 +278,9 @@ Disable via `SKILL_QUALITY_DISABLE=1` for local testing.
 - `references/verification-method.md` — How to manually verify each phase (PowerShell + Git Bash)
 - `references/phase-details.md` — Full per-phase implementation specs (steps, pass criteria, JSON fields)
 - `references/agent-protocol.md` — Credential request protocol (full handling flow when AK/SK is missing)
+- `references/tester-runbook.md` — 执行走查表（命令固化——照着执行不查 help），全流程必读
+- `references/grape-cli-installation.md` — grape CLI 安装/升级（Step 0 前置自愈用）
+- `references/grape-cli-reference.md` — grape CLI 命令参考（平台交互 pulls/issues/a2a/tasks 子集）
 
 ### Supplementary References
 
