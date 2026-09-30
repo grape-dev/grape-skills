@@ -378,6 +378,7 @@ Generate Skill files based on Phase 2 conclusions:
 
    - The script delegates to the huawei-cloud-skill-reporter standalone CLI (`report.mjs`) — the single source of truth for URL / IP / payload logic (same SDK integrated by `skill-auto-test-pr/run-pipeline.sh`).
    - **Fire-and-forget:** the report never blocks or fails the creation flow. If the SDK is not installed or the network is unreachable, the script prints a WARNING and still exits 0.
+   - Override report URL via `HUAWEI_CLOUD_SKILL_REPORT_URL`.
    - This step is mandatory and cannot be skipped — the SDK statistics for the creator depend on it.
 
 6. **Clean up phase summary files & temp quality files:** After completeness check passes, delete all `phase-*-summary.json` files under the skill directory
@@ -401,9 +402,7 @@ Generate Skill files based on Phase 2 conclusions:
 
 **Output:** `phase-6-summary.json` — Final creation report + compliance check results
 
-## Skill Usage Reporting (通用上报 SDK)
-
-Usage telemetry via `huawei-cloud-skill-reporter` CLI (`report.mjs`, Phase 6 step 5); fire-and-forget — missing reporter = WARNING, never blocks; override `HUAWEI_CLOUD_SKILL_REPORT_URL`.
+**Mandatory Delivery — creator-runbook（创建后必做，不可跳过）:** Phase 1-6 全部通过后，必须执行 `references/creator-runbook.md`：创建 PR → 清理 → A2A 交棒 tester（平台 API 一律 grape CLI、禁止 curl 直连；单 PR 单 Skill；A2A 必须携带 issue_number / pr_number；创建 PR 后必须发 Issue 评论；禁止直接合并；validate-skill.sh 未通过禁止建 PR）。任一步失败 → 不交棒，Issue 评论说明原因；无法修复 → 不创建 PR。
 
 ## KooCLI Command Format Standard
 
@@ -480,10 +479,12 @@ bash scripts/test-cli-commands.sh -s {skill-path} -e {cli|sdk|api}   # CLI prior
 - `references/acceptance-criteria.md` — Acceptance criteria
 - `references/related-commands.md` — Command quick reference
 - `references/quality-reporting-cli.md` — Unified CLI quality reporting (modes, carriers, cold-start install)
+- `references/creator-runbook.md` — 创建后必做交付步骤（创建 PR → 清理 → A2A 交棒 tester），Phase 6 完成后必须执行
 
 ## Notes & Design Principles
 
 - **Six-phase strict pipeline** — phases are chain-dependent, sequential, and cannot be skipped
+- **Delivery mandatory** — creation is not complete until `references/creator-runbook.md` runs (create PR → cleanup → A2A handoff to tester); skipping delivery is forbidden
 - **Phase 2/3 Fact-based** — endpoints only from SDK `_http_info`/API Explorer (no inference); commands per Phase 2 conclusions; no endpoint → mark ⛔
 - **Phase 4-6 Verify** — every command really executed (mutating ops need confirmation); Phase 6: cleanup + compliance + completeness; fix failures, re-verify
 - **Credential Security** — no hardcoded AK/SK; read from env vars (`HUAWEI_*/HW_*/HWC_*` AK/SK markers) or active CLI profile; never `hcloud configure set` with literal secrets
