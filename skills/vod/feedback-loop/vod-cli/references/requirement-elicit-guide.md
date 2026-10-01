@@ -45,7 +45,7 @@
 
 1. **清晰度审视**：读取 Issue 完整内容（title/body/标签/评论），对照四要素；结合知识基线判断可执行性/重复/歧义
 2. **沟通澄清**（不清晰时）：在 Issue 评论 @开发者 追问（body 以 `[VOD Agent]` 开头）；≤3 轮
-3. **结构化总结**：用 `grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"body":"…"}'` 将 body 收敛为模板结构
+3. **结构化总结（以评论发布，不改写原始 Issue）**：用 `grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} --json '{"body":"[VOD Agent] 已结构化收敛需求：\n<§四 模板结构>"}'` 将收敛结论以评论形式发布，遵循"不修改开发者原始 Issue 提交记录"的原则
 4. **A2A 交办**：`grape a2a handoff --json '{...}'` → Issue Agent 做 spec/标签/里程碑/分配（见 §五）
 
 ## 四、结构化 Issue 模板

@@ -61,20 +61,20 @@ grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all 
 - **不清晰**（需澄清，≤3 轮）→ Step 4b
 - **纯咨询 / 无新需求**（如"介绍一下项目""这是做什么的"）→ Step 4c
 
-### Step 4a · 需求清晰 → 结构化收敛
-按 §四 模板写 body 到文件，再更新 Issue：
-```bash
-# 先写 /tmp/vod-body-N.md（模板见 requirement-elicit-guide.md §四），再转 JSON 提交
-grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json "{\"body\":\"$(jq -Rs . < /tmp/vod-body-N.md)\"}" --json-out
-# 或长文用 @file：先转成 {"body":"..."} 的 json 文件再 --json @file
-```
-> 更稳：`printf '{"body":"%s"}' "$(cat /tmp/vod-body-N.md)" > /tmp/body.json` 再 `--json @/tmp/body.json`。
+### Step 4a · 需求清晰 → 结构化收敛（以评论发布，不改原始 Issue）
+> ⚠️ **原则：不修改开发者原始 Issue 提交记录**——VOD 的审视/结构化结论以**评论**形式发布（`issues comments create`），**不使用 `issues update` 改写原始 `body`**。
 
-> ⚠️ **`issues update` 字段说明（已确认契约）**：`git-repo issues update` 的请求体允许字段 = `labels` / `assignee` / `milestone_id` / `state` / **`body`**。
-> - **只收敛 body 时只传 `body`**，不要顺带 `state`/`labels` 等无关字段；
-> - `--json-out` 校验返回值（成功返回更新后的 Issue 对象）。
-> - **一次成功即可**，失败先核对字段是否在允许集（`unknown request field` 会提示），**不要无限重试同一命令**；必要时 `grape git-repo issues update --help` 看 Body fields。
+按 §四 模板写结构化收敛正文到文件，以评论发布：
+```bash
+# 先写 /tmp/vod-body-N.md（模板见 requirement-elicit-guide.md §四），body 以 [VOD Agent] 开头，再转 JSON 发评论
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  --json "{\"body\":\"[VOD Agent] 已结构化收敛需求：\n\n$(cat /tmp/vod-body-N.md)\"}" --json-out
+# 或长文用 @file：先转成 {"body":"[VOD Agent] ..."} 的 json 文件再 --json @file
+```
+> 更稳：`printf '{"body":"[VOD Agent] 已结构化收敛需求：%s"}' "$(cat /tmp/vod-body-N.md)" > /tmp/body.json` 再 `--json @/tmp/body.json`。
+
+> ⚠️ **成功判定与不重试**：`--json-out` 返回应含评论对象 `id`（有 id = 发布成功）。**一次成功即可**——不要因"没看到报错"就重复发同一条评论（重复会刷屏）；失败先核对字段允许集（`unknown request field` 会提示），必要时 `grape git-repo issues comments create --help`。
+> ⚠️ 仅当需要给 Issue 打标签/改分配等结构化元数据时，才用 `issues update` 传相应字段（`labels`/`assignee`/`milestone_id`/`state`）——**不涉及 body 收敛**。
 - 收敛后 **进入 Step 5**（如 pipeline 已有 `issue:a2a_event` 则跳过 A2A，直接 Step 6 + `next_step=reply_comment`）。
 
 ### Step 4b · 需求不清晰 → 澄清追问
