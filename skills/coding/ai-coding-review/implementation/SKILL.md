@@ -42,7 +42,7 @@ tools:
 | `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空）| --number / A2A pr_number（无则不填）| 有 PR 时 |
 | `GRAPE_WORK_BRANCH` | 目标合入分支/工作基线（缺省取仓库默认分支）| 建 PR 的 base；开发分支基于它创建 | 场景任务 |
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串）| `grape scenes detail` 取场景节点——A2A 前确认 qa 节点存在（防悬空）| 场景任务 |
-| `BOT_USERNAME` | Bot 在 GitCode 的 VCS 用户名 | `grape git config user.name`；Issue 分配 assignee | 事件任务 |
+| `BOT_USERNAME` | Bot 在 VCS 平台的用户名（GitCode/GitHub/GitLab 等均可） | `grape git config user.name`；Issue 分配 assignee | 事件任务 |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要处理 | 全部 |
 | `GRAPE_LINKED_REPOS` | 关联仓库列表 JSON（场景高级选项配置）| 关联仓库多仓库开发（见 4.9）| 场景配置了关联仓库时 |
 | `GRAPE_LINKED_WORKTREES` | 关联仓库 worktree 路径列表 JSON（平台自动初始化）| 关联仓库多仓库开发（见 4.9）| coding 任务且有 linked_repos 时 |

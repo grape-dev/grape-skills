@@ -1,7 +1,8 @@
 ﻿# VOD 执行走查表（runbook）
 
 > 目的：把 VOD 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
-> 环境变量可直接使用：`$ACCOUNT`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> ⚠️ **owner 只用 `$REPO_OWNER`**（从 `$REPO_FULL_NAME` 解析、与仓库路径一致）；`$ACCOUNT` 是触发人 actor 的真实账号，**仅用于 A2A payload `account` 字段，一律不用作 `--owner`**。
 > **评论前缀硬规**：所有 VOD 评论 body 一律以 `[VOD Agent]` 开头（用 `grape git-repo issues comments create ... --json '{"body":"[VOD Agent] ..."}'`）。
 > 命令取舍速查：读 Issue 聚合用 `issues detail`；取原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth single`（**`tree` 无 `--path`**）。
 
@@ -73,7 +74,9 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 ```
 > 更稳：`printf '{"body":"[VOD Agent] 已结构化收敛需求：%s"}' "$(cat /tmp/vod-body-N.md)" > /tmp/body.json` 再 `--json @/tmp/body.json`。
 
-> ⚠️ **成功判定与不重试**：`--json-out` 返回应含评论对象 `id`（有 id = 发布成功）。**一次成功即可**——不要因"没看到报错"就重复发同一条评论（重复会刷屏）；失败先核对字段允许集（`unknown request field` 会提示），必要时 `grape git-repo issues comments create --help`。
+> ⚠️ **成功判定与不重试（强制）**：`--json-out` 返回含评论对象 `id` = **发布成功，立即停止**——
+> - **不要再去查 `comments create --help`**、**不要重建/重新校验 json**、**不要重复发布同一条评论**（重复会刷屏、污染 Issue 讨论）；
+> - 一次发布成功后就继续下一步（A2A 等）；只有在 `--json-out` 明确报错（如 `unknown request field` / 404）时才排查字段或命令，修后重试一次，仍失败则评论说明。
 > ⚠️ 仅当需要给 Issue 打标签/改分配等结构化元数据时，才用 `issues update` 传相应字段（`labels`/`assignee`/`milestone_id`/`state`）——**不涉及 body 收敛**。
 - 收敛后 **进入 Step 5**（如 pipeline 已有 `issue:a2a_event` 则跳过 A2A，直接 Step 6 + `next_step=reply_comment`）。
 
@@ -96,6 +99,7 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 ### Step 5 · A2A 交办（仅 Step 4a 收敛后，必须严格按以下三步）
 
 > ⚠️ **本步为强制流程，不得跳过**：交办前**必须执行下方第 1 步的 `grape scenes detail`**（即使 `$GRAPE_SCENE_ID` 为空也先调用一次，空结果按第 2 步"场景未绑定"处理），据结果确定目标节点，再发起 A2A；**禁止不执行场景核验就直接 A2A 默认 `issue`**——跳过一次即视为违规，可能交办给场景中不存在的 Agent。
+> ⚠️ **禁止硬编码伪造场景节点**：校验必须基于真实 `grape scenes detail` 返回结果（`$SCENE_NODES`）；**禁止自己 `echo '{"nodes":[...]}'` 捏造节点 JSON 来"通过"校验**——那是假通过，会向不存在的 Agent 交办。
 
 **第 1 步：取当前场景节点，并显式解析出"可用 Agent 集合"**
 ```bash

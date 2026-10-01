@@ -32,9 +32,9 @@ tools:
    grape refresh
    ```
    - ⚠️ 契约权威 = `grape commands` 实列；不猜命令名。
-3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$ACCOUNT`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不打印 token）：
+3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$REPO_OWNER`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不打印 token）：
    ```bash
-   echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
+   echo "token=${GRAPE_SESSION_TOKEN:+ok} owner=$REPO_OWNER repo=$REPO_NAME issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
    ```
 4. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `issue-runbook.md` 进入处理流程。
 
@@ -58,6 +58,7 @@ tools:
 > - 判断优先级：`GRAPE_WORK_BRANCH`（场景注入，权威）> 仓库默认分支（`git-repo repo` 的 `default_branch`）> `main` 探测（不存在则 `master`）。
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标 |
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[issue agent]` 前缀） |
+| `BOT_USERNAME` | Bot 在 VCS 平台的用户名（GitCode/GitHub/GitLab 等均可） | 机器人接管时的 `assignee`（runbook Step 4/6） |
 | `DEVOPS_EVENT_TYPE` | 事件类型（如 `issue_updated`） | 判断入口/是否需要处理 |
 
 > ⚠️ token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**。

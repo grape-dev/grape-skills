@@ -39,7 +39,7 @@ tools:
 | `ISSUE_NUMBER` | Issue 编号 | --number / A2A payload / notify | 事件任务 |
 | `PR_NUMBER` | PR 编号（A2A 交办 coding 时透传）| A2A payload（有则填，无则 0/不填）| 有 PR 时 |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 场景路由（4.2）| 全部 |
-| `BOT_USERNAME` | 机器人 GitCode 用户名（占位 `{BOT_USERNAME}`）| 分配给机器人（assignee）/ spec-generation | 平台注入 |
+| `BOT_USERNAME` | 机器人 VCS 平台用户名（GitCode/GitHub/GitLab 等，占位 `{BOT_USERNAME}`）| 分配给机器人（assignee）/ spec-generation | 平台注入 |
 
 派生变量：`ACCOUNT` = `${REPO_FULL_NAME%/*}`、`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
 

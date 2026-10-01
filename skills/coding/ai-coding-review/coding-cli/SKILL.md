@@ -39,9 +39,9 @@ tools:
    grape refresh
    ```
    - ⚠️ 契约权威 = `grape commands` 实列；不猜命令名。
-3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$ACCOUNT`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不要打印 token）：
+3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$REPO_OWNER`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不要打印 token）：
    ```bash
-   echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
+   echo "token=${GRAPE_SESSION_TOKEN:+ok} owner=$REPO_OWNER repo=$REPO_NAME issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
    ```
    - ⚠️ 只用注入的 `$GRAPE_SESSION_TOKEN`，**不探测** `BOT_*`/`USER_*`/其它 token。
 4. **git 身份预置**（避免 commit 被拒；进入 worktree/表明后、首次 commit 前执行一次）：
@@ -68,7 +68,7 @@ tools:
 | `GRAPE_WORK_BRANCH` | 目标合入分支（工作基线；服务端注入，缺省则取仓库默认分支，如 main/master） | 建 PR 的 `base`；开发分支 `feat/issue-{issue_number}` 基于它创建，本地 push/同步均以它为基线 |
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标（见 runbook Step 7） |
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[Coding Agent]` 前缀） |
-| `BOT_USERNAME` | Bot 在 GitCode 的 VCS 用户名 | `grape git config user.name` 的 git 身份（见 Prerequisites 4 / runbook Step 0）；Issue 分配 `assignee` 也用它 |
+| `BOT_USERNAME` | Bot 在 VCS 平台的用户名（GitCode/GitHub/GitLab 等均可） | `grape git config user.name` 的 git 身份（见 Prerequisites 4 / runbook Step 0）；Issue 分配 `assignee` 也用它 |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要处理 |
 
 > ⚠️ **`GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能是长期分支（`dev`/`weekly-xx`），**也可能叫 `feat/issue-N`（N 不一定等于当前 Issue 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。

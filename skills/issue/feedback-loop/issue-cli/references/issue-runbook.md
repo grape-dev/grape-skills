@@ -1,7 +1,8 @@
 ﻿# Issue-CLI 执行走查表（runbook）
 
 > 目的：把 Issue Agent 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
-> 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。`ACCOUNT`（触发人 actor）一般不作 --owner。
+> 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
+> ⚠️ **owner 只用 `$REPO_OWNER`**（从 `$REPO_FULL_NAME` 解析、与仓库路径一致）；`$ACCOUNT` 是触发人 actor 的真实账号，**仅用于 A2A payload `account` 字段，一律不用作 `--owner`**。
 > **评论前缀硬规**：所有 Issue 评论 body 一律以 `[issue agent]` 开头。
 > 命令取舍速查：读 Issue 聚合用 `issues detail`；原始字段/评论用 `git-repo issues get` / `issues comments list`；列目录用 `contents --path ""` 或 `tree --depth single`（`tree` 无 `--path`）。
 
@@ -53,11 +54,14 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
 - 细则见 `references/issue-developability-analysis.md`；评论事件同样重新分析（用户补充信息会改变评级）。
 
 ### Step 4 · 按评级执行动作 + 标签 + 分配
+
+> 📚 **references 按需读取**：只读当前评级/任务类型用到的 guide（如 ready 需 `spec-generation.md`；分配责任人再读 `assignee-guide.md`/`codeowners-guide.md`；普通分诊**不必**全读）。别一次性加载全部 6 个 guide 浪费上下文。
+
 ```bash
 # ready → 生成 Spec（→ Step 5）；贴 Issue 评论；打 spec-ready；A2A 交办 coding
 #   ⚠️ Spec 中注明目标分支（开发基准 = $WORK_BRANCH，Step 2 ① 解析），供 coding 在正确分支开发
 grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"labels":"{原有标签},spec-ready","assignee":"{BOT_USERNAME}"}'
+  --json '{"labels":"{原有标签},spec-ready","assignee":"'"$BOT_USERNAME"'"}'
 # almost-ready → 分配责任人（CODEOWNERS）→ 精确追问 1-2 个问题
 # needs-discussion → 分配责任人 → 逐维度追问 → 标记 need-info
 # not-feasible → 评论说明不可行 → 标记 invalid
@@ -172,6 +176,7 @@ grape tasks complete --json '{
 |------|------|
 | `No such command 'X'` | 命令名错，核对 runbook / reference；仍不确定才 `grape commands <关键词>` |
 | `unknown request field(s): ...` | `--json` 字段不在允许集，看 `--help` 的 Body fields 删除多余字段 |
+| `a2a handoff` 非 2xx / 未命中 | **不探索 `--help`**：回看 Step 2/5 确认目标 agent 是否在当前场景节点集合中（`scenes detail` 的 nodes）；缺失 → 按 Step 5 未命中分支说明 + `next_step=a2a_need_clarify` 收尾；重试 ≤3 次仍失败 → 评论说明需人工介入 |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能一般不涉及 |
 | `contents` 路径不存在 | 用 `tree --depth single` 或 `contents --path ""` 定位 |

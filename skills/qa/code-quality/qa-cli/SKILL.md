@@ -34,9 +34,9 @@ tools:
    grape refresh
    ```
    - ⚠️ 契约权威 = `grape commands` 实列；不猜命令名。
-3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$ACCOUNT`/`$REPO_NAME`/`$PR_NUMBER` 有值（用 `${VAR:+ok}` 校验，不打印 token）：
+3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$REPO_OWNER`/`$REPO_NAME`/`$PR_NUMBER` 有值（用 `${VAR:+ok}` 校验，不打印 token）：
    ```bash
-   echo "token=${GRAPE_SESSION_TOKEN:+ok} repo=$REPO_NAME pr=$PR_NUMBER issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
+   echo "token=${GRAPE_SESSION_TOKEN:+ok} owner=$REPO_OWNER repo=$REPO_NAME pr=$PR_NUMBER issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
    ```
 4. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `qa-runbook.md` 进入处理流程。
 

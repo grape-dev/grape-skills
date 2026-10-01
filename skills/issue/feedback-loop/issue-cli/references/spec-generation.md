@@ -159,7 +159,7 @@ grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
 
 ```bash
 grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
-  --json '{"assignee":"{BOT_USERNAME}"}'
+  --json '{"assignee":"'"$BOT_USERNAME"'"}'
 ```
 
 使用 Grape 的 GitCode 用户名作为 assignee，表示机器人接管后续开发流程。
