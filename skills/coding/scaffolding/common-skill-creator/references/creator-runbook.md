@@ -1,7 +1,17 @@
 # 通用 Skill 生成执行走查表（common-skill-creator runbook）
 
 > 目的：把 common-skill-creator 每一步**要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
-> **命令纪律**：本技能为**本地生成器**——命令面 = 本地脚本（python3/node/bash）+ **唯一平台接口** 4.8 任务收尾 `tasks complete`。**禁止**尝试 grape 平台管理命令（issues/pulls/a2a/refresh——本技能无平台业务交互）；grape CLI 在平台任务上下文外不可用。
+> **命令纪律**：本技能为**流水线节点**——命令面 = 本地脚本（python3/node/bash）+ PR 创建（`scripts/create_common_skill_pr.sh`——内部封装 pulls）+ 发评论（`grape git-repo issues comments create`）+ `grape a2a handoff`（交棒 tester）+ 4.8 `tasks complete`（收尾）。**禁止**直接手敲 pulls 命令（走脚本）；**禁止合并 PR**（tester 验证通过后由 QA 节点执行）；Issue 其他读写非本技能职责。grape CLI 在平台任务上下文外不可用。
+
+## 前置环境变量（平台注入——流水线场景）
+
+| 变量 | 用途 |
+|------|------|
+| `GRAPE_SESSION_TOKEN` | 任务级 token（`tk_` 前缀），grape 自动读取——pr/评论/a2a/收尾 |
+| `REPO_FULL_NAME` | 仓库全名 `owner/repo`（OWNER=`${REPO_FULL_NAME%/*}`、REPO=`${REPO_FULL_NAME#*/}`）|
+| `ISSUE_NUMBER` | Issue 编号 |
+| `ACCOUNT` | 触发者账号（actor——A2A payload 用）|
+| `PR_NUMBER` | PR 编号（A2A payload `pr_number` 提取——评论/A2A 必填；standalone 场景由 PR 脚本 stdout 输出取得）|
 
 ## Step 0 就绪（前置检查门）
 
@@ -10,6 +20,7 @@
 | node | `node --version` | ≥ 12 | 尝试安装（nvm/包管理器）→ 重试 → 仍失败 STOP |
 | python3 | `python3 --version` | 存在 | 尝试安装 → 重试 → 仍失败 STOP |
 | bash | `bash --version` | 存在 | STOP |
+| grape（流水线场景）| `grape --version` | 存在 | 尝试安装（grape-cli-installation.md）→ 重试 → 仍失败 STOP；standalone 跳过 |
 | 目标位置可写 | `test -w "<目标父目录>"` | 可写 | 报错请用户换位置，不静默改路径 |
 
 任一失败 → 输出「前置检查未通过：<原因>」结束任务，不无限重试。
@@ -95,26 +106,52 @@ node common-skill-creator/scripts/fetch_checks.js "https://..."            # 自
 8. 迭代：三信号（失败断言 + 人工反馈 + 执行转录）+ 当前 SKILL.md → 改进 → 新迭代重跑 → 满意/无实质改进即停
 - 产出：`phase-5-summary.json`（eval 结果 + benchmark + 最终 SKILL.md）
 
-## Step 6 收尾清理 + 任务收尾
+## Step 6 收尾清理
 
 ```bash
 # 完整性确认：phase-1~5-summary.json 齐全（Phase 5 简单 skill 已标记跳过亦可）；缺失 → 从缺失阶段重启
-rm -f {skill-path}/phase-*.json    # 清理临时产物（不留半成品状态文件）
+rm -f {skill-path}/phase-*.json    # 清理临时产物（不留半成品状态文件——PR 不含 phase 临时文件）
 ```
 
-### 平台任务收尾（唯一 grape 交互——必做）
-
-业务动作全部完成后，**先调 tasks complete 关任务，再在最终答复末尾输出 JSON 块**：
+## Step 7 创建 PR（流水线场景必做——A2A 触发或用户要求入库时；standalone 跳过）
 
 ```bash
-grape tasks complete --json '{"result_text": "生成/优化/校验完成：<skill 名称与结论>", "actions": ["五阶段流水线执行（需求/设计/生成/验证/eval）"], "conclusion": "<交付结论>", "artifacts": ["<skill 目录路径>", "phase-4-summary.json"], "next_step": "<用户下一步选择>"}'
+bash scripts/create_common_skill_pr.sh "<skill_name>" [--base main]
+```
+
+- 脚本内部：默认分支探测（`grape git-repo repo`，--base 可覆盖）→ git add/commit/push（feat/issue-{N} 分支）→ **幂等查重**（同分支已有 open PR → 复用编号）→ pulls create（契约字段 related_issue_nums/auto_close_issues）→ **pulls update 补 body**（幂等双保险）→ base 校验 → 输出 `PR_NUMBER`/`PR_URL`
+- 退出码：0=成功（创建或复用）；1=参数/环境错误；2=调用失败（可重试 1 次）
+- **创建 PR 后必须发 Issue 评论**（body 以 `[Coding Agent]` 开头）：
+```bash
+grape git-repo issues comments create --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --number "$ISSUE_NUMBER" \
+  --json '{"body":"[Coding Agent] ✅ Skill 已创建并提交 PR\n\n**Skill 名称**：<name>\n**功能摘要**：<一句话>\n**PR 链接**：[#'"$PR_NUMBER"'](https://gitcode.com/'"$REPO_FULL_NAME"'/merge_requests/'"$PR_NUMBER"')\n**下一步**：QA（common-skill-tester）功能验证——通过后合并发布"}'
+```
+- 失败 → 按 SKILL 4.5：重试 1 次 → 评论说明 → 不交棒
+
+## Step 8 A2A 交棒 tester（流水线场景必做）
+
+```bash
+grape a2a handoff --json '{"agent":"qa","payload":{"repository":"'"$REPO_FULL_NAME"'","account":"'"$ACCOUNT"'","issue_number":'"$ISSUE_NUMBER"',"pr_number":'"$PR_NUMBER"',"context":"Issue #'"$ISSUE_NUMBER"' skill 已创建，PR #'"$PR_NUMBER"' 已提交。请对 skill 进行功能验证。Skill 名称：<name>"}}'
+```
+
+- **payload 必带 issue_number + pr_number**（tester 拉取/合并/交棒依赖）
+- **agent 用场景标准节点名 `qa`**（⚠️ 不传技能名——#10 not_in_scene 教训：节点名才被场景接受；场景无 qa 节点 → 评论说明 + 改交 sre（若有）或人工介入）
+- A2A 失败 → 重试 ≤3 次 → 仍失败：评论说明「A2A 服务不可达」+ next_step 人工介入
+- 交棒成功后再进行平台任务收尾（complete 在 A2A 之后）
+
+### 平台任务收尾（必做——A2A 交棒之后调用）
+
+业务动作全部完成后（含 Step 7/8——流水线场景；standalone 场景无 Step 7/8），**调 tasks complete 关任务，再在最终答复末尾输出 JSON 块**：
+
+```bash
+grape tasks complete --json '{"result_text": "生成/优化/校验完成：<skill 名称与结论>", "actions": ["五阶段流水线执行（需求/设计/生成/验证/eval）", "created:<skill_name>", "submitted:PR#<n>", "a2a:qa"], "conclusion": "<交付结论>", "artifacts": ["<skill 目录路径>", "PR#<n>链接"], "next_step": "<QA 验证/用户下一步选择>"}'
 ```
 ```json
 {
-  "actions": ["五阶段流水线执行"],
+  "actions": ["五阶段流水线执行", "created:<skill_name>", "submitted:PR#<n>", "a2a:qa"],
   "conclusion": "交付结论",
-  "artifacts": ["<skill 目录路径>"],
-  "next_step": "用户下一步选择",
+  "artifacts": ["<skill 目录路径>", "PR#<n>链接"],
+  "next_step": "QA 验证/用户下一步选择",
   "issue_summary": "本次任务最新聚合结论（紧凑文本，用 | 分隔）"
 }
 ```
@@ -132,4 +169,10 @@ grape tasks complete --json '{"result_text": "生成/优化/校验完成：<skil
 | 触发率差（应触发不触发 / 不应触发误触发）| description 过窄 / 过宽 | 按 4c 修订：拓宽范围 或 加「不做什么」边界 |
 | eval 显示 skill 无增量 | skill 可能不必要 | 与用户确认是否放弃/简化 |
 | `grape tasks complete` 失败 | 非平台任务上下文 | 跳过收尾（无任务可关），照常交付产物 |
+| `issues comments create` 失败 | 评论权限/网络 | 重试 1 次 → 仍失败：logged 记录，PR 已建不阻塞 A2A |
+| 平台 API 返回 403/401 | 权限不足 | **停止操作**——回复「该操作需要管理员/维护者权限，请在仓库设置中配置后重试」——不尝试其他 token、不绕行 |
+| create_common_skill_pr.sh exit 2（创建失败/无输出）| grape pulls 异常 | 重试 1 次 → 仍失败：Issue 评论说明失败原因（不创建 PR 不交棒）|
+| PR base 校验不过 | --base 参数错误/仓库默认分支不同 | 检查默认分支（`grape git-repo repo`）→ 修正后重新执行脚本 |
+| 幂等查重命中（已有本 skill PR）| 重复提交 | 复用该 PR 编号——不重复创建——直接走 Step 8 交棒 |
+| `grape a2a handoff` 失败 | A2A 服务异常 | 重试 ≤3 次 → 仍失败：评论说明「A2A 服务不可达」+ next_step 人工介入 |
 | 覆盖已有同名 skill 目录 | 破坏性操作 | 先用户确认或 `--dry-run` 预览，不静默覆盖 |

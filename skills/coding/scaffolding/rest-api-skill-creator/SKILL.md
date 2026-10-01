@@ -1,6 +1,6 @@
 ﻿---
 name: rest-api-skill-creator
-version: 2.1.0
+version: 2.2.0
 description: |
   按需求自动创建 REST API 管理 skill：查重 → 读取 Spec → OpenAPI/文档/基础信息三级调研 →
   骨架生成（脚本+SKILL.md+端点文档+测试用例）→ 自测 → 创建 PR → A2A 交棒 QA Agent 测试。
@@ -15,7 +15,7 @@ tools:
 
 ## 一、安全硬约束（必须遵守）
 
-1. **平台交互一律走 grape CLI**（自动读取 `$GRAPE_SESSION_TOKEN`），严禁从数据库/configs/日志/历史中寻找其他 token。
+1. **平台交互一律走 grape CLI**（自动读取 `$GRAPE_SESSION_TOKEN`），严禁从数据库/configs/日志/历史中寻找其他 token。**禁止 curl 直连平台 API**（`grape api` 已移除——契约未覆盖的端点不可调用；curl 仅用于**目标系统 API 探测**——被创建的 skill 要管理的系统）。
 2. **严禁读取 Grape 内部数据**（data/、configs/、sessions.db、user_accounts 等）。
 3. **403/无权限**：立即停止该操作并回复用户，严禁尝试其他 token 或绕行手段。
 4. **token 不得写入任何文件/日志/评论**。
@@ -90,115 +90,25 @@ Don't use for: 测试 skill（tester 职责）/ 发布 skill（publish 职责）
 
 ### 4.3 处理流程（统一骨架）
 
-**Step 0：查重**——检查目标仓库 skills/ 目录是否已有同名 skill：
-```bash
-grape git-repo tree --owner "$REPO_OWNER" --repo "$REPO_NAME" --path skills --json-out
-```
-- 远程已存在 → 回复「已存在——可复用/更新」——不重复造
-- 不存在 → 继续
+**流程总览（一行）**：
 
-**Step 1：需求澄清**——从 Issue 获取完整内容。用户填了需求模板（`templates/requirement-template.md`）→ 直接从模板提取信息；否则按 4 维度逐一澄清：
-1. **目标系统 API 地址** — base_url（如 https://blog.example.com/api）
-2. **认证方式** — Basic Auth / Bearer Token / API Key（Header 或 Query）/ 无认证
-3. **API 文档形式** — OpenAPI/Swagger 文件 / Markdown 文档 / 口头描述
-4. **需要哪些操作** — 用户期望的管理能力（发布/编辑/删除/查询/分类管理等）
+Step 0 查重（远程同名 skill——先查后做）→ Step 1 需求澄清（4 维度 + 凭据变量前缀推导）
+→ Step 2 技术调研（API 文档三级回退 + 真实 API 验证）
+→ Step 3 骨架生成（只生成 5 件套）→ Step 3.5 自测（三项门禁）
+→ Step 4 创建 PR（脚本封装 + 必发 Issue 评论）→ Step 5 清理 → Step 6 A2A 交棒 tester → 4.8 任务收尾
 
-凭据变量前缀推导：skill name 转大写 + 下划线（`blog-manager` → `BLOG_MANAGER`）——`{PREFIX}_USERNAME`+`{PREFIX}_PASSWORD`（Basic）/ `{PREFIX}_TOKEN`（Bearer）/ `{PREFIX}_API_KEY`（API Key）/ 无认证不需要。
-覆盖所有维度后 → 展示需求摘要表（含认证方式 + 凭据变量名）→ 等用户确认。
+**执行规则**：
 
-**Step 2：技术调研（REST API 文档三级回退）**——详细方法见 `references/api-research-guide.md`。核心：**API 端点只认文档解析或 curl 探测结果，严禁猜测**。
-- 优先：OpenAPI/Swagger 文档（`python3 -c` 解析 paths）
-- 回退：Markdown 文档（提取端点/参数/响应）
-- 最后：基础信息 + curl 逐个探测（`curl -s --max-time 30` 只读端点）
-- 时间盒：每端点 ≤5 分钟，超时标记 ⛔；失败门控：所有端点都 ⛔ → 终止，不生成任何文件
-- 【真实 API 验证】：凭据可用时 curl 真实调用一次只读端点 → 成功记录返回结构；失败 → 标记 API 不可用，走失败门控
+- ⚠️ **启动即读 `references/creator-runbook.md`**——每步具体命令按走查表照抄执行（不现场查 --help）
+- **查重必须先**：`grape git-repo tree` 查目标仓库 skills/ 已有同名 skill → 已有则复用/更新，不重复造
+- **API 端点只认文档解析或 curl 探测结果，严禁猜测**；凭据可用时 curl 真实调用一次只读端点验证；所有端点都失败 → 终止，不生成任何文件
+- **只生成 5 件套**（SKILL.md / scripts/{name}.py / references/api-reference.md / templates/test-vars.json / requirements.txt）——生成清单之外的文件禁止
+- **Step 3.5 自测门禁**：`--help` 无语法错误 + validate-skill.sh 16 项校验全过 + 真实 API 可达——三项不过不建 PR
+- **Step 4**：PR 走 `scripts/create_rest_api_skill_pr.sh`（幂等查重/契约字段 related_issue_nums + auto_close_issues/补 body/base 校验）——创建后**必须发 Issue 评论**（模板见 4.6）
+- **Step 6**：A2A payload **必带 issue_number + pr_number**（tester 拉取/合并/交棒依赖）——agent 用场景标准节点名 `qa`（⚠️ **不传技能名**）
+- **收尾顺序**：Step 6 完成 → 4.8 tasks complete（**先交棒再关任务**）
 
-**Step 3：骨架生成**——生成前先读 `references/skill-spec.md`（生成物规范）。目录 `skills/{name}/`（name=小写连字符），只生成 5 件套：
-| 产物 | 要求 |
-|------|------|
-| `SKILL.md` | ≤500 行；**按 skill-spec.md 规范生成**（必填段落：安全硬约束/评论规范/Configuration/场景/知识/步骤/判断标准/输出规范/参考文档/分析结论示例/任务结束——即验证段落表）|
-| `scripts/{name}.py` | Python 入口（端点 <10 单文件 / ≥10 入口+包目录模块化；`--format` 加到每个子命令 parser；用 requests 不用 urllib；结构按 `references/rest-api-skill-template.md`）|
-| `references/api-reference.md` | API 端点文档（`{base_url}` 占位，不硬编码真实地址）|
-| `templates/test-vars.json` | 测试用例（结构见下）|
-| `requirements.txt` | 至少 `requests>=2.20.0` |
-
-⚠️ 只生成以上 5 个文件/目录——不生成 tests/、根目录 main.py、README.md、requirements-dev.txt、.gitignore 等（生成清单之外的文件禁止）。
-
-**脚本生成约束**：
-1. `--format` 参数必须加到每个子命令的 parser（`add_common_args(子parser)`），**不能加到全局 parser**——用户可在子命令后使用 `--format md`
-2. `requirements.txt` 用真实换行符（`\n`），不能写字面量 `\\n`
-3. 脚本按 `references/rest-api-skill-template.md` 结构生成——`add_common_args` + `sub.add_parser` + `add_common_args(p_N)` 模式
-4. 用 `requests` 库，**不能用 `urllib`**；`requirements.txt` 声明 `requests>=2.20.0`
-5. SKILL.md 中 API 地址一律 `{base_url}` 占位符，不硬编码真实地址（示例地址标注「(示例)」）；api-reference.md 同
-
-**test-vars.json 结构**（creator 生成时按此写入，tester 读取时按此解析——只含测试用例和元数据，**不含真实地址/凭据值**——可安全提交 git）：
-```json
-{
-  "skill_name": "{skill_name}",
-  "entry_file": "scripts/{skill_name}.py",
-  "test_cases": [
-    {"id": "TC-01", "name": "health-check", "command": "python3 scripts/{skill_name}.py health-check", "expected": "{\"status\":\"ok\"}", "method": "GET", "category": "readonly", "description": "检查 API 可达性"},
-    {"id": "TC-02", "name": "list-articles", "command": "python3 scripts/{skill_name}.py list-articles --page 1 --size 10", "expected": "{\"code\":200,\"data\":[...]}", "method": "GET", "category": "readonly", "description": "查询文章列表"},
-    {"id": "TC-03", "name": "create-article", "command": "python3 scripts/{skill_name}.py create-article --title test --content hello", "expected": "{\"code\":200,\"data\":{\"id\":...}}", "method": "POST", "category": "mutable", "description": "创建文章", "cleanup": "执行 delete-article 删除刚创建的测试文章"}
-  ],
-  "env_vars_required": ["{CRED_PREFIX}_BASE_URL（API 地址）", "有认证时：{CRED_PREFIX}_TOKEN / {CRED_PREFIX}_USERNAME / {CRED_PREFIX}_PASSWORD（凭据）"],
-  "notes": "凭据和 base_url 从环境变量或 .project-info/ 下 JSON 配置文件获取，不写入此文件"
-}
-```
-字段：skill_name / entry_file（固定 `scripts/{name}.py`）/ test_cases[]（id/name/command/expected/method/category/description——**五字段必填不得省略**；cleanup 可选——mutable 用例必含描述性清理说明）/ env_vars_required（只含变量名说明）/ notes。
-**最低覆盖要求**：`health-check`（必填）+ 每类资源至少 1 个只读查询 + 至少 1 个写操作（category=mutable 含 cleanup）+ `capability-list`（必填）。不要求每个子命令都写用例。
-
-**子命令生成规则**（由 API 文档动态决定——不预设）：
-| API 端点特征 | 子命令 | 示例 |
-|-------------|--------|------|
-| GET /api/{resource} | list-{resource} | GET /api/articles → list-articles |
-| POST /api/{resource} | create-{resource} | POST /api/articles → create-article |
-| GET /api/{resource}/{id} | get-{resource} | GET /api/articles/42 → get-article |
-| PUT/PATCH /api/{resource}/{id} | update-{resource} | PUT /api/articles/42 → update-article |
-| DELETE /api/{resource}/{id} | delete-{resource} | DELETE /api/articles/42 → delete-article |
-| 特殊路径（restore/reply/heat/top 等）| 语义段 + 动词 | restore-article / top-articles |
-| 其他 | path 末段 + method | GET /api/search → search |
-
-补充：resource 名取 path 资源段（复数转单数）；文档有 operationId/summary 优先（下划线转连字符/驼峰转连字符）；**拼写修正**：API 路径拼写错（如 lables）→ 子命令用正确拼写、脚本内请求用 API 实际路径、Core Commands 表格注明；**特殊路径**（restore/reply/heat/top）语义段 + resource 名；**Web 页面端点排除**（返回 HTML 的不生成子命令）；**文件上传**：multipart/form-data 用 `files=`（单文件 dict 值 = 单个 file object；批量用元组列表——dict value 为列表会 unpack 报错）；子命令参数由文档 parameters/requestBody 定义决定。
-
-**生成的脚本凭据读取规范**（4 级优先级，与生成物 Configuration 段落一致）：
-1. 项目知识（递归扫描 `.project-info/` 下所有 JSON——secrets.{PREFIX}_*）→ 2. 环境变量（{PREFIX}_*）→ 3. 当前上下文（A2A 注入，含在 2）→ 4. 交互输入（以上都无时提示）
-环境变量和项目知识都缺失 → **退出码 3**。代码模板见 `references/rest-api-skill-template.md` 的 `_load_credentials` + `_load_from_project_knowledge`。
-
-**生成的脚本调用模式**（按认证方式生成）：Basic = HTTPBasicAuth；Bearer = Authorization header；API Key = Header 或 Query（参数名由需求澄清决定）；无认证直接 GET。全部 `timeout=30`。⚠️ **只支持真实 API 调用——严禁 mock 模式/假数据/MOCK_DATA/--mock 参数**。
-
-**生成物命名/大小约束**：frontmatter name 必须跟 `skills/{name}/` 目录名一致；扩展名白名单 .md/.txt/.json/.yaml/.yml/.py/.sh/.csv/.cfg/.conf/.xml/.html/.css/.svg；总内容 ≤40MB、文件数 ≤50、SKILL.md ≤500 行。
-
-**Step 3.5：自测**：
-1. `python3 skills/{name}/scripts/{name}.py --help` → 无语法错误
-2. `bash {{SKILL_DIR}}/rest-api-skill-creator/scripts/validate-skill.sh skills/{name}/` → 16 项校验全过（frontmatter/name 与目录一致/必填段落 11 段/入口文件可执行/api-reference 存在/test-vars 存在/requirements 存在/无 mock/无硬编码 IP/SKILL 安全约束无 GitCode/requests 非 urllib/test-vars 无敏感字段/字段完整/≤500 行/文件数 ≤50）
-3. 真实 API 调用一次（只读端点）→ API 可达
-4. 失败 → 修复后重试；无法修复 → Issue 评论说明，不创建 PR
-
-**Step 4：创建 PR**——调 `bash {{SKILL_DIR}}/rest-api-skill-creator/scripts/create_rest_api_skill_pr.sh "$SKILL_NAME"`（脚本内部：git commit+push → pulls list 幂等查重 → pulls create → pulls update 补 body → pulls get base 校验——0.3.3 无 assignees 接口已跳过）。
-⚠️ **创建 PR 后必须发 Issue 评论告知**：
-```bash
-grape git-repo issues comments create \
-  --owner "$REPO_OWNER" --repo "$REPO_NAME" \
-  --number "$ISSUE_NUMBER" \
-  --json '{"body": "[Coding Agent] ✅ Skill 已创建并提交 PR\n\n**Skill 名称**：{name}\n**功能摘要**：{一句话描述}\n**API 端点数**：{N} 个\n**认证方式**：{AUTH_TYPE}\n**PR 链接**：{PR_URL}\n**测试状态**：已 A2A 交棒 QA Agent，测试中\n\n**下一步**：\n- 测试通过后自动合并 → 发布"}'
-```
-
-**Step 5：清理**——删除临时调研产物。
-
-**Step 6：A2A 交棒 tester**：
-```bash
-grape a2a handoff --json '{
-  "agent": "qa",
-  "payload": {
-    "repository": "'"$REPO_FULL_NAME"'",
-    "account": "'"$ACCOUNT"'",
-    "issue_number": '"$ISSUE_NUMBER"',
-    "pr_number": '"$PR_NUMBER"',
-    "context": "Issue #'"$ISSUE_NUMBER"' skill 已创建，PR #'"$PR_NUMBER"' 已提交。请对 skill 进行功能验证。Skill 名称：{name}"
-  }
-}'
-```
+> 每步阶段摘要/命令/产物详表 → 按 `references/creator-runbook.md` Step 0-6 照抄执行。
 
 ### 4.4 命令标准（子集与坑点）
 
@@ -302,7 +212,7 @@ grape tasks complete --json '{"result_text": "<处理结论>", "actions": ["做�
 | `templates/requirement-template.md` | 用户需求模板 | Step 1 需求澄清（引导用户填写）|
 | `scripts/validate-skill.sh` | 生成物 16 项结构校验 | Step 3.5 自测 |
 | `scripts/create_rest_api_skill_pr.sh` | PR 创建脚本（pulls 幂等/补 body/base 校验）| Step 4 |
-| `references/creator-runbook.md` | 执行走查表（命令固化——照着执行不查 help）| 全流程 |
+| `references/creator-runbook.md` | **执行走查表：Step 0-6 全程命令逐步照抄 + 错误排查速查** | ⭐ **最先**——启动即读，全流程照抄不查 --help |
 
 ## 六、Best Practices（实践积累区）
 
