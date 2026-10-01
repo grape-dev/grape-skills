@@ -3,7 +3,7 @@
 # create_rest_api_skill_pr.sh — Coding Agent 创建 GitCode PR 的脚本(grape CLI 版)
 #
 # 职责：git commit + push → grape pulls 幂等查重 → grape pulls create
-#       (+ update 补 body，pulls create 无 body 字段) → base 校验 → 输出 PR URL
+#       (+ update 补 body，契约 PRCreateBody 已支持 body——update 补写为幂等双保险) → base 校验 → 输出 PR URL
 # 复用 worktree 已有分支 feat/issue-{N}，不另建分支。
 #
 # 用法：
@@ -113,7 +113,8 @@ if [[ -n "$PR_NUMBER" ]]; then
 fi
 
 # ============================================================================
-# 3. 创建 PR（pulls create 无 body 字段 → create 后 update 补 body）
+# 3. 创建 PR（create 直接传契约字段 related_issue_nums/auto_close_issues；body 契约已支持——
+#    下方 update 补写为幂等双保险，非必需）
 # ============================================================================
 log "创建 PR: grape git-repo pulls create  base=${BASE_BRANCH} head=${BRANCH}"
 CREATE_RESP=$(grape git-repo pulls create \
@@ -122,8 +123,8 @@ CREATE_RESP=$(grape git-repo pulls create \
     \"title\": \"feat(skill): 新增 ${SKILL_NAME}\",
     \"head\": \"${BRANCH}\",
     \"base\": \"${BASE_BRANCH}\",
-    \"inner_issue_nums\": \"${OWNER}/${REPO}#${ISSUE_NUM}\",
-    \"close_related_issue\": true
+    \"related_issue_nums\": [\"${OWNER}/${REPO}#${ISSUE_NUM}\"],
+        \"auto_close_issues\": true
   }" 2>/dev/null)
 
 if [[ -z "$CREATE_RESP" ]]; then
@@ -138,7 +139,7 @@ if [[ -z "$PR_NUMBER" ]]; then
   exit 2
 fi
 
-# 补 PR body（create 无 body 字段，用 update 补；失败不阻塞——PR 已创建）
+# 补 PR body（契约字段 related_issue_nums/auto_close_issues 已在 create 传入；update 补 body 为幂等双保险——失败不阻塞——PR 已创建）
 PR_BODY="## 新增 Skill: ${SKILL_NAME}\n\n由 rest-api-skill-creator 自动创建\n\nFixes #${ISSUE_NUM}"
 if grape git-repo pulls update \
   --owner "$OWNER" --repo "$REPO" --number "$PR_NUMBER" \

@@ -63,12 +63,12 @@ grape tasks complete --json '{"result_text":"<处理结论>","actions":[...],"co
 # 收尾协议：业务动作完成后先调 tasks complete，再输出 JSON 块（见 SKILL 4.8 任务收尾）
 ```
 
-## 4. ❌ 不存在的命令（防误用，禁止尝试）
+## 4. ❌ 不要尝试的命令（不存在或禁止使用）
 
 | 命令 | 说明 |
 |------|------|
 | `grape tasks close / mine / start / status / clarify` | tasks 组仅有 complete/current/notify/wait |
-| `grape git xxx`（透传） | git 操作不存在透传，worktree 操作用原生 git |
+| `grape git xxx`（透传） | **存在但不用**（0.3.3 实测：`grape git` = 本地 git 透传，会尝试注入平台凭据到 git 命令）——本技能 git 操作全部用**原生 git**（worktree 由平台准备），透传会引入凭据注入风险且无必要 |
 | `grape api` | 已移除（0.2.2 起），且平台禁止直连 API |
 | `grape knowledge context/content` | 不存在，知识基线由 prompt 内联注入 |
 | `grape events detail --seq` | --seq 平台不注入，勿用 |

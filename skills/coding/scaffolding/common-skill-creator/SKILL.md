@@ -10,7 +10,7 @@ description: >
   "optimize skill description", "validate skill", "skill eval", "创建skill", "新建skill",
   "skill脚手架", "帮我创建一个skill", "生成skill", "skill创建器", "通用skill创建器",
   "build skill", "make a skill".
-version: 2.1.0
+version: 2.3.0
 ---
 
 # Common Skill Creator
@@ -19,20 +19,25 @@ version: 2.1.0
 
 ## 一、安全硬约束（必须遵守）
 
-1. **本地生成器定位**：本技能只做**本地文件操作**——在用户指定位置生成/校验/迭代 Skill 目录。不调用 grape 平台管理命令（issues/pulls/a2a/refresh 等均不适用）；唯一平台接口是 4.8 任务收尾的 `tasks complete`。
-2. **严禁读取内部数据**：不读取平台内部数据（data/、configs/、sessions.db、user_accounts 等）。
-3. **不写死凭据**：生成的 Skill 与脚本中禁止硬编码凭据（AK/SK/密码/token）——一律使用环境变量引用或占位符。校验脚本若检出硬编码凭据（credential scan），必须修复后才能进入下一步。
-4. **在线规范动态拉取**：Phase 4b 的 lint 检查点（`common_skillslinter.json`）**不硬编码、不凭记忆**——每次执行必须用 `scripts/fetch_checks.js` 从在线地址拉取最新版；拉取失败按 4.5 故障决策表降级（本地保存文件复用 → 仅跑 4a 并标记 4b 待办 → 重试），**不得**凭旧快照/记忆假装执行。
-5. **外部域界**：fetch_checks.js 访问的在线规范源（gitcode.com 生态规范文件仓库）属**外部规范源域**——脚本内 https 请求合法；此域与 grape 平台管理 API 严格区分（平台管理一律走 CLI 纪律，此处无 CLI 通道也不制造）。
-6. **不 mock 不臆造**：校验判定（pass/fail/warn/skip）必须基于**客观证据**（文件存在、grep 命中、行号、统计数字）——禁止凭印象判定。
-7. **交互输入禁止**：生成的脚本必须无交互输入（agent 无法应答交互提示）——`--help`、环境变量、参数、stdin 是合法输入方式；交互式脚本直接拒绝并要求改写。
-8. **产物清理**：Step 6 收尾时清理 phase-N-summary.json 临时产物（`rm -f {skill-path}/phase-*.json`），不留半成品状态文件。
+1. **链路节点定位**：本技能以**本地文件操作**为主（生成/校验/迭代 Skill 目录），并在**流水线场景**下**创建 PR 入库 + A2A 交棒 `common-skill-tester`**（对齐 rest-api/huawei 系已跑通的链路）。平台管理命令面 = PR 创建（走 `scripts/create_common_skill_pr.sh`）+ 发评论（`grape git-repo issues comments create`）+ `a2a handoff`（交棒）+ 4.8 `tasks complete`（收尾）；**仍不合并 PR、不发布、不做 lint/test/audit 全面测试**（合并归 tester、发布归 skill-publish、全面测试归 common-skill-tester）。**平台 API 返回 403/401 → 立即停止操作**，回复「该操作需要管理员/维护者权限，请在仓库设置中配置后重试」——**不尝试其他 token、不绕行**。
+2. **平台交互唯一通道（grape CLI）**：所有平台管理操作（PR 创建/评论/A2A 交棒/任务收尾）必须经 `grape CLI`（或封装脚本 `scripts/create_common_skill_pr.sh`）执行——**禁止 curl 直连平台 API**（`grape api` 已于 0.2.2 移除——契约未覆盖的端点不可调用）。执行前必须过前置门 5（`grape --version` 校验——缺失自动安装 → 重试 → 仍失败 STOP）；CLI 不可用时**不尝试绕过**（不拼 URL、不裸调 API）。
+3. **严禁读取内部数据**：不读取平台内部数据（data/、configs/、sessions.db、user_accounts 等）。
+4. **不写死凭据**：生成的 Skill 与脚本中禁止硬编码凭据（AK/SK/密码/token）——一律使用环境变量引用或占位符。校验脚本若检出硬编码凭据（credential scan），必须修复后才能进入下一步。
+5. **在线规范动态拉取**：Phase 4b 的 lint 检查点（`common_skillslinter.json`）**不硬编码、不凭记忆**——每次执行必须用 `scripts/fetch_checks.js` 从在线地址拉取最新版；拉取失败按 4.5 故障决策表降级（本地保存文件复用 → 仅跑 4a 并标记 4b 待办 → 重试），**不得**凭旧快照/记忆假装执行。
+6. **外部域界**：fetch_checks.js 访问的在线规范源（gitcode.com 生态规范文件仓库）属**外部规范源域**——脚本内 https 请求合法；此域与 grape 平台管理 API 严格区分（平台管理一律走 CLI 纪律，此处无 CLI 通道也不制造）。
+7. **不 mock 不臆造**：校验判定（pass/fail/warn/skip）必须基于**客观证据**（文件存在、grep 命中、行号、统计数字）——禁止凭印象判定。
+8. **交互输入禁止**：生成的脚本必须无交互输入（agent 无法应答交互提示）——`--help`、环境变量、参数、stdin 是合法输入方式；交互式脚本直接拒绝并要求改写。
+9. **产物清理**：Step 6 收尾时清理 phase-N-summary.json 临时产物（`rm -f {skill-path}/phase-*.json`），不留半成品状态文件。
 
 ## 二、环境变量表
 
 | 变量 | 来源 | 说明 |
 |------|------|------|
-| `GRAPE_SESSION_TOKEN` | 平台注入 | 会话令牌——**仅 4.8 任务收尾的 `tasks complete` 使用**（CLI 自动读取，不手动传入）|
+| `GRAPE_SESSION_TOKEN` | 平台注入 | 会话令牌——**平台交互（PR 创建/评论/A2A 交棒/任务收尾）使用**（CLI 自动读取，不手动传入）|
+| `REPO_FULL_NAME` | 平台注入 | 仓库全名 `owner/repo`（PR 脚本与 A2A 必填——`OWNER=${REPO_FULL_NAME%/*}`、`REPO=${REPO_FULL_NAME#*/}`）|
+| `ISSUE_NUMBER` | 平台注入 | Issue 编号（PR 脚本/A2A payload/评论必填）|
+| `ACCOUNT` | 平台注入 | 触发者账号（actor——A2A payload 的 `account` 字段用）|
+| `PR_NUMBER` | 平台注入 | PR 编号（A2A payload 的 `pr_number` 提取——评论/A2A 必填；standalone 场景改由 `create_common_skill_pr.sh` 脚本 stdout 输出取得）|
 | `DEVOPS_SKILLS_DIR` | 平台注入 | Skills 目录路径——生成的 Skill 若需并入技能库，目标父目录从这里取 |
 | `NODE` / `PYTHON`（可选）| 环境探测 | node / python3 可执行文件路径——预检时探测，不存在则按三、前置检查门自愈 |
 
@@ -42,7 +47,8 @@ version: 2.1.0
 2. **python3**（运行 `scripts/init-skill.py`、`scripts/validate-skill.sh` 内部逻辑）：`python3 --version` 检查——缺失 → 尝试安装 → 重试 → 仍失败则 STOP。
 3. **bash**（运行 `scripts/validate-skill.sh`）：`bash --version` 检查——缺失 → STOP（脚本无法执行）。
 4. **目标位置可写**：生成位置（用户指定或 `--output`）存在且可写——不可写 → 报错并请用户换位置，不静默改路径。
-5. 任一前置门失败 → 输出「前置检查未通过：<原因>」并结束任务，不无限重试。
+5. **grape CLI（流水线场景必须——PR/评论/A2A/收尾依赖）**：`grape --version` 检查——缺失 → 尝试安装（见 `references/grape-cli-installation.md`）→ 重试 → 仍失败 STOP；**standalone（无平台注入）跳过此项**。
+6. 任一前置门失败 → 输出「前置检查未通过：<原因>」并结束任务，不无限重试。
 
 ## 四、技能定义与执行
 
@@ -52,176 +58,61 @@ version: 2.1.0
 - **不做什么**：
   - 不生成 Huawei Cloud 专用 skill（那是 `huawei-cloud-skill-creator` 的职责）——识别后交棒/告知用户换技能。
   - 不做 REST API 类 skill 的生成（那是 `rest-api-skill-creator` 的职责——目标系统 API 编排）。
-  - 不执行平台发布/PR/A2A 链路（本技能产物由用户自行安排入库/上架）。
+  - 不合并 PR、不发布产物（合并由 `common-skill-tester` 验证通过后执行、上架交 `skill-publish`）——本技能交付到 **创建 PR 入库 + A2A 交棒 tester** 为止。
   - 不做 skill 的 lint/test/audit 全面测试（那是 `common-skill-tester` 的职责——本技能只做 Phase 4b 的 lint 检查点自检）。
 
 ### 4.2 场景路由
 
 | 入口 | 路径 |
 |------|------|
-| 用户要新建/脚手架一个 skill（含未明说"skill"但明显是创建技能的场景）| 4.3 全流程（Step 1-6）|
+| 平台流水线 A2A 触发（Issue 交办创建 skill）| 4.3 全流程（Step 1-6）→ Step 7 创建 PR → Step 8 A2A 交棒 tester |
+| 用户要新建/脚手架一个 skill（含未明说"skill"但明显是创建技能的场景）| 4.3 全流程（Step 1-6）→ **流水线上下文**（`REPO_FULL_NAME`/`ISSUE_NUMBER` 已注入）→ Step 7 创建 PR + Step 8 A2A 交棒（创建完成即交付——对齐 huawei mandatory delivery）；standalone（无注入）→ 停在 Step 6 并告知产物路径 |
 | 用户要对已有 skill 做描述优化 / 触发词优化 | 4.3 Step 4c（从已有描述出发，跳过 Step 1-3 生成）|
 | 用户要校验已有 skill 是否符合规范 | 4.3 Step 4a-4b（validate-skill.sh + lint 检查点）|
 | 用户要对已有 skill 做 eval 迭代 | 4.3 Step 5（需先有 Skill 实体）|
 | 用户要的是 Huawei/REST API 类 skill | 交棒对应技能（见 4.1 边界），不重复造轮子 |
 | 其他场景 | 不做处理——告知本技能边界并结束（不硬套流水线）|
 
-### 4.3 处理流程（五阶段流水线 → 统一骨架）
+### 4.3 处理流程（统一骨架）
 
-```
+**流程总览（一行）**：
+
 Step 0 就绪（前置门） → Step 1 需求分析 → Step 2 设计 → Step 3 生成
 → Step 4 验证（4a 规范 / 4b lint / 4c 描述优化）
-→ Step 5 eval 迭代（复杂 skill 推荐） → Step 6 收尾清理 + 任务收尾
-```
+→ Step 5 eval 迭代（复杂 skill 推荐） → Step 6 收尾清理
+→ Step 7 创建 PR（流水线场景必做） → Step 8 A2A 交棒 tester（流水线场景必做） → 4.8 任务收尾
 
-**Step 0 就绪**：跑三、前置检查门（node/python3/bash/目标位置）——全过后开始。
+**执行规则**：
 
-**Step 1 需求分析（Socratic Q&A）**
+- ⚠️ **启动即读 `references/creator-runbook.md`**——每步具体命令按走查表照抄执行（不现场查 --help）
+- **五阶段链式不可跳**：任何阶段缺失 → 从缺失处重启（Step 1-5 产物 phase-1~5-summary.json 链式依赖）
+- **验证门禁**（Step 4）：4a 规范合规（validate-skill.sh 11 项硬性约束）+ 4b 动态 lint 检查点（fetch_checks.js 在线拉取——**Critical fail 一票否决、评分 ≥ 95 才合格**，公式详见 runbook）——双通过才进 Step 5
+- **Step 7**：单 PR 单 Skill——pulls 走 `scripts/create_common_skill_pr.sh`（幂等查重/契约字段 related_issue_nums + auto_close_issues/补 body/base 校验）——创建后**必须发 Issue 评论**（模板见 4.6）
+- **Step 8**：A2A payload **必带 issue_number + pr_number**（tester 拉取/合并/交棒依赖）——agent 用场景标准节点名 `qa`（⚠️ **不传技能名**——#10 not_in_scene 教训）
+- **收尾顺序**：流水线场景 Step 7/8 完成 → 4.8 tasks complete（**先交棒再关任务**）；standalone（无平台注入）→ 停在 Step 6 告知产物路径，跳过 7/8
 
-一次只问**一个问题**，覆盖维度：
-
-| # | 维度 | 关键问题 |
-|---|------|---------|
-| 1 | 领域 / 目的 | 解决什么问题？哪个领域？|
-| 2 | 功能范围 | 具体做什么？**不**做什么？（内聚单元——不窄不宽）|
-| 3 | 触发场景 | agent 何时激活？用户会怎么说？（含不直呼领域名的场景）|
-| 4 | 输入 / 输出 | 输入什么？输出什么格式？|
-| 5 | 复杂度 | 单文件 skill，还是需要 scripts/、references/、assets/？|
-| 6 | 环境前置 | 依赖什么语言/工具/包？（写入 compatibility 字段）|
-| 7 | 素材来源 | 有无现成文档/代码/runbook/事故报告作领域知识输入？|
-
-- 每 5 问或覆盖全部维度 → 展示需求汇总表 → **等用户明确确认** → 才进 Step 2
-- 鼓励用户提供项目现成产物（runbook/API spec/评审意见/事故报告）作为素材——真实经验 > 通用知识
-
-**输出**：`phase-1-summary.json`（用户已确认的需求）
-
-**Step 2 设计**
-
-1. **命名**——按规范约束：1-64 字符、小写 `a-z0-9-`、不以连字符开头/结尾、无连续 `--`、**必须与父目录名一致**
-2. **草拟 description**——按 `references/description-optimization.md` 原则（祈使句「Use this skill when...」/ 聚焦用户意图 / 偏激进入 / ≤1024 字符）
-3. **规划 token 预算**（渐进披露）：SKILL.md 正文 < 5000 token、< 500 行；详细素材进 `references/`；写明**何时**加载各文件
-4. **选指令模式**——按任务特征选（见 `references/instruction-patterns.md`）：Gotchas / 输出模板 / 检查清单 / 验证循环 / plan-validate-execute
-5. **定脚本方案**（见 `references/script-design-guide.md`）：一次性命令（uvx/npx/pipx/go run）直接写 SKILL.md；可复用逻辑进 `scripts/`（自包含脚本）
-6. **建目录骨架**——目标父目录取值：**用户指定 > `${DEVOPS_SKILLS_DIR}`（平台注入技能库路径）> 当前目录**：
-```bash
-python3 scripts/init-skill.py <skill-name> --output "${DEVOPS_SKILLS_DIR:-<用户指定父目录>}" [--with-scripts] [--with-references] [--with-assets] [--with-evals]
-```
-7. **控制校准**：脆弱操作（顺序敏感/一致性关键）→ 强指令；灵活任务（多条可行路径）→ 给自由度 + 解释 why
-
-**输出**：`phase-2-summary.json`（设计文档 + 目录结构）
-
-**Step 3 内容生成**
-
-**SKILL.md 生成规则**：
-
-| 部分 | 要求 |
-|------|------|
-| YAML frontmatter | `name`（必填）+ `description`（必填）+ 可选 `license`/`compatibility`/`metadata`/`allowed-tools` |
-| 正文核心原则 | **只写 agent 不知道的内容**——项目约定、领域专用流程、非常规边界；不解释 PDF 是什么/HTTP 怎么工作 |
-| 指令粒度 | 与脆弱性匹配——脆弱 = 强指令；灵活 = 自由 + 理由 |
-| 工具选择 | 给**默认项 + 简要逃生口**，不给等权菜单 |
-| 方法论 | 教**方法**（可复用的做法），不教**实例**（具体答案）。流程 > 声明 |
-
-**SKILL.md 推荐段落**：Overview / Prerequisites / Workflow or Steps / Core Commands or Patterns / Gotchas（最高价值）/ Edge Cases / Available Scripts / Reference Documents（references/ 下文件 + 加载时机）
-
-**支撑文件**（按 Step 2 决策）：
-- `scripts/`——必须符合 agentic 设计原则：无交互输入、`--help` 输出、结构化输出（JSON/CSV）、友好报错、幂等、破坏性操作 `--dry-run`、有意义的退出码
-- `references/`——聚焦单主题文件；SKILL.md 中写明**何时**加载（示例文案：「当 API 返回非 200 状态码时读取 references/api-errors.md」——实际文件名按生成内容定，无此文件则不写）
-- `assets/`——模板、数据文件、schema
-
-**输出**：`phase-3-summary.json`（生成文件清单 + 结构校验）
-
-**Step 4 验证**
-
-**4a. 规范合规检查**——运行 `scripts/validate-skill.sh`：
-
-| 检查项 | 级别 | 验证方式 |
-|--------|------|---------|
-| SKILL.md 存在 | Critical | 文件存在性 |
-| name 匹配 `^[a-z0-9]+(-[a-z0-9]+)*$` | Critical | 正则匹配 |
-| name ≤ 64 字符 | Critical | 长度检查 |
-| name == 父目录名 | Critical | 目录名比较 |
-| description 非空且 ≤ 1024 字符 | Critical | 字符计数 |
-| frontmatter 是合法 YAML | Critical | YAML 解析 |
-| SKILL.md ≤ 500 行 | High | 行数 |
-| 文件引用相对路径、一层深 | Medium | 路径分析 |
-| 无硬编码凭据 | Critical | 模式扫描 |
-| 脚本无交互输入 | Critical | 代码审查 |
-| 脚本提供 `--help` | High | 运行 `--help` |
-
-失败 → 先修复再进 4b（不跳过不降级）。
-
-**4b. 通用 lint 检查点（skill-linter 集成）**
-
-检查点**动态**加载——不硬编码、不凭记忆：
-
-```bash
-node common-skill-creator/scripts/fetch_checks.js                        # 拉取在线检查点
-node common-skill-creator/scripts/fetch_checks.js -o /tmp/checks.json    # 保存到文件（断点续跑/复查）
-node common-skill-creator/scripts/fetch_checks.js "https://..."          # 自定义检查点 URL
-```
-
-对**每一个**检查项针对生成目录执行——按 `references/lint-checks.md` 方法映射以**客观证据**判定 pass/fail/warn/skip（结构/frontmatter/命名/.env/危险脚本/资源限制/凭据扫描/安全评分/删除操作确认等）。简单 skill 也不跳过——每项按实据判。
-
-评分与门禁：
-```
-Lint 评分 = 100 - (Critical_fail × 15) - (High_fail × 8) - (Medium_fail × 4) - (Low_fail × 2) - (warn × 1)
-```
-- **任何 Critical fail（含 failure_handling=FAIL）→ 阻断门禁**：修复后才能进 Step 5
-- **评分 ≥ 95 → 通过**（与 lint/tester/auditor 质量门槛一致）；< 95 → 列必改/建议项 → 修复 → 重新拉取重跑直到通过
-
-记录进 `phase-4-summary.json`：total/pass/fail/warn/skip、Lint 评分、星级、fail/warn 全清单（含修复建议 + 检查点版本 doc 字段）。
-
-**4c. 描述触发优化**（见 `references/description-optimization.md`）：
-
-1. 设计 ~20 条触发 eval 查询：8-10 应触发（变换措辞/显式度/细节/复杂度）+ 8-10 不应触发（**近失配优先**——共享关键词但需要不同响应）
-2. 分 train/validation 集（60/40）防过拟合
-3. 测触发率（环境支持时）：每条查 3 次算触发率——应触发 > 0.5 通过；不应触发 < 0.5 通过
-4. 按失败修订：应触发失败 → 拓宽范围/补适用语境；不应触发误触发 → 补「不做什么」边界；**不**从失败查询里扣关键词（过拟合）——找一般类别
-5. 复核修订后 description 仍 < 1024 字符
-6. 按验证集通过率选最优迭代
-
-**输出**：`phase-4-summary.json`（4a+4b 结果、Lint 评分）+ 优化后 description
-
-**Step 5 eval 驱动迭代（复杂 skill 推荐，简单 skill 可跳过）**
-
-按 `references/eval-workflow.md` 全流程：
-
-1. 设计测试用例 → `evals/evals.json`（2-3 起：prompt + expected_output + 可选 input files；变换措辞/覆盖边界/真实语境）
-2. 跑 eval——每条用例跑两次：**with_skill**（agent 带 skill 加载）vs **without_skill**（基线/旧版）；每次干净上下文；记录 token/时长
-3. 首跑后写断言（可编程验证：合法 JSON/文件存在/计数正确；具体可观察，不模糊）
-4. 评分 → `grading.json`（每条断言 PASS/FAIL + 实证；PASS 不给 benefit of the doubt）
-5. 聚合 → `benchmark.json`（with vs without 的 pass_rate/time/token；算 delta——skill 的成本与收益）
-6. 分析模式：删双配置恒过断言（无区分度）/ 查双配置恒失败（断言坏或测试过难）/ 研究 with 过 without 不过（skill 的价值）/ 结果不稳定（高 stddev）→ 收紧指令
-7. 人工评审 → `feedback.json`（逐用例具体可执行反馈）
-8. 迭代：三信号（失败断言 + 人工反馈 + 执行转录）+ 当前 SKILL.md 给 LLM → 提改进（从反馈泛化/保持精简/解释 why/合并重复工作）→ 应用 → 新迭代重跑全部 → 满意或无明显改进即停
-
-**输出**：`phase-5-summary.json`（eval 结果 + benchmark + 最终 SKILL.md）
-
-**Step 6 收尾清理**
-
-```bash
-# 完整性确认：5 个 phase 摘要齐全（Phase 5 简单 skill 已标记跳过亦可）
-# 缺失 → 从缺失阶段重启
-rm -f {skill-path}/phase-*.json    # 清理临时产物
-```
+> 每步阶段摘要/命令/产物详表 → 按 `references/creator-runbook.md` Step 1-8 照抄执行。
 
 ### 4.4 命令标准（本技能命令子集）
 
-本技能的 grape 命令面**仅一条**——4.8 任务收尾的 `grape tasks complete`（平台全部技能通用的收尾协议，不由本技能发起任何业务操作）。**平台管理命令**（issues/pulls/a2a/refresh 等）本技能**不使用**——命令面 = 本地脚本 + 外部规范源拉取：
+本技能的 grape 命令面**四条**——① PR 创建（走 `scripts/create_common_skill_pr.sh`——内部封装 pulls list/create/update 幂等与 base 校验，**不直接手敲 pulls**）② `grape git-repo issues comments create`（Step 7 发 PR 成功评论）③ `grape a2a handoff`（Step 8 交棒 tester）④ `grape tasks complete`（4.8 任务收尾——平台全部技能通用协议）。**不合并 PR**（tester 验证通过后由 QA 节点合并）、不发布（skill-publish 职责）、Issue 其他读写不用。命令面 = 本地脚本 + PR 脚本 + 评论 + a2a + tasks complete：
 
 | 命令 | 用途 | 前置 |
 |------|------|------|
 | `python3 scripts/init-skill.py <name> [--output <dir>] [--with-scripts] [--with-references] [--with-assets] [--with-evals]` | 脚手架建目录 | python3 |
 | `bash scripts/validate-skill.sh <skill-path> [--fix]` | Phase 4a 规范校验 | bash |
 | `node common-skill-creator/scripts/fetch_checks.js [-o <file>] [<url>]` | 拉取在线 lint 检查点 | node ≥ 12 |
-| `grape tasks complete --json '{...}'` | **仅 4.8 任务收尾** | 平台任务上下文 |
+| `bash scripts/create_common_skill_pr.sh "<skill_name>" [--base main]` | Step 7 创建 PR（内部 pulls list/create/update——幂等 + body 补写 + base 校验）| bash + grape CLI |
+| `grape git-repo issues comments create --owner ... --number "$ISSUE_NUMBER" --json '{...}'` | Step 7 发 PR 成功评论（body 以 `[Coding Agent]` 开头）| 平台任务上下文 |
+| `grape a2a handoff --json '{"agent":"qa","payload":{...}}'` | Step 8 交棒 tester（**必带 issue_number + pr_number**；agent 用节点名 qa）| 平台任务上下文 |
+| `grape tasks complete --json '{...}'` | **4.8 任务收尾**（A2A 交棒之后调用）| 平台任务上下文 |
 
 > ⚠️ **不存在的命令（防误用——本技能禁止尝试）**：
 >
 > | 命令 | 理由 |
 > |------|------|
-> | `grape git-repo issues / pulls / a2a handoff / refresh` 等平台管理命令 | 本技能无平台业务交互——本地生成器不走链路 |
+> | `grape git-repo pulls create/merge` 等 pulls 手敲 | **不直接手敲**——PR 创建走 `scripts/create_common_skill_pr.sh`（幂等/补 body/base 校验封装）；**合并 PR 禁止**（tester 通过后由 QA 节点执行）|
+> | `grape git-repo issues` 其他子命令（list/get/update 状态等）| 本技能不用（只允许 `issues comments create` 发 PR 成功评论——standalone 场景不发）|
 > | `grape api` | 已移除（0.2.2 起），且平台禁止直连 API |
 > | 脚本中的交互式输入（`input()` / `read` 等待键盘）| agent 无法应答——一律改为参数/环境变量/--help |
 
@@ -243,13 +134,26 @@ rm -f {skill-path}/phase-*.json    # 清理临时产物
 | 触发 eval 触发率差 | 按 4c 修订：应触发失败拓宽、不应触发失败加边界 |
 | eval 显示 skill 无增量价值 | skill 可能不需要——考虑 agent 无 skill 本就能处理 |
 | Step 5 发现缺阶段 | 从缺失阶段重启直到完整 |
+| 创建 PR 失败（grape 无输出/exit 2）| 重试 1 次 → 仍失败 → Issue 评论说明失败原因（不创建 PR 不交棒）|
+| PR base 校验不过 | 检查 `--base` 参数（默认 main）——修正后重新执行脚本 |
+| PR 幂等查重命中（已有本 skill 的 PR）| 复用该 PR 编号——不重复创建——直接走 Step 8 交棒 |
+| A2A 交棒失败（非 2xx/超时）| 重试 ≤3 次 → 仍失败：评论说明「A2A 服务不可达，待恢复后重试」+ next_step 人工介入 |
+| 本地 standalone 创建（无 issue/PR 上下文）| 跳过 Step 7/8（不建 PR 不交棒）——完成后告知用户产物路径（入库/上架由用户自行安排）|
+| 生成目录不在仓库 worktree 内 | 脚本 `git add` 无变更 → 空 PR 风险 | **不建 PR**——评论告知产物路径（`<绝对路径>`），入库/上架由用户或后续流程安排；仍可走 A2A 交棒需有 PR 前提——无 PR 则跳过交棒并说明 |
 
 ### 4.6 输出格式（固定产物）
 
 - **阶段摘要**：每阶段产出 `phase-N-summary.json`（Step 6 清理）
 - **evaluations**：`evals/evals.json` + `grading.json` + `benchmark.json` + `feedback.json`（Step 5 产物）
 - **最终交付**：完整 Skill 目录（SKILL.md + references/ + scripts/（按需）+ assets/（按需））
-- **对话汇报**：每阶段结束向用户汇报该阶段结论与下一阶段预告；全流程完成给出交付清单（目录路径 + 文件清单 + 校验结果摘要）
+- **PR 产物**（流水线场景）：PR #N（单 PR 单 Skill——pulls 幂等）——创建后**必须发 Issue 评论**（成功模板）：
+```
+[Coding Agent] ✅ Skill 已创建并提交 PR #<n>
+**Skill 名称**：<name>　**功能摘要**：<一句话>
+**PR 链接**：https://gitcode.com/<owner>/<repo>/merge_requests/<n>
+**下一步**：QA（common-skill-tester）功能验证——通过后合并发布
+```
+- **对话汇报**：每阶段结束向用户汇报该阶段结论与下一阶段预告；全流程完成给出交付清单（目录路径 + 文件清单 + 校验结果摘要 + PR 链接（如有））；流水线场景汇报**不再自称「全面测试通过」**——改「五阶段生成完成，全面测试由 QA（common-skill-tester）执行」
 
 ### 4.7 写操作协议
 
@@ -257,22 +161,26 @@ rm -f {skill-path}/phase-*.json    # 清理临时产物
 - **脚本可执行位**：生成的 `scripts/*.py` 或 `*.sh` 保持可执行（`chmod +x`）
 - **破坏性操作**：覆盖已有同名 skill 目录前必须用户确认（或 `--dry-run` 预览）
 - **临时产物**：`phase-*.json` 属流程内临时状态——Step 6 清理，不留在交付目录
+- **创建 PR**（Step 7——流水线场景必做）：走 `scripts/create_common_skill_pr.sh`（pulls 幂等封装——不直接手敲）——创建后必发 Issue 评论
+- **A2A 交棒 tester**（Step 8——流水线场景必做）：`grape a2a handoff`——payload 必带 issue_number + pr_number
+- **合并 PR**：❌ **禁止**（tester 验证通过后由 QA 节点合并——本技能不合并）
+- **提交顺序**：Step 6 清理临时产物后再建 PR（PR 不含 phase-*.json 半成品）
 
 ### 4.8 任务收尾（必做）
 
-业务动作全部完成后：
+业务动作全部完成后（含 Step 7 创建 PR + Step 8 A2A 交棒——流水线场景）：
 
-1. **先调 `grape tasks complete` 关闭当前任务**（任务中心闭环）：
+1. **最后调 `grape tasks complete` 关闭当前任务**（任务中心闭环——必须在 A2A 交棒之后，先交棒再关任务）：
 ```bash
-grape tasks complete --json '{"result_text": "生成/优化/校验完成：<skill 名称与结论>", "actions": ["五阶段流水线执行（需求/设计/生成/验证/eval）"], "conclusion": "<交付结论>", "artifacts": ["<skill 目录路径>", "phase-4-summary.json"], "next_step": "<用户下一步选择>"}'
+grape tasks complete --json '{"result_text": "生成/优化/校验完成：<skill 名称与结论>", "actions": ["五阶段流水线执行（需求/设计/生成/验证/eval）", "created:<skill_name>", "submitted:PR#<n>", "a2a:qa"], "conclusion": "<交付结论>", "artifacts": ["<skill 目录路径>", "PR#<n>链接"], "next_step": "<QA 验证/用户下一步选择>"}'
 ```
 2. **再在最终答复末尾输出结构化 JSON 块**（平台读取）：
 ```json
 {
-  "actions": ["五阶段流水线执行"],
+  "actions": ["五阶段流水线执行", "created:<skill_name>", "submitted:PR#<n>", "a2a:qa"],
   "conclusion": "交付结论",
-  "artifacts": ["<skill 目录路径>"],
-  "next_step": "用户下一步选择",
+  "artifacts": ["<skill 目录路径>", "PR#<n>链接"],
+  "next_step": "QA 验证/用户下一步选择",
   "issue_summary": "本次任务最新聚合结论（紧凑文本，用 | 分隔）"
 }
 ```
@@ -293,7 +201,9 @@ grape tasks complete --json '{"result_text": "生成/优化/校验完成：<skil
 | `templates/skill-template.md` | 生成物模板：SKILL.md 骨架（与 init-skill.py 内嵌模板同款，供人工参考/独立复用）| Step 2-3 |
 | `templates/evals-template.json` | 生成物模板：eval 用例骨架（完整 3 用例版；init-skill.py 使用内嵌 1 用例简化版）| Step 5 初始化 eval 时 |
 | `templates/trigger-queries-template.json` | 生成物模板：触发查询集骨架（8 应触发 + 12 不应触发备选）| Step 4c 触发 eval 时 |
-| `references/creator-runbook.md` | 执行走查表（命令固化——照着执行不查 help）| 全流程 |
+| `references/creator-runbook.md` | **执行走查表：Step 0-8 全程命令逐步照抄 + 错误排查速查** | ⭐ **最先**——启动即读，全流程照抄不查 --help |
+| `references/grape-cli-installation.md` | grape CLI 安装/升级/验证（前置门 5 自愈）| 前置检查发现缺失/版本过低时 |
+| `references/grape-cli-reference.md` | grape CLI 命令契约（子集 + ❌ 警示 + token scope）| Step 7/8 平台交互前 |
 
 ## 六、Best Practices
 
@@ -317,3 +227,5 @@ grape tasks complete --json '{"result_text": "生成/优化/校验完成：<skil
 | Phase 4 验证（4a 规范 / 4b lint / 4c 描述优化）| Step 4 |
 | Phase 5 eval 驱动迭代 | Step 5 |
 | Final Completeness Check + 清理 | Step 6 |
+| 创建 PR 入库（流水线场景必做——pulls 幂等 + 发评论）| Step 7 |
+| A2A 交棒 tester（流水线场景必做——payload 带 issue_number + pr_number）| Step 8 |

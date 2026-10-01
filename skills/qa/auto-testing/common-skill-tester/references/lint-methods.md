@@ -18,6 +18,7 @@
 | .env 文件 | Glob 搜索 `.env` 文件 |
 | 危险脚本 | Grep 搜索 `sudo`、`rm -rf /` 等模式 |
 | Skill 间调用 | Grep 搜索 SKILL.md 中是否引用其他具名 Skill |
+| **引用完整性（补测）** | 对账 SKILL.md 正文 + 「五、参考文件清单」引用的 `references/*`/`scripts/*`/`templates/*` 文件**存在性**——引用不存在 = fail（附缺失路径+引用位置）；SKILL.md 运行时依赖的脚本（清理/初始化/拉取器）在 `scripts/` 缺失 = fail；frontmatter 触发词与 name/description 表述闭环 |
 | 明文 IP/域名 | Grep 搜索内网 IP 段（10.x, 172.16-31.x, 192.168.x）和内部域名 |
 | 脚本 shebang | Read .sh 文件首行，检查是否为 `#!/usr/bin/env bash` |
 | 脚本语法 | Bash 执行 `python -m py_compile` 或 `bash -n` |
@@ -37,10 +38,10 @@
 
 ## 判定逻辑
 
-对每个检查项，输出以下状态之一：
+对每个检查项（含 `[补测]` 引用完整性），输出以下状态之一：
 
 - **pass** — 检查通过
-- **fail** — 检查不通过（根据 `failure_handling` 决定严重性）
+- **fail** — 检查不通过（根据 `failure_handling` 决定严重性；引用完整性 fail = 引用文件不存在，按缺失文件严重性定级——缺失脚本/引用断裂记 High）
 - **warn** — 警告（`failure_handling` 为 WARN）
 - **skip** — 不适用（注明原因）
 
