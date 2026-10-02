@@ -80,13 +80,32 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 > ⚠️ 仅当需要给 Issue 打标签/改分配等结构化元数据时，才用 `issues update` 传相应字段（`labels`/`assignee`/`milestone_id`/`state`）——**不涉及 body 收敛**。
 - 收敛后 **进入 Step 5**（如 pipeline 已有 `issue:a2a_event` 则跳过 A2A，直接 Step 6 + `next_step=reply_comment`）。
 
-### Step 4b · 需求不清晰 → 澄清追问
+### Step 4b · 需求不清晰 → 澄清追问（显式 awaiting-input + 收尾）
+> 需要用户补充输入才能继续——**同时**做三件事：发追问评论（落 Issue 讨论）、`tasks awaiting-input` 显式声明待澄清（置 `awaiting_input` + 飞书卡片触达用户）、`tasks complete` 结束本轮。
+
 ```bash
-# body 以 [VOD Agent] 开头，1-3 个具体问题；长文用 @file
+# ① 发追问评论（body 以 [VOD Agent] 开头，1-3 个具体问题；长文用 @file）
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[VOD Agent] 您指的是……？请补充：1) … 2) …"}'
+
+# ② 显式声明进入待澄清（关键：请求体 questions 必填，与追问一致；成功返回 changed:true）
+grape tasks awaiting-input --json '{
+  "questions": "[VOD Agent] 您指的是……？请补充：1) … 2) …",
+  "reason": "需求四要素缺失，需开发者补充"
+}' --json-out
+
+# ③ 本轮任务结束（awaiting 非终态，但仍 self-complete 表示本轮处理完毕，等 clarify 回 processing 后走下一轮）
+grape tasks complete --json '{
+  "result_text": "结论：Issue #'"$ISSUE_NUMBER"' 需求不清晰，已发澄清追问并置 awaiting_input，等待用户补充。",
+  "next_step": "a2a_need_clarify",
+  "actions": ["澄清追问评论", "显式 awaiting-input（questions）", "本轮 tasks complete"],
+  "conclusion": "已请求用户补充四要素缺失项，Issue 状态置 awaiting_input，待开发者回复后重新分析",
+  "artifacts": ["Issue #'"$ISSUE_NUMBER"' 追问评论", "awaiting-input 状态变更"],
+  "issue_summary": "待澄清 | 已追问并 awaiting-input | 等待用户补充 | next=redo"
+}'
 ```
-- **直接进入 Step 6，`next_step=a2a_need_clarify`**（不要等待用户回复，也不要 A2A）。
+- ⚠️ **不要等待用户回复，也不要 A2A**（awaiting 提交后由服务端飞书卡片触达用户；用户 `clarify` 回复后 `awaiting_input → processing`，新一轮 vod 事件再进来重新分析）。
+- `awaiting-input` 仅 vod/issue 会话 token 可用（`--json-out` 返回 `changed:true`=成功；`false`=已终态/已等待，幂等忽略）。
 
 ### Step 4c · 纯咨询 / 已解决 / 无需动作 → 回复说明
 ```bash
