@@ -54,7 +54,7 @@ grape git-repo pulls list --owner {owner} --repo {repo} --state all --per_page 1
 # 创建 PR（新开发场景；base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支），不要写死 main；关联 Issue 可让合并后自动关闭）
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner {owner} --repo {repo} --json-out | jq -r '.default_branch // "main"')}"
 grape git-repo pulls create --owner {owner} --repo {repo} \
-  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"'"$WORK_BRANCH"'","inner_issue_nums":"{owner}/{repo}#{n}","close_related_issue":true}'
+  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"'"$WORK_BRANCH"'","related_issue_nums":["{owner}/{repo}#{n}"],"auto_close_issues":true}'
 
 # 补充/更新 PR body 或标签（PATCH）
 grape git-repo pulls update --owner {owner} --repo {repo} --number {pr} \
@@ -126,8 +126,9 @@ grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 
 ## `pulls create` 字段说明（错误排查用）
 
-- 允许字段常见为：`title`、`head`、`base`、`inner_issue_nums`（`owner/repo#N` 关联 Issue）、`close_related_issue`（bool）等。
-- ⚠️ 字段以 `grape git-repo pulls create --help` 的 **Body files** 为准（契约版本不同字段集略有差异）；`inner_issue_nums`/`close_related_issue` 不是所有契约都有——缺失时报 `unknown request field(s)` 就删掉这些字段、保留 `title`/`head`/`base` 精简重试。
+- 允许字段常见为：`title`、`head`、`base`、`related_issue_nums`（数组，如 `["owner/repo#N"]` 关联 Issue）、`auto_close_issues`（bool）等。
+- ⚠️ 旧字段名 `inner_issue_nums`/`close_related_issue` 多数契约已不识别——报 `unknown request field(s)` 就删掉这些字段、保留 `title`/`head`/`base` 精简重试；具体以 `grape git-repo pulls create --help` 的 **Body fields** 为准。
+- PR 链接以 `grape git-repo pulls get --number {pr}` 返回的 `html_url` 为准（不猜 `/pull/` vs `/merge_requests/`）。
 - `pulls update` 仅允许 `body`/`labels` 等字段，**不支持 `state`**（关闭/合并走其他渠道或人工）。
 
 ## 错误排查
@@ -137,7 +138,7 @@ grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 | `HTTP 401: ... re-inject` | token 无效/过期/缺失 | 任务级 token 短命，失效属正常：说明「凭据已失效」，不尝试换 token |
 | `HTTP 403: ... 不支持会话 token / use GRAPE_API_TOKEN` | 账户/平台类（D 类）拒绝会话凭据 | 本技能一般不涉及；确需时改用 `GRAPE_API_TOKEN`（`grape_`）或 Web JWT |
 | `No such command 'X'. Did you mean: A, B?` | 命令名写错 | 按建议改；或 `grape commands <关键词>` 查 |
-| `unknown request field(s): ... allowed for ...` | `--json` 字段不在请求体允许集 | 看 `grape <group> <verb> --help` 的 Body fields；删多余字段（`pulls create` 常见为 `inner_issue_nums`/`close_related_issue`，`pulls update` 常见为 `state`） |
+| `unknown request field(s): ... allowed for ...` | `--json` 字段不在请求体允许集 | 看 `grape <group> <verb> --help` 的 Body fields；删多余字段（`pulls create` 常见为旧字段 `inner_issue_nums`/`close_related_issue`，改用 `related_issue_nums`/`auto_close_issues`；`pulls update` 常见为 `state`） |
 | `pulls create` 重复失败 | base/字段/契约问题 | 先去掉 `tail` 看完整错误；核对 `base`（默认 `$WORK_BRANCH`，跨依赖场景为所依赖分支）；精简 JSON；仍失败 `grape git-repo pulls create --help` |
 | `git commit` 被拒（identity 缺失） | 未配置 user.name/email | 先 `grape git config user.name/user.email` 再 commit |
 | `(path not found; try --path '' to list root)` | `contents` 路径不存在 | 先 `--path ""` 看根列表定位 |

@@ -126,15 +126,15 @@ grape git push origin feat/issue-{number}
 ⚠️ 创建 PR 后必须先发 Issue 评论告知用户，否则视为未完成。
 
 ```bash
-# 创建 PR（base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支），不要写死 main）
+# 创建 PR（base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支），不要写死 main；关联字段用 related_issue_nums/auto_close_issues，不用旧名 inner_issue_nums/close_related_issue）
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 grape git-repo pulls create --owner {owner} --repo {repo} \
   --json '{
     "title": "feat: #{number} 标题",
     "head": "feat/issue-{number}",
     "base": "'"$WORK_BRANCH"'",
-    "inner_issue_nums": "{owner}/{repo}#{number}",
-    "close_related_issue": true
+    "related_issue_nums": ["{owner}/{repo}#{number}"],
+    "auto_close_issues": true
   }'
 
 # PATCH 补充 body
@@ -145,14 +145,15 @@ grape git-repo pulls update --owner {owner} --repo {repo} --number {pr_number} \
 ### ⚠️ 必须执行：发 Issue 评论告知
 
 > **PR 链接路径规则（重要）：**
-> - GitCode **Web 页面** PR 链接使用 `/pull/`（**单数**）：`https://gitcode.com/{owner}/{repo}/pull/{pr_number}`
-> - GitCode **API** 路径使用 `/pulls/`（复数）：`$VCS_API_BASE/repos/{owner}/{repo}/pulls`
-> - **Issue 评论中必须使用 Web 页面链接（`/pull/` 单数），不得使用 API 路径（`/pulls/` 复数）**
-> - **必须使用 markdown 链接格式** `[PR #{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})`，不得使用纯文本 `PR #{pr_number}`
+> - ⚠️ **以 `grape git-repo pulls get --number {pr_number}` 返回的 `html_url` 为准**（不猜 `/pull/` vs `/merge_requests/`，各托管平台/仓库可能不同）。
+> - 若暂无 `html_url`：GitCode Web 页面一般用 `/pull/`（单数）`https://gitcode.com/{owner}/{repo}/pull/{pr_number}`；API 路径用 `/pulls/`（复数），**评论中不得使用 API 路径**。
+> - **必须使用 markdown 链接格式** `[PR #{pr_number}]({html_url})`，不得使用纯文本 `PR #{pr_number}`
 
 ```bash
-grape git-repo issues comments create --owner {owner} --repo {repo} --number {number} \
-  --json '{"body": "[Coding Agent] ✅ 已完成实现，请审查 PR [#{pr_number}](https://gitcode.com/{owner}/{repo}/pull/{pr_number})。"}'
+# 取 PR html_url（评论用）
+PR_URL="$(grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${pr_number}" --json-out | jq -r '.html_url // ""')"
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  --json '{"body": "[Coding Agent] ✅ 已完成实现，请审查 PR [#{pr_number}]('"$PR_URL"')。"}'
 ```
 
 **跳过此步 = 事件未完成处理。**

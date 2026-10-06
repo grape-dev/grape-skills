@@ -45,8 +45,11 @@ grape --version      # 确认版本
 
 | 命令 | 用途 |
 |------|------|
-| `grape knowledge context --repo {owner}/{repo} --agent_type vod --json-out` | 合并注入上下文（项目知识基线等） |
-| `grape knowledge content --repo {owner}/{repo} --file {path} --json-out` | 读取知识文件全文 |
+| `grape repos project info --owner {owner} --repo {repo} --json-out` | 项目知识基线：project-graph.md + project-capabilities.md 全文 + meta（degraded/commit/branches） |
+| `grape knowledge stats --repo {owner}/{repo} --json-out` | 各类知识数量，判断是否有沉淀 |
+| `grape knowledge list --repo {owner}/{repo} --source agent --json-out` | Agent 沉淀知识清单（前序经验） |
+| `grape knowledge list --repo {owner}/{repo} --source system --json-out` | 系统注入说明文档清单 |
+| `grape knowledge detail --knowledge_id {id} --json-out` | 读取单条知识全文 |
 
 ### 3.3 Issue 操作
 

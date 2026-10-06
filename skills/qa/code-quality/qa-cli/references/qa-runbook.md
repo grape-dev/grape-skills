@@ -128,15 +128,23 @@ grape issues pending-review --issue_id "$ISSUE_ID" \
   --json '{"review_points":"PR #'"$PR_NUMBER"' 审查通过（{结论摘要}），请确认是否合入","references":"PR #'"$PR_NUMBER"'"}' --json-out
 ```
 - **用户评论续接**（平台恢复 processing 后，下一轮 qa 事件按用户回复判定）：
-  - 用户同意合入/完成 → `review-pass target=done`（仅最终合入决策）或 `target=processing`（继续下一环节）：
+  - 用户同意合入/完成 → `review-pass target=done` **并处理 PR 合入**（仅最终合入决策）：
     ```bash
+    # ① 标记审核通过（仅 pending_review 态有效）
     grape issues review-pass --issue_id "$ISSUE_ID" --json '{"target":"done","evidence":"用户确认合入（评论 {id}）"}' --json-out
+    # ② 合入 PR（走 grape git-repo 合入流程；合并后在 Issue/PR 评论告知）
+    grape git-repo pulls merge --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+    ```
+    - 若 `pulls merge` 失败（如 409 不可合并/冲突）→ 评论说明不可合入原因，不强行合并。
+  - 用户同意继续下一环节（非最终合入）→ `review-pass target=processing`：
+    ```bash
+    grape issues review-pass --issue_id "$ISSUE_ID" --json '{"target":"processing","evidence":"用户确认（评论 {id}）"}' --json-out
     ```
   - 用户要求修改/打回 → `review-reject`（打回重做或转澄清）：
     ```bash
     grape issues review-reject --issue_id "$ISSUE_ID" --json '{"target":"processing","reason":"用户要求修改：{要点}"}' --json-out
     ```
-- ⚠️ `pending-review` 不终态化（与任务周期正交）——**本轮仍走 Step 7 `tasks complete` 收尾**；`review-pass target=done` 才置 completed。
+- ⚠️ `pending-review` 不终态化（与任务周期正交）——**本轮仍走 Step 7 `tasks complete` 收尾**；`review-pass target=done` 才置 completed，**且需显式执行 `grape git-repo pulls merge` 合入 PR**（合入成功才算最终交付完成）。
 - ⚠️ 用户 `confirm-done`/`cancel` 是最高权威，Agent 判定不覆盖；`review-pass`/`review-reject` 仅在 `pending_review` 态有效（幂等，`changed:false` 则已终态/已退出，忽略）。
 - 需用户补充信息（非拍板）→ 用 `awaiting-input`（见 vod-runbook 澄清流程），不混用。
 
