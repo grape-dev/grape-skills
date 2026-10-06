@@ -81,7 +81,7 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 - 收敛后 **进入 Step 5**（如 pipeline 已有 `issue:a2a_event` 则跳过 A2A，直接 Step 6 + `next_step=reply_comment`）。
 
 ### Step 4b · 需求不清晰 → 澄清追问（显式 awaiting-input + 收尾）
-> 需要用户补充输入才能继续——**同时**做三件事：发追问评论（落 Issue 讨论）、`tasks awaiting-input` 显式声明待澄清（置 `awaiting_input` + 飞书卡片触达用户）、`tasks complete` 结束本轮。
+> 需要用户补充输入才能继续——**同时**做三件事：发追问评论（落 Issue 讨论）、`issues awaiting-input` 显式声明待澄清（置 `awaiting_input` + 飞书卡片触达用户）、`tasks complete` 结束本轮。
 
 ```bash
 # ① 发追问评论（body 以 [VOD Agent] 开头，1-3 个具体问题；长文用 @file）
@@ -89,10 +89,13 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
   --json '{"body":"[VOD Agent] 您指的是……？请补充：1) … 2) …"}'
 
 # ② 显式声明进入待澄清（关键：请求体 questions 必填，与追问一致；成功返回 changed:true）
-grape tasks awaiting-input --json '{
-  "questions": "[VOD Agent] 您指的是……？请补充：1) … 2) …",
-  "reason": "需求四要素缺失，需开发者补充"
-}' --json-out
+#    ⚠️ --issue_id 是需求卡片内部 id（int），可用 `grape issues detail` 出参的 `id` 字段；若不确定用
+#      ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')"
+grape issues awaiting-input --issue_id "${ISSUE_ID:-$ISSUE_NUMBER}" \
+  --json '{
+    "questions": "[VOD Agent] 您指的是……？请补充：1) … 2) …",
+    "reason": "需求四要素缺失，需开发者补充"
+  }' --json-out
 
 # ③ 本轮任务结束（awaiting 非终态，但仍 self-complete 表示本轮处理完毕，等 clarify 回 processing 后走下一轮）
 grape tasks complete --json '{
