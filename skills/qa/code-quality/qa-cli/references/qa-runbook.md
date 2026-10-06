@@ -120,8 +120,10 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
 - body 以 `[$AGENT_NAME]` 开头；按「输出规范」逐节组织；全部通过则评论「审查通过，所有检查项均正常」。
 - **发评论前必做「输出自检」**（模板/契约/占位符核对，见 SKILL「输出自检」），自检不通过禁止发送（重试一次，仍失败输出显式错误说明）。
 
-### Step 6b · 审核点（pending_review）：审查通过需合入确认/需用户拍板时
-> ⚠️ 审查通过且涉及合入决策时，用 `pending-review` **显式置审核点**（交付决策点、飞书触达用户拍板），与 awaiting_input（索要输入）区分。
+### Step 6b · 审核点（pending_review）：审查通过分支**必做**（除非已合入/无需拍板）
+> ⚠️ **审查通过 = 交付决策点**。凡是审查通过且 PR **未合入**、需用户确认是否合入的，**必须用 `pending-review` 显式置审核点**（飞书触达用户拍板）；**禁止在评论里只写"可合入/建议维护者确认"就直接收尾**——无审核点则用户无触达、状态不一致。
+> 例外（可不置 pending-review）：PR 已合入、或纯上报无需用户拍板（如配置检查跳过）。需用户补充信息才走 `awaiting-input`（非拍板）。
+
 ```bash
 # ① 置审核点（review_points=审查结论，references=PR#；changed:true=成功）
 grape issues pending-review --issue_id "$ISSUE_ID" \
