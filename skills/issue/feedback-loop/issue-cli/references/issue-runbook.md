@@ -1,6 +1,7 @@
 ﻿# Issue-CLI 执行走查表（runbook）
 
 > 目的：把 Issue Agent 处理 Issue 的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
+> ⚠️ **起步只读本 runbook**：不要一次性读取全部 references（6 个 guide + grape-cli-reference 等）——runbook 已内置每步所需命令，guide 在对应 Step 指明时才 read（见 Step 4「按需读取」）。避免开局 8+ read 浪费上下文。
 > 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_SCENE_ID`（当前场景）、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
 > ⚠️ **owner 只用 `$REPO_OWNER`**（从 `$REPO_FULL_NAME` 解析、与仓库路径一致）；`$ACCOUNT` 是触发人 actor 的真实账号，**仅用于 A2A payload `account` 字段，一律不用作 `--owner`**。
 > **评论前缀硬规**：所有 Issue 评论 body 一律以 `[issue agent]` 开头。
@@ -57,19 +58,25 @@ grape knowledge list --repo "$REPO_FULL_NAME" --source system --json-out
 
 > 📚 **references 按需读取**：只读当前评级/任务类型用到的 guide（如 ready 需 `spec-generation.md`；分配责任人再读 `assignee-guide.md`/`codeowners-guide.md`；普通分诊**不必**全读）。别一次性加载全部 6 个 guide 浪费上下文。
 
+> ⚠️ **正文（body/描述）一律用评论发布，不用 `issues update` 改正文**：`issues update` 是**整体覆盖语义**，会重置未传字段，可能把原始描述冲掉。Spec/收敛结论/结构化内容**必须用 `issues comments create` 发布**（对齐 vod-cli「以评论发布、不改写原始 Issue」）；`issues update` 仅用于 labels/assignee/state 等元数据，且**先把 `git-repo issues get` 回取的原始 body 一并回传**避免覆盖原始描述。
+
 ```bash
-# ready → 生成 Spec（→ Step 5）；贴 Issue 评论；打 spec-ready；A2A 交办 coding
+# ready → 生成 Spec（→ Step 5）以评论发布；贴 ready 评级评论；打 spec-ready；A2A 交办 coding
 #   ⚠️ Spec 中注明目标分支（开发基准 = $WORK_BRANCH，Step 2 ① 解析），供 coding 在正确分支开发
+# ① 先回取原始 body 与现有 labels，后续 update 一律回填（防止覆盖原始描述/标签）
+ISSUE_BODY="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.body')"
+CUR_LABELS="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '[.labels[]?.name] | join(",")')"
+# labels = 原有标签,spec-ready（整体 set，先合并避免覆盖已有标签）
 grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"labels":"{原有标签},spec-ready","assignee":"'"$BOT_USERNAME"'"}'
+  --json '{"body":"'"$ISSUE_BODY"'","labels":"'"${CUR_LABELS:+$CUR_LABELS,}"'spec-ready","assignee":"'"$BOT_USERNAME"'"}'
 # almost-ready → 分配责任人（CODEOWNERS）→ 精确追问 1-2 个问题
 # needs-discussion → 分配责任人 → 逐维度追问 → 标记 need-info
 # not-feasible → 评论说明不可行 → 标记 invalid
 
-# 打标签（先确保标签存在再设置）
-grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"feature","color":"#a2eeef"}'
+# 打标签（⚠️ `labels create` 若返回 400 属平台行为，不要排查，直接用下方 update 的 labels 落地，平台自动补建标签）
+grape git-repo labels create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"name":"feature","color":"#a2eeef"}' 2>/dev/null || true
 grape git-repo issues update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"labels":"feature,triaged"}'
+  --json '{"body":"'"$ISSUE_BODY"'","labels":"feature,triaged"}'
 ```
 
 ### Step 5 · A2A 交办（仅 ready 且已生成 Spec；必须严格按以下三步）
@@ -125,9 +132,10 @@ grape a2a handoff --json '{
 - ⚠️ **重复 A2A 检查**：pipeline 已含目标 agent 的 `a2a_event` → 不要重复交办，只发评论回复。
 
 ### Step 6 · 任务通知（处理结束责任人确定后必做，幂等）
+> assignee 用 `$BOT_USERNAME`（机器人接管）或实际责任人 VCS 用户名，不写死 `grape_bot` 字面量。
 ```bash
 grape tasks notify --json '{
-  "assignee": "<责任人VCS用户名 或 grape_bot>",
+  "assignee": "'"$BOT_USERNAME"'",
   "repo_key": "'"$REPO_FULL_NAME"'",
   "issue_number": '"$ISSUE_NUMBER"',
   "task_description": "Issue #'$ISSUE_NUMBER' 已分配给你，请处理：<简要任务描述>"
@@ -174,8 +182,10 @@ grape tasks complete --json '{
 
 | 现象 | 处理 |
 |------|------|
-| `No such command 'X'` | 命令名错，核对 runbook / reference；仍不确定才 `grape commands <关键词>` |
+| `No such command 'X'` | 命令名错，核对 runbook / reference；仍不确定才 `grape commands <关键词>`。**`grape issues update` 不存在**——改 Issue 用 `grape git-repo issues update` |
 | `unknown request field(s): ...` | `--json` 字段不在允许集，看 `--help` 的 Body fields 删除多余字段 |
+| Issue 原始描述被冲掉 / `issues update` 后 body 变空 | `issues update` 为**整体覆盖**——先 `git-repo issues get` 回取原始 body 回填再 update（见 Step 4）；正文内容改走 `issues comments create` 发布，不 update 改写 |
+| `labels create` 返回 400 | 平台行为，不要排查——用 `issues update` 的 `labels` 字段落地（自动补建标签） |
 | `a2a handoff` 非 2xx / 未命中 | **不探索 `--help`**：回看 Step 2/5 确认目标 agent 是否在当前场景节点集合中（`scenes detail` 的 nodes）；缺失 → 按 Step 5 未命中分支说明 + `next_step=a2a_need_clarify` 收尾；重试 ≤3 次仍失败 → 评论说明需人工介入 |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能一般不涉及 |
@@ -184,5 +194,7 @@ grape tasks complete --json '{
 ## 明确禁止
 
 - ❌ `tree --path`（参数不存在），层级用 `--depth`。
+- ❌ **用 `issues update` 改写正文（body/描述）**——结构化内容一律 `issues comments create` 发布，update 仅限 labels/assignee/state 且回填原始 body。
+- ❌ `issues update` 只传 labels/assignee 不回填 body（会覆盖原始描述）。
 - ❌ 不因"等待用户回复"跳过 Step 8（tasks complete）。
 - ❌ 直接写代码 / 提交 PR / 合并 PR（交给 coding/对应环节）。

@@ -148,9 +148,13 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {nu
 
 ### 同时打标签
 
+> ⚠️ `issues update` 为整体覆盖语义，**先回取原始 body 与现有 labels 回填**，防止覆盖原始描述与已有标签。
+
 ```bash
+ISSUE_BODY="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.body')"
+CUR_LABELS="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '[.labels[]?.name] | join(",")')"
 grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
-  --json '{"labels":"{原有标签},spec-ready"}'
+  --json '{"body":"'"$ISSUE_BODY"'","labels":"'"${CUR_LABELS:+$CUR_LABELS,}"'spec-ready"}'
 ```
 
 新增 `spec-ready` 标签（颜色 `#0075ca`）。
@@ -158,8 +162,9 @@ grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
 ### 分配给机器人
 
 ```bash
+ISSUE_BODY="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.body')"
 grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
-  --json '{"assignee":"'"$BOT_USERNAME"'"}'
+  --json '{"body":"'"$ISSUE_BODY"'","assignee":"'"$BOT_USERNAME"'"}'
 ```
 
 使用 Grape 的 GitCode 用户名作为 assignee，表示机器人接管后续开发流程。

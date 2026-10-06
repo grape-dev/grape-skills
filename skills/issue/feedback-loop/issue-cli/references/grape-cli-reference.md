@@ -37,11 +37,13 @@ grape issues events --owner {owner} --repo {repo} --number {n} --json-out
 grape issues pipeline --owner {owner} --repo {repo} --number {n} --json-out
 grape git-repo issues get --owner {owner} --repo {repo} --number {n} --json-out
 
-# 更新 Issue（仅允许字段：labels / assignee / milestone_id / state；改状态/阶段属 user 层）
+# ⚠️ 更新 Issue（**该命令为整体覆盖语义，会重置未传字段——绝不可用它写正文/结构化内容**）
+#   - 描述(body)等正文内容一律用 `issues comments create` 以评论追加（对齐 vod-cli「以评论发布、不改写原始 Issue」），不要用 update 改正文。
+#   - `issues update` 仅用于 labels / assignee / milestone_id / state 这类元数据；确需用时**先 `git-repo issues get` 回取原始字段，把原 body 一并回传**，避免覆盖原始描述。
 grape git-repo issues update --owner {owner} --repo {repo} --number {n} \
-  --json '{"labels":"feature,triaged","assignee":"younger_eric"}'
+  --json '{"body":"<先 get 回填的原始 body>","labels":"feature,triaged","assignee":"younger_eric"}'
 grape git-repo issues update --owner {owner} --repo {repo} --number {n} \
-  --json '{"labels":"invalid","state":"close"}'
+  --json '{"body":"<先 get 回填的原始 body>","labels":"invalid","state":"close"}'
 
 # Issue 评论（body 一律以 [issue agent] 开头；长文用 --json @file.json）
 grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \

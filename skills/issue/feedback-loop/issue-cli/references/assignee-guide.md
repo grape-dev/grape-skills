@@ -56,18 +56,19 @@ text = base64.b64decode(data['content']).decode('utf-8')
 
 判断 Issue 是否与仓库项目范围完全无关：
 - **完全无关** → 不分配，直接关闭：
-  ① `grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"labels":"invalid"}'`
+  ① `grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"body":"<先 get 回填的原始 body>","labels":"invalid"}'`
   ② `grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"state":"close"}'`
   ③ 评论说明该 Issue 与项目无关，已关闭 → 结束处理
 - **可能相关但无法确认** → 走兜底负责人，让人工判断
 
 ### 7. 能确定负责人
 
-立即调用 `grape git-repo issues update` 分配（必须先执行，再评论）：
+立即调用 `grape git-repo issues update` 分配（必须先执行，再评论；⚠️ update 为整体覆盖语义，回填原始 body 防覆盖描述）：
 
 ```bash
+ISSUE_BODY="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.body')"
 grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
-  --json '{"assignee":"younger_eric"}'
+  --json '{"body":"'"$ISSUE_BODY"'","assignee":"younger_eric"}'
 ```
 
 ### 7.1 通知责任人 / 确保任务存在（必做）

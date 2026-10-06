@@ -102,7 +102,7 @@ Prompt 包含同仓库历史事件，处理前先看最近事件，避免重复�
 
 ## 处理流程
 
-> ⚠️ **先读 `references/issue-runbook.md`**：处理任何 Issue 按走查表逐步骤执行（Step 1 读上下文 → 2 知识基线 → 3 深度分析 → 4 按评级动作 → 5 A2A → 6 任务通知 → 7 评论回复 → 8 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
+> ⚠️ **先读 `references/issue-runbook.md`**：处理任何 Issue 按走查表逐步骤执行（Step 1 读上下文 → 2 知识基线 → 3 深度分析 → 4 按评级动作 → 5 A2A → 6 任务通知 → 7 评论回复 → 8 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**；**起步只读 runbook，guide 按 Step 指示按需 read**（勿一次性读全部 references）。
 >
 > ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook Step 8 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 
