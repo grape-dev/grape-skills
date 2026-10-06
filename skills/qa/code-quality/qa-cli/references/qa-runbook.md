@@ -19,6 +19,9 @@
 grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 取 head.sha / base.ref
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out | jq -r '.base.ref // "main"')}"
 echo "work_branch=$WORK_BRANCH"   # 缺省仓库默认分支，不要写死 main
+# 解析需求卡片内部 id（pending-review / review-pass / review-reject 的 --issue_id 用，非 issue 编号）
+ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id' 2>/dev/null)"
+echo "issue_id=$ISSUE_ID"
 ```
 - ⚠️ **`$GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能叫长期分支（`dev`/`weekly-xx`）**或 `feat/issue-N`（N 不一定等于当前 Issue/PR 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
   - **默认采用 `$GRAPE_WORK_BRANCH` 作为 PR 审查的基准确认**；若该变量未注入，则以 PR 的 `base.ref`（>= 仓库默认分支）为 `$WORK_BRANCH`。
@@ -116,6 +119,26 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
 ```
 - body 以 `[$AGENT_NAME]` 开头；按「输出规范」逐节组织；全部通过则评论「审查通过，所有检查项均正常」。
 - **发评论前必做「输出自检」**（模板/契约/占位符核对，见 SKILL「输出自检」），自检不通过禁止发送（重试一次，仍失败输出显式错误说明）。
+
+### Step 6b · 审核点（pending_review）：审查通过需合入确认/需用户拍板时
+> ⚠️ 审查通过且涉及合入决策时，用 `pending-review` **显式置审核点**（交付决策点、飞书触达用户拍板），与 awaiting_input（索要输入）区分。
+```bash
+# ① 置审核点（review_points=审查结论，references=PR#；changed:true=成功）
+grape issues pending-review --issue_id "$ISSUE_ID" \
+  --json '{"review_points":"PR #'"$PR_NUMBER"' 审查通过（{结论摘要}），请确认是否合入","references":"PR #'"$PR_NUMBER"'"}' --json-out
+```
+- **用户评论续接**（平台恢复 processing 后，下一轮 qa 事件按用户回复判定）：
+  - 用户同意合入/完成 → `review-pass target=done`（仅最终合入决策）或 `target=processing`（继续下一环节）：
+    ```bash
+    grape issues review-pass --issue_id "$ISSUE_ID" --json '{"target":"done","evidence":"用户确认合入（评论 {id}）"}' --json-out
+    ```
+  - 用户要求修改/打回 → `review-reject`（打回重做或转澄清）：
+    ```bash
+    grape issues review-reject --issue_id "$ISSUE_ID" --json '{"target":"processing","reason":"用户要求修改：{要点}"}' --json-out
+    ```
+- ⚠️ `pending-review` 不终态化（与任务周期正交）——**本轮仍走 Step 7 `tasks complete` 收尾**；`review-pass target=done` 才置 completed。
+- ⚠️ 用户 `confirm-done`/`cancel` 是最高权威，Agent 判定不覆盖；`review-pass`/`review-reject` 仅在 `pending_review` 态有效（幂等，`changed:false` 则已终态/已退出，忽略）。
+- 需用户补充信息（非拍板）→ 用 `awaiting-input`（见 vod-runbook 澄清流程），不混用。
 
 ### Step 7 · 任务完成流程（必做，任何分支都必须执行到最后）
 > ⚠️ **强约束：本技能收尾 = 调 `grape tasks complete`（情形一）**。任何分支最后一步都必须调用，**评论发完 ≠ 任务完成**；只调 complete，不再输出 JSON 块。

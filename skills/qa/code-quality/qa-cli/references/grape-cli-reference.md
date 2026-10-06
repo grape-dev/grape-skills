@@ -76,6 +76,14 @@ grape git-repo commits --owner {owner} --repo {repo} --per_page 20 --json-out
 # A2A 交办 coding Agent（审查发现问题需修改时，专属命令）
 grape a2a handoff --json '{"agent":"coding","payload":{...}}'
 
+# 审核点（pending_review）：审查通过需合入确认/用户拍板时；session_only；--issue_id=需求卡片内部 id；changed:true=成功
+grape issues pending-review --issue_id {id} \
+  --json '{"review_points":"PR #N 审查通过，请确认是否合入","references":"PR #N"}'
+# 审核通过（用户确认后）：target=done（最终合入）/ processing（继续）
+grape issues review-pass --issue_id {id} --json '{"target":"done","evidence":"用户确认合入（评论 id）"}'
+# 审核打回（用户要求修改）：target=processing / awaiting_input
+grape issues review-reject --issue_id {id} --json '{"target":"processing","reason":"用户要求修改：{要点}"}'
+
 # 任务自报完成（收尾必做，见 runbook Step 7；会话 token 自动定位任务，无需 --task_id；⚠️ 结构化字段必填，服务端据此组装 archive）
 grape tasks complete --json '{
   "result_text": "结论：PR #N 审查完成。",
