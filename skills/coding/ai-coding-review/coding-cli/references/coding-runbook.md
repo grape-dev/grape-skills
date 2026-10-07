@@ -219,15 +219,41 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
   --json '{"body":"[Coding Agent] 已根据审查意见完成修改，请重新审查。"}'
 ```
 
+### Step 3b · A2A 通知 QA 重新审查（必须执行，跳过 = 流水线断裂）
+> ⚠️ **PR 评论 ≠ 收尾**：必须用 `grape a2a handoff` 显式通知 QA 重新审查，否则 QA 不会被触发、审查流水线断在 coding。
+```bash
+echo "scene_id=${GRAPE_SCENE_ID:+set}"
+SCENE_NODES="$(grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out 2>/dev/null)"
+echo "scene_agents: $(echo "$SCENE_NODES" | jq -r '[.nodes[]?.tag // .nodes[]?.skill] | unique | join(",")' 2>/dev/null)"
+if echo "$SCENE_NODES" | jq -e --arg a "qa" '[.nodes[] | ((.tag // "")|ascii_downcase) + " " + ((.skill // "")|ascii_downcase)] | any(startswith($a) or startswith("$a-"))' >/dev/null 2>&1; then
+  echo "OK: scene contains qa node → 可 A2A qa"
+  grape a2a handoff --json '{
+    "agent": "qa",
+    "payload": {
+      "repository": "'"$REPO_FULL_NAME"'",
+      "account": "'"$ACCOUNT"'",
+      "issue_number": '"$ISSUE_NUMBER"',
+      "pr_number": '"$PR_NUMBER"',
+      "context": "PR #'"$PR_NUMBER"' 已按审查意见完成修改（commit {sha}），请重新审查。修改摘要：{review_summary}"
+    }
+  }' --json-out
+else
+  echo "BLOCK: scene 不含 qa 节点 → 不发起 qa A2A（评论说明场景未配置 QA Agent，next_step=done）"
+fi
+```
+- ⚠️ `issue_number` 必填，`pr_number` 填 PR 编号，禁止混用。
+- **场景无 `qa` 节点** → 不发起 qa A2A，评论温和说明"当前开发流水线未配置 QA Agent，本次未发起重新审查"，`next_step` 用 `done`。
+- 用真实 `scenes detail` 结果校验，禁止硬编码伪造节点。
+
 ### Step 4 · 任务完成流程（必做，与场景 A Step 8 同结构）
 ```bash
 grape tasks complete --json '{
   "result_text": "结论：PR #'"$PR_NUMBER"' 已按审查意见完成修改。",
-  "next_step": "wait_qa",
-  "actions": ["修改代码修复审查意见", "grape git push 分支", "在 PR #'"$PR_NUMBER"' 评论告知重新审查"],
-  "conclusion": "已按审查意见完成哪些修复，待 QA 重新审查",
-  "artifacts": ["PR #'"$PR_NUMBER"' 评论"],
-  "issue_summary": "已按审查意见修复 | 修改摘要 | 待重新审查"
+  "next_step": "a2a_qa",
+  "actions": ["修改代码修复审查意见", "grape git push 分支", "在 PR #'"$PR_NUMBER"' 评论告知重新审查", "A2A 通知 QA 重新审查"],
+  "conclusion": "已按审查意见完成哪些修复，已 A2A 通知 QA 重新审查",
+  "artifacts": ["PR #'"$PR_NUMBER"' 评论", "A2A seq=XXXX → qa"],
+  "issue_summary": "已按审查意见修复 | 修改摘要 | 已 A2A 交 QA 重新审查"
 }'
 ```
 - 除 `grape tasks complete` 之外不再发出其他任务收尾信令，避免重复完成。
