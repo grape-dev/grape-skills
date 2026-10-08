@@ -126,20 +126,21 @@ grape git push origin feat/issue-{number}
 ⚠️ 创建 PR 后必须先发 Issue 评论告知用户，否则视为未完成。
 
 ```bash
-# 创建 PR（base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支），不要写死 main；关联字段用 related_issue_nums/auto_close_issues，不用旧名 inner_issue_nums/close_related_issue）
+# 创建 PR（base 用目标合入分支 $WORK_BRANCH；字段以契约为准：related_issue_nums + auto_close_issues；body 必带，生成的 PR 才有完整描述）
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out | jq -r '.default_branch // "main"')}"
 grape git-repo pulls create --owner {owner} --repo {repo} \
   --json '{
     "title": "feat: #{number} 标题",
     "head": "feat/issue-{number}",
     "base": "'"$WORK_BRANCH"'",
-    "related_issue_nums": ["{owner}/{repo}#{number}"],
+    "body": "## 概述\n\n实现 Issue #{number}：{需求摘要}。\n\n## 改动\n- {文件/改动要点}\n\n## 测试\n- python3 -m unittest ... 通过\n- node ... 通过",
+    "related_issue_nums": ["#{number}"],
     "auto_close_issues": true
   }'
 
-# PATCH 补充 body
+# （可选）PATCH 补充/更新 body（pulls update 仅允许 title/body/labels 等，不传 state）；create 已带 body 则无需重复
 grape git-repo pulls update --owner {owner} --repo {repo} --number {pr_number} \
-  --json '{"body": "## 概述\n\n自动实现 Issue #{number}", "labels": "auto-pr"}'
+  --json '{"body": "## 概述\n\n自动实现 Issue #{number}：{需求摘要}", "labels": "auto-pr"}'
 ```
 
 ### ⚠️ 必须执行：发 Issue 评论告知

@@ -51,14 +51,14 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 # 列 PR（是否已有方案 / 查自建 PR 编号）
 grape git-repo pulls list --owner {owner} --repo {repo} --state all --per_page 10 --json-out
 
-# 创建 PR（新开发场景；base 用目标合入分支 $WORK_BRANCH（＝$GRAPE_WORK_BRANCH 或仓库默认分支），不要写死 main；关联 Issue 可让合并后自动关闭）
+# 创建 PR（新开发场景；base 用目标合入分支 $WORK_BRANCH；字段以契约为准：related_issue_nums/auto_close_issues；body 必带，生成的 PR 才有完整描述）
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo repo --owner {owner} --repo {repo} --json-out | jq -r '.default_branch // "main"')}"
 grape git-repo pulls create --owner {owner} --repo {repo} \
-  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"'"$WORK_BRANCH"'","related_issue_nums":["{owner}/{repo}#{n}"],"auto_close_issues":true}'
+  --json '{"title":"feat: #{n} 标题","head":"feat/issue-{n}","base":"'"$WORK_BRANCH"'","body":"## 概述\n\n实现 Issue #{n}：{需求摘要}。\n\n## 改动\n- {要点}\n\n## 测试\n- {测试命令}通过","related_issue_nums":["#{n}"],"auto_close_issues":true}'
 
-# 补充/更新 PR body 或标签（PATCH）
+# （可选）PATCH 补充/更新 PR body 或标签（pulls update 仅允许 title/body/labels 等，不传 state）；create 已带 body 则无需重复
 grape git-repo pulls update --owner {owner} --repo {repo} --number {pr} \
-  --json '{"body":"## 概述\n\n自动实现 Issue #{n}","labels":"auto-pr"}'
+  --json '{"body":"## 概述\n\n自动实现 Issue #{n}：{需求摘要}","labels":"auto-pr"}'
 
 # 取 PR 行内评论（优化流程核实审查意见）
 grape git-repo pulls comments list --owner {owner} --repo {repo} --number {pr} --json-out
@@ -126,8 +126,9 @@ grape git checkout -b feat/issue-7 "origin/$WORK_BRANCH"
 
 ## `pulls create` 字段说明（错误排查用）
 
-- 允许字段常见为：`title`、`head`、`base`、`related_issue_nums`（数组，如 `["owner/repo#N"]` 关联 Issue）、`auto_close_issues`（bool）等。
-- ⚠️ 旧字段名 `inner_issue_nums`/`close_related_issue` 多数契约已不识别——报 `unknown request field(s)` 就删掉这些字段、保留 `title`/`head`/`base` 精简重试；具体以 `grape git-repo pulls create --help` 的 **Body fields** 为准。
+- 允许字段（当前契约 v2.1.0 实测）：`title`、`head`、`base`、`body`、`related_issue_nums`（Issue 号数组，如 `[12]`）、`auto_close_issues`（bool，true=合并后自动关闭关联 Issue）。
+- ⚠️ 报 `unknown request field(s)` 就删掉多余字段、保留 `title`/`head`/`base` 精简重试；字段以 `grape git-repo pulls create --help` 的 **Body fields** 为准。
+- 创建时带 `body` 生成 PR 描述，含 `## 概述 / ## 改动 / ## 测试` 三节（需求摘要 + 变更要点 + 测试命令与结果）。
 - PR 链接以 `grape git-repo pulls get --number {pr}` 返回的 `html_url` 为准（不猜 `/pull/` vs `/merge_requests/`）。
 - `pulls update` 仅允许 `body`/`labels` 等字段，**不支持 `state`**（关闭/合并走其他渠道或人工）。
 
