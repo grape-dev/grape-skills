@@ -1,4 +1,4 @@
-# Grape CLI 参考（Chat-CLI 版）
+﻿# Grape CLI 参考（Chat-CLI 版）
 
 > 本技能**只使用 `grape` CLI**，统一使用系统注入的 **`$GRAPE_SESSION_TOKEN`**（任务级临时，随任务/会话失效）即可操作。
 > 详细指南见 `grape-cli-guidance` 技能（命令分组 / token 作用域 / 错误排查 / 反模式），本文件是 Chat 对话实际用到的命令与要点。
@@ -34,19 +34,19 @@ grape git-repo issues get --owner {owner} --repo {repo} --number {number} --json
 # Issue 全部评论（理解讨论过程）
 grape git-repo issues comments list --owner {owner} --repo {repo} --number {number} --json-out
 
-# Issue 评论回复（task-handling 回帖 / 澄清追问，body 注明补充人和来源）
+# Issue 评论回复（task-clarify 回帖 / 澄清追问，body 注明补充人和来源）
 grape git-repo issues comments create --owner {owner} --repo {repo} --number {number} \
   --json '{"body":"**补充需求澄清**（由任务处理对话整理）：\n\n## 背景\n<原 Issue 核心内容>\n\n## 澄清后的需求\n- 使用场景：<用户补充>\n- 预期效果：<用户补充>\n- 验收标准：<用户补充>\n\n---\n补充人：<用户昵称>（通过 Chat 对话整理）"}'
 
-# 创建 Issue（inquiry-handling 需求明确后；不带标签，标签由 issue skill 统一分诊）
+# 创建 Issue（task-feedback 需求明确后；不带标签，标签由 issue skill 统一分诊）
 grape issues create --owner {owner} --repo {repo} \
   --json '{"title":"<清晰的需求标题>","description":"<需求描述，含提交人/渠道>"}'
 
-# 列 Issue（implementation-start 查询待启动 feature；出参结构与 GitCode 平台一致，含 labels/assignee）
+# 列 Issue（task-review 查询待启动 feature；出参结构与 GitCode 平台一致，含 labels/assignee）
 grape issues list --owner {owner} --repo {repo} --json-out
 grape git-repo issues list --owner {owner} --repo {repo} --state open --per_page 100 --json-out
 
-# 更新 Issue（implementation-start 加 PATCH 标签，触发 implementation skill；仅允许字段 labels/assignee/state）
+# 更新 Issue（task-review 加 PATCH 标签，触发 implementation skill；仅允许字段 labels/assignee/state）
 grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
   --json '{"labels":"feature,triaged,PATCH"}'
 
