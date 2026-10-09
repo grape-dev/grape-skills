@@ -15,7 +15,7 @@
     {
       "id": "vod",
       "tag": "vod",
-      "skill": "vod",
+      "skill": "vod-cli",
       "mode": "emit",
       "next": "issue",
       "handoff": "a2a"
@@ -23,7 +23,7 @@
     {
       "id": "issue",
       "tag": "issue",
-      "skill": "issue-advance",
+      "skill": "issue-cli",
       "mode": "emit",
       "next": "coding",
       "handoff": "a2a"
@@ -31,7 +31,7 @@
     {
       "id": "coding",
       "tag": "coding",
-      "skill": "implementation",
+      "skill": "coding-cli",
       "mode": "emit",
       "next": "qa",
       "handoff": "a2a"
@@ -39,7 +39,7 @@
     {
       "id": "qa",
       "tag": "qa",
-      "skill": "pr",
+      "skill": "qa-cli",
       "mode": "emit",
       "next": "sre",
       "handoff": "a2a"
@@ -47,7 +47,7 @@
     {
       "id": "sre",
       "tag": "sre",
-      "skill": "cloud-deploy",
+      "skill": "deploy-cli",
       "mode": "emit",
       "next": "done",
       "handoff": "complete"
