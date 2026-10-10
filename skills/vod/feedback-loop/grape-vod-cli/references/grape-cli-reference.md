@@ -57,6 +57,7 @@ grape --version      # 确认版本
 |------|------|
 | `grape issues pipeline --owner {owner} --repo {repo} --number {n} --json-out` | Issue pipeline（防重复 A2A 检查） |
 | `grape issues list --owner {owner} --repo {repo} --json-out` | Issue 列表（历史全貌/判断重复） |
+| `grape issues awaiting-input --issue_id {issue_id} --json '{"questions":"...","reason":"..."}' --json-out` | 澄清时显式声明待用户补充（置 awaiting_input + 触达；vod/issue 会话可用，changed:true=成功） |
 
 ### 3.4 GitCode Issue 评论与更新
 

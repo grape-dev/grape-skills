@@ -66,12 +66,24 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 ```
 - 收敛后 **进入 Step 5**（如 pipeline 已有目标 a2a_event 则跳过 A2A，直接 Step 6 + `next_step=reply_comment`）。
 
-**4b · 需求不清晰 → 澄清追问后进入收尾**
+**4b · 需求不清晰 → 澄清追问（显式 awaiting-input + 收尾，参考 vod-cli）**
+> 需要用户补充输入才能继续——**同时**做三件事：发追问评论（落 Issue 讨论）、`issues awaiting-input` 显式声明待澄清（置 `awaiting_input` + 触达用户）、`tasks complete` 结束本轮。
+
 ```bash
+# ① 发追问评论（body 以 [VOD Agent] 开头，1-3 个具体问题；用 skill-requirement-guide §二 要素追问）
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"body":"[VOD Agent] 请补充：…（1-3 个问题）"}'
+  --json '{"body":"[VOD Agent] 请补充：1) … 2) … 3) …"}'
+
+# ② 显式声明进入待澄清（关键：questions 必填；--issue_id 用 issues detail 的 id，若不确定用 ISSUE_NUMBER）
+#    ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')"
+grape issues awaiting-input --issue_id "${ISSUE_ID:-$ISSUE_NUMBER}" \
+  --json '{
+    "questions": "[VOD Agent] 技能需求信息不完整，请补充：<列出缺失要素>",
+    "reason": "技能需求六要素缺失，需开发者补充"
+  }' --json-out
 ```
-- 直接进入 Step 6，`next_step=a2a_need_clarify`。
+- **直接进入 Step 6 收尾，`next_step=a2a_need_clarify`**；`awaiting-input` 返回 `changed:true`=成功，`false`=已终态/已等待，幂等忽略。
+- ⚠️ **不要等待用户回复，也不要 A2A**（awaiting 提交后由服务端触达用户；用户 clarify 回复后 `awaiting_input → processing`，新一轮 vod 事件重新分析）。
 
 **4c · 非技能需求/纯咨询/已处理 → 回复说明**
 ```bash
@@ -124,6 +136,7 @@ grape a2a handoff --json '{
 
 先**输出人类可读的分析摘要**（需求要素收敛情况、发现的问题、交办情况），再调用自报完成：
 
+**4a 收敛并交办**：
 ```bash
 grape tasks complete --json '{
   "result_text": "结论：技能需求 <已收敛/待澄清/无需动作>。",
@@ -134,6 +147,20 @@ grape tasks complete --json '{
   "issue_summary": "技能需求已收敛 | agent_type={X} | name={Y} | 交办 issue"
 }'
 ```
+
+**4b 待澄清（已 awaiting-input）**：
+```bash
+grape tasks complete --json '{
+  "result_text": "结论：技能需求不清晰，已发澄清追问并置 awaiting_input，等待用户补充。",
+  "next_step": "a2a_need_clarify",
+  "actions": ["追问评论", "显式 awaiting-input（questions）", "本轮 tasks complete"],
+  "conclusion": "技能需求要素缺失，Issue 状态置 awaiting_input，待用户回复后重新分析",
+  "artifacts": ["Issue #'"$ISSUE_NUMBER"' 追问评论（comment id=XXXXXX）", "awaiting-input 状态变更"],
+  "issue_summary": "待澄清 | 已追问并 awaiting-input | 等待用户补充 | next=redo"
+}'
+```
+
+**4c 非技能需求/纯咨询/已处理**：`next_step=reply_comment`，结构同 4b（无 awaiting-input）。
 > ✅ **结构化字段必填**：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` 服务端据此组装结构化 `_sd` 写入 archive——**只传 result_text 会丢结构化归档**。
 > 若返回 `already:true`（任务已终态），属正常，忽略即可。**然后结束任务**，不要继续思考或等待输入。
 
