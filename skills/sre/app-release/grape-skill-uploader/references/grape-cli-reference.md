@@ -57,31 +57,38 @@ grape commands     # 验证命令树可用
 
 | 命令 | Scope | 用途 |
 |------|-------|------|
-| `grape tasks current --json-out` | session_only | 获取当前任务 |
+| `grape tasks current --json-out` | session_only | 获取当前任务（含前序 A2A context） |
 | `grape issues detail --owner {owner} --repo {repo} --number {n} --json-out` | dual | Issue 全貌 |
-| `grape events detail --event_id {seq} --json-out` | dual | 读取前序 A2A 交接 payload |
+| `grape events detail --seq {seq} --json-out` | dual | 读取前序 A2A 交接 payload（参数是 `--seq`，不是 `--event_id`） |
 
 ### 3.3 PR 状态与变更确认
 
 | 命令 | Scope | 用途 |
 |------|-------|------|
 | `grape git-repo pulls get --owner {owner} --repo {repo} --number {pr} --json-out` | session_only | PR 详情（合并状态确认，触发点 c） |
-| `grape git-repo pulls files --owner {owner} --repo {repo} --number {pr} --json-out` | session_only | PR 变更文件（定位 skills/ 目录） |
+| `grape git-repo pulls files --owner {owner} --repo {repo} --number {pr} --json-out` | session_only | PR 变更文件（定位 skill 目录，来源唯一） |
 
-### 3.4 GitCode Issue 评论
+### 3.4 skill 内容获取（仓库直拉，不依赖本地 worktree）
+
+| 命令 | Scope | 用途 |
+|------|-------|------|
+| `grape git-repo contents --owner {owner} --repo {repo} --path {skill_dir} --json-out` | session_only | 列出 skill 目录下文件清单 |
+| `grape git-repo contents --owner {owner} --repo {repo} --path {file} --raw` | session_only | 拉取单个文件原文（SKILL.md / references/{f}）到本地临时目录用于打包 |
+
+### 3.5 GitCode Issue 评论
 
 | 命令 | Scope | 用途 |
 |------|-------|------|
 | `grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} --json '{"body":"..."}'` | session_only | 发布上传结果/失败通知 |
 
-### 3.5 任务完成与 A2A 交接
+### 3.6 任务完成与 A2A 交接
 
 | 命令 | Scope | 用途 |
 |------|-------|------|
-| `grape tasks complete --json '{"result_text":"...","next_step":"done"}'` | dual | 自报完成 |
-| `grape a2a handoff --json '{"agent":"coding","payload":{...}}'` | dual | 失败时回交 Coding 排查 |
+| `grape tasks complete --json '{"result_text":"...","next_step":"done","actions":[],"conclusion":"...","artifacts":[],"issue_summary":"..."}'` | dual | 自报完成（结构化字段必填） |
+| `grape a2a handoff --json '{"agent":"coding","payload":{...}}'` | dual | 内容类失败（422）时回交 Coding 排查 |
 
-### 3.6 --json body Schema（本 skill 用到的）
+### 3.7 --json body Schema（本 skill 用到的）
 
 | Body schema | 使用命令 | 必填 | 可选 |
 |-------------|---------|------|------|
@@ -91,7 +98,7 @@ grape commands     # 验证命令树可用
 
 > `skills upload` 为 multipart，无 JSON body schema，参数走 `--file`/`--scope`/`--repo`/`--agent_type`。
 
-### 3.7 A2A payload 标准结构
+### 3.8 A2A payload 标准结构
 
 ```json
 {
@@ -114,10 +121,7 @@ grape commands     # 验证命令树可用
 
 ### 命令遮蔽（不可执行）
 
-- `issues list`（遮蔽）→ 用 `git-repo issues list`
-- `issues pipeline`（遮蔽）→ 用 `issues pipeline detail`
-- `issues status`（遮蔽）→ 用 `issues status get`
-- `tasks status`（遮蔽）→ 用 `tasks status get`
+> 经 `grape commands` + `grape <group> <verb> --help` 动态验证（CLI v0.3.2），本 skill 用到的 `git-repo pulls get/files`、`git-repo issues comments create`、`git-repo contents`、`tasks current`、`tasks complete`、`a2a handoff`、`skills list/detail/sub list/upload` 均可直接调用，不存在遮蔽。
 
 ### 无 grape api 逃生舱
 
@@ -125,9 +129,19 @@ grape commands     # 验证命令树可用
 
 ### 不存在的能力（不要尝试）
 
-任务删除（有 close 非删除）· 知识上传 · Issue/PR 删除 · 分支创建/删除 · Token 管理（CLI 层）· `tasks create`（已移除，用 `issues create`）· `tasks start/status`（已下架/遮蔽）· `tasks mine`（已下架，用 `tasks current`）· `auth profile`（已下架）· 流式输出 · 交互式提示 · 配置初始化。
+| 能力 | 说明 |
+|------|------|
+| 任务删除 | 无 `tasks delete`（有 `tasks close` 但非删除） |
+| 知识上传 | 无 `knowledge upload` |
+| Issue/PR 删除 | 无 issues delete / pulls delete |
+| 分支创建/删除 | 无 branches create / branches delete |
+| Token 管理（CLI 层） | 无 CLI 子命令创建/吊销/刷新 token |
+| `grape api` 逃生舱 | 已移除，契约未覆盖端点无法 CLI 调用 |
+| `tasks create` | 已移除，用 `issues create` 代替 |
+| `tasks start/status` | 已下架/遮蔽 |
+| 流式输出 / 交互式提示 / 配置初始化 | 不支持 |
 
-> ✅ `skills upload`/`skills search`/`skills list`/`skills detail`/`skills convert`/`skills delete` 等均存在且可用。旧文档将其标注为「已下架」为过时信息，以 `grape commands skills` 实际输出为准。
+> ✅ `skills upload` / `skills list` / `skills detail` / `skills sub list` 均存在且可用（dual，`tk_` 可调），`skills convert`/`skills delete` 为 `user_only`（需 `GRAPE_API_TOKEN`）——本 skill 不用。旧文档将 `skills upload` 标注「已下架」为过时信息，以 `grape commands skills` 实际输出为准。`skills upload` 返回 HTTP 503「OBS 存储未启用」= 服务端配置阻塞，非命令/参数问题。
 
 ---
 
