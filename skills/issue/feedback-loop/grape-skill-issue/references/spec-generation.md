@@ -41,19 +41,6 @@
 |------|------|------|------|
 | {决策点} | {选项A/B} | {选择} | {理由} |
 
-## Huawei Cloud Skill Details
-> 仅当 Issue 涉及华为云 skill 开发时填写（Step 2b 识别到华为云关键词时生成）
-
-| 维度 | 值 | 说明 |
-|------|-----|------|
-| Target Service | {VPC/ECS/OBS/RDS/CCE/IAM/BSS/...} | 华为云目标服务 |
-| Feature Scope | {Query/Manage/Deploy/Monitor/Diagnose} | 功能范围 |
-| Execution Mode | {CLI/SDK/API} | 优先 CLI，CLI 不可用降级 SDK（creator Step 2 验证） |
-| CLI Operations | {List/Show/Create/Delete/Update} | 涉及的 hcloud 操作 |
-| Skill Name | huawei-cloud-{product}-{function} | 遵循命名规范 ^huawei-cloud-[a-z0-9]+(-[a-z0-9]+)*$ |
-| IAM Permissions | {service}:{action} | 最小权限 |
-| Trigger Scenarios | {何时触发} | 如：日常巡检/故障排查/资源管理 |
-
 ## Affected Modules
 
 | 模块 | 改动类型 | 说明 |
@@ -96,16 +83,6 @@
 - **Scope**：对照 project-capabilities.md 的 Supported Features，每项可映射到 project-graph.md 模块
 - **Technical Approach**：基于 project-graph.md 的 Architecture Overview 和 Module Dependency Graph
 - **Affected Modules**：从 project-graph.md 提取涉及模块，标注改动类型
-
-### Step 2b: 识别华为云需求（条件性）
-
-扫描 Issue 正文和评论，匹配华为云关键词：
-- `hcloud` / `huaweicloudsdk` / `华为云` / `Huawei Cloud` / `KooCLI`
-- `ECS` / `VPC` / `OBS` / `RDS` / `CCE` / `IAM` / `BSS` / `ModelArts` / `GaussDB` / `DCS` / `DDS` / `EVS` / `EIP` / `SLB`
-- `AK/SK` / `hcloud CLI`
-
-**匹配到** → 填写 Huawei Cloud Skill Details 段落（基于 Issue 内容提取 7 个维度，缺失项留空标注"待 creator Step 2 验证"）
-**未匹配** → 跳过此段落（非华为云 skill）
 
 ### Step 6: 填写 Acceptance Criteria
 
@@ -165,8 +142,13 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {n}
 
 ### 同时打标签
 
+> ⚠️ `issues update` 为整体覆盖语义，**先回取原始 body 与现有 labels 回填**，防止覆盖原始描述与已有标签。
+
 ```bash
-grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"labels":"{原有标签},spec-ready"}'
+ISSUE_BODY="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.body')"
+CUR_LABELS="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '[.labels[]?.name] | join(",")')"
+grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
+  --json '{"body":"'"$ISSUE_BODY"'","labels":"'"${CUR_LABELS:+$CUR_LABELS,}"'spec-ready"}'
 ```
 
 新增 `spec-ready` 标签（颜色 `#0075ca`）。
@@ -174,15 +156,17 @@ grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '
 ### 分配给机器人
 
 ```bash
-grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"assignee":"{bot_username}"}'
+ISSUE_BODY="$(grape git-repo issues get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.body')"
+grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
+  --json '{"body":"'"$ISSUE_BODY"'","assignee":"'"$BOT_USERNAME"'"}'
 ```
 
-使用 Grape 的 GitCode 用户名作为 assignee，表示机器人接管后续开发流程。
+使用 Grape 的 VCS 用户名（`$BOT_USERNAME`）作为 assignee，表示机器人接管后续开发流程。
 
 ## A2A 通知 Coding Agent
 
 ```bash
-grape a2a handoff --json '{"agent":"coding","payload":{"repository":"{owner}/{repo}","account":"{user}","issue_number":{n},"context":"Issue #{n} 已通过深度可开发性分析（评级: ready），Spec 已发布。\n\n## Objective\n{摘要}\n\n## Scope (In)\n{摘要}\n\n## Technical Approach\n{摘要}\n\n## Acceptance Criteria\n{摘要}\n\n请基于以上 Spec 启动开发实现。完整 Spec 见 Issue 评论。"}}'
+grape a2a handoff --json '{"agent":"coding","payload":{"repository":"'"$REPO_FULL_NAME"'","account":"'"$ACCOUNT"'","issue_number":'"$ISSUE_NUMBER"',"context":"Issue #'"$ISSUE_NUMBER"' 已通过技能可开发性分析（评级: ready），Spec 已发布。\n\n## Objective\n{摘要}\n\n## Scope (In)\n{摘要}\n\n## Technical Approach\n{摘要}\n\n## Acceptance Criteria\n{摘要}\n\n请处理本技能创建/改造开发。完整 Spec 见 Issue 评论。"}}'
 ```
 
 ⚠️ **字段规则**：`issue_number` 必填（当前 Issue 真实编号）；无法确定则不调用 A2A。`pr_number` 有则填、无则不填，严禁将 PR 编号填入 issue_number。

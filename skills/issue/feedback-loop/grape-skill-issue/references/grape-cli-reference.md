@@ -8,10 +8,10 @@
 
 ## 1. 安装与就绪检查
 
-`grape` 由运维/部署侧预装，agent 不自行安装。使用前验证：
+`grape` 通常由运维/部署侧预装；**未装/版本过低可自行安装**（见 `references/grape-cli-installation.md`）。使用前验证：
 
 ```bash
-grape --version    # 确认安装
+grape --version    # 确认安装（应 >= 0.3.2）
 grape commands     # 验证命令树可用
 ```
 
@@ -75,10 +75,12 @@ grape git-repo repo --owner {owner} --repo {repo} --json-out             # 仓�
 ### 任务通知与 A2A 交接
 
 ```bash
-grape tasks notify --json '{"assignee":"{user}","repo_key":"{owner}/{repo}","issue_number":{n},"task_description":"..."}'
-grape tasks complete --json '{"result_text":"...","next_step":"a2a_coding"}'
+grape tasks notify --json '{"assignee":"'"$BOT_USERNAME"'","repo_key":"{owner}/{repo}","issue_number":{n},"task_description":"..."}'
+grape tasks complete --json '{"result_text":"...","next_step":"a2a_coding","actions":[],"conclusion":"","artifacts":[],"issue_summary":""}'
 grape a2a handoff --json '{"agent":"coding","payload":{"repository":"{owner}/{repo}","account":"{user}","issue_number":{n},"context":"..."}}'
 ```
+
+> `grape a2a handoff` 交办的是 **agent**（`coding`/`sre`/`vod`），不是技能；对应 agent 使用哪个技能由该 agent 自行决定。路由：创建/改造→`coding`；下架→`sre`；需求不清→`vod`。
 
 > `grape tasks create`（创建任务+自动开 Issue）与 `grape issues create`（仅创建 Issue）不同；issue agent 一般用 `issues create`。
 
@@ -93,8 +95,18 @@ grape issues create --owner {owner} --repo {repo} --json '{"title":"...","descri
 ### 知识读取
 
 ```bash
-grape knowledge context --repo {owner}/{repo} --agent_type issue --json-out  # 合并注入上下文
-grape knowledge content --repo {owner}/{repo} --file {path} --json-out       # 读取知识文件全文
+grape repos project info --owner {owner} --repo {repo} --json-out       # 项目知识基线（project-graph + project-capabilities 全文 + meta）
+grape knowledge stats --repo {owner}/{repo} --json-out                  # 各类知识数量
+grape knowledge list --repo {owner}/{repo} --source agent --json-out    # Agent 沉淀知识清单
+grape knowledge detail --knowledge_id {id} --json-out                    # 读取单条知识全文
+```
+
+### 技能资产（技能开发需求判断用）
+
+```bash
+grape skills list --json-out 2>/dev/null          # 平台技能清单（命名查重）；403/不存在则跳过
+grape git-repo tree --owner {owner} --repo {repo} --depth single --json-out   # 仓库 skills/ 目录
+grape git-repo contents --owner {owner} --repo {repo} --path skills --json-out
 ```
 
 ### 命令发现
@@ -187,10 +199,10 @@ grape refresh               # 重拉最新契约
 
 ## 6. 安全与边界
 
-- **token 使用范围**：`$BOT_TOKEN`（VCS API）和 `$GRAPE_SESSION_TOKEN`（grape API）分开使用，严禁混用。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（会话级 `tk_`）；`BOT_TOKEN`/`USER_TOKEN` 已不注入。`user_only` 端点（auth/skills 等）对 `tk_` 返回 403，需 `GRAPE_API_TOKEN`（`grape_`）或 Web JWT——本技能一般用不到。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`configs/`、`user_accounts` 表、`managed_repos` 表——不得读取。
 - **403/401 处理**：
   - 403（无权限）→ 立即停止该操作，回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置」。
-  - 401（token 失效）→ token 已过期，不可自行刷新，回复用户重新注入。
-  - `user_only` 端点对 `tk_` 返回 403 → 改用 `GRAPE_API_TOKEN`（`grape_`）或走只读 `dual` 路径。
+  - 401（token 失效）→ token 已过期，说明「凭据已失效」即可，不尝试替换。
+- **`git-repo issues update` 为整体覆盖语义**：只传 labels/assignee/state 会重置未传字段（可能覆盖 body）。**先 `git-repo issues get` 回填原始 body 再 update**；Spec/结论等正文一律用 `issues comments create` 发布。
 - **token 不落盘**：不得将 token 写入文件、日志、评论或脚本。

@@ -55,35 +55,40 @@ grape --version      # 确认版本
 
 | 命令 | 用途 |
 |------|------|
-| `grape issues mine --json-out` | 我的 Issue 列表（判断重复/已解决） |
-| `grape issues create --owner {owner} --repo {repo} --json '{"title":"...","description":"..."}'` | 创建 Issue（反馈转 Issue） |
 | `grape issues pipeline --owner {owner} --repo {repo} --number {n} --json-out` | Issue pipeline（防重复 A2A 检查） |
+| `grape issues list --owner {owner} --repo {repo} --json-out` | Issue 列表（历史全貌/判断重复） |
 
 ### 3.4 GitCode Issue 评论与更新
 
-> VOD 建 Issue 使用统一入口 `grape issues create`（§3.3），该命令同时创建 GitCode Issue 并触发 pipeline；`grape git-repo issues create` 仅创建 GitCode Issue 不触发 pipeline，VOD 不使用，列出供完整性参考。
+> 本技能接管 `issue_opened`（开发者提交的 Issue），不建 Issue；结构化收敛结论**以评论发布**（`issues comments create`），**不用 `issues update` 改写 body**（防覆盖原始描述）。
 
 | 命令 | 用途 |
 |------|------|
 | `grape git-repo issues list --owner {owner} --repo {repo} --json-out` | 原始 Issue 列表 |
-| `grape git-repo issues create --owner {owner} --repo {repo} --json '{"title":"...","body":"..."}'` | 仅创建 GitCode Issue（不触发 pipeline；VOD 用 `issues create` 统一入口代替） |
-| `grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} --json '{"body":"[VOD Agent] ..."}'` | 发评论（澄清/结构化结论） |
-| `grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"state":"open"}'` | 更新 Issue（收敛 body/state；标签/分配属 Issue Agent 职责） |
+| `grape git-repo issues comments list --owner {owner} --repo {repo} --number {n} --json-out` | 读评论（理解讨论过程） |
+| `grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} --json '{"body":"[VOD Agent] ..."}'` | 发评论（澄清/结构化收敛结论） |
+| `grape git-repo issues update --owner {owner} --repo {repo} --number {n} --json '{"state":"close"}'` | 仅用于关闭/状态（**不传 body**，改 body 会覆盖原始描述） |
 
 ### 3.5 任务完成与 A2A 交接
 
 | 命令 | 用途 |
 |------|------|
 | `grape tasks complete --json '{"result_text":"...","next_step":"a2a_issue"}'` | 自报完成 |
-| `grape a2a handoff --json '{"agent":"issue","payload":{...}}'` | A2A 交棒 Issue Agent |
+| `grape a2a handoff --json '{"agent":"grape-skill-issue","payload":{...}}'` | A2A 交棒 grape-skill-issue（技能需求收敛后） |
+
+### 3.5.1 技能资产查询（技能创建需求引导用）
+
+| 命令 | 用途 |
+|------|------|
+| `grape skills list --json-out` | 平台技能清单（命名查重 / 改造定位）；403/不存在则跳过，用仓库 `skills/` 目录查重 |
+| `grape git-repo tree --owner {owner} --repo {repo} --depth single --json-out` | 仓库目录树（看是否已有 skills/ 子目录） |
 
 ### 3.6 --json body Schema（VOD 用到的）
 
 | Body schema | 使用命令 | 必填 | 可选 |
 |-------------|---------|------|------|
-| Free-form JSON | `issues create` | — | `title`, `description`, `assignee`, `scene_id`, `is_subtask_mode`（任意字段） |
-| `IssueUpdateBody` | `git-repo issues update` | — | `assignee`, `body`, `labels`, `milestone_id`, `state` |
 | `CommentBody` | `git-repo issues comments create` | `body` | — |
+| `IssueUpdateBody` | `git-repo issues update` | — | `assignee`, `labels`, `milestone_id`, `state`（**不含 body**：改 body 会覆盖原始描述，收敛结论用 comments） |
 | `A2AHandoffBody` | `a2a handoff` | — | `agent`, `payload` |
 | `CompleteBody` | `tasks complete` | — | `actions`, `artifacts`, `conclusion`, `issue_summary`, `next_step`, `result_text`, `task_id` |
 
@@ -141,7 +146,7 @@ v0.2.2 移除 `grape api` 通用兜底命令。契约未覆盖的端点无法通
 
 ### 不存在的能力（不要尝试）
 
-任务删除（有 close 非删除）· 知识上传 · Issue/PR 删除 · 分支创建/删除 · Token 管理 · `tasks create`（已移除，用 `issues create`）· 流式输出 · 交互式提示 · 配置初始化
+任务删除（有 close 非删除）· 知识上传 · Issue/PR 删除 · 分支创建/删除 · Token 管理 · 流式输出 · 交互式提示 · 配置初始化
 
 > 注：`repos create`/`repos remove`（仓库创建/删除）**已存在**（v0.2.6+），不列为不存在。`skills upload`/`skills delete`/`skills convert` **已存在**，不列为不存在。
 
