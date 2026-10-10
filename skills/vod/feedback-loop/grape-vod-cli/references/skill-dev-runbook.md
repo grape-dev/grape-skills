@@ -43,11 +43,15 @@ grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --
 - **非技能需求 / 纯咨询 / 无关** → Step 4c（说明 / 转对应流程）
 
 ### Step 3 · 技能需求引导（≤3 轮，一次 1-3 个问题）
-对照 `references/skill-requirement-guide.md` §二 要素引导（agent_type / name / description / 目标系统 / 验收风险）。**服务项目 = 当前项目（环境变量/prompt 已注入），无需引导；触发场景固定（工作流自动调用本技能），无需引导**。追问用评论：
+对照 `references/skill-requirement-guide.md` §二 要素引导（agent_type / name / description / 目标系统 / 验收风险 + **流程审批节点**）。**服务项目 = 当前项目（环境变量/prompt 已注入），无需引导；触发场景固定（工作流自动调用本技能），无需引导**。
+
+> 💡 **流程审批节点（按需了解）**：判断该技能处理过程中是否需要额外的流程节点——如「用户输入补充（awaiting-input）」「评审审批（pending-review/review-pass）」「任务通知（tasks notify）」等。是否需要由技能职责 + issue 阶段设计决定，**不强制每个技能都要**；只有用户诉求或职责要求时才引导确认。
+
+追问用评论：
 
 ```bash
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"body":"[VOD Agent] 为了给您生成合适的技能，请补充：\n1) 这个技能承担哪类职责（chat/vod/issue/coding/qa/sre）？\n2) 技能叫什么名字（小写连字符，如 blog-manager）？\n3) 它会操作什么系统/服务？"}'
+  --json '{"body":"[VOD Agent] 为了给您生成合适的技能，请补充：\n1) 这个技能承担哪类职责（chat/vod/issue/coding/qa/sre）？\n2) 技能叫什么名字（小写连字符，如 blog-manager）？\n3) 它会操作什么系统/服务？\n4) 处理过程中需要哪些流程节点？（如：需要用户输入补充 / 需要评审审批 / 需要任务通知；可都选或都不选）"}'
 ```
 
 判定要点见 `skill-requirement-guide.md` §四（agent_type 速查）+ §七（常见口径）。
@@ -76,9 +80,9 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 ```
 - 直接进入 Step 6，`next_step=reply_comment`。
 
-### Step 5 · A2A 交办 grape-skill-issue（仅 Step 4a 收敛后，必须严格按以下三步）
+### Step 5 · A2A 交办 issue agent（仅 Step 4a 收敛后，必须严格按以下三步）
 
-> ⚠️ **不得跳过场景核验**：交办前必须先用 `$GRAPE_SCENE_ID` 取当前场景，据此确定目标节点，再发起 A2A。
+> ⚠️ **不得跳过场景核验**：交办前必须先用 `$GRAPE_SCENE_ID` 取当前场景，据此确定目标节点，再发起 A2A。**A2A 交办的是 agent（`issue`），不是技能名（grape-skill-issue）**。
 
 **第 1 步：取当前场景节点**
 ```bash
@@ -88,13 +92,13 @@ grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out   # nodes[].skill �
 ```
 
 **第 2 步：按场景节点确定 A2A 目标**
-- **首选目标 `grape-skill-issue`**（grape-skill-dev 场景的 issue 节点：做可开发性分析/Spec/门控）。
-- 仅当场景节点含 `issue`/`issue-*`/`grape-skill-issue` 才交办；若场景无该节点 → 评论说明「当前场景未包含该环节」，`next_step=a2a_need_clarify` 标注需人工确认，不发起 A2A。
+- **目标 agent = `issue`**：交办后由 issue agent 自行决定使用哪个技能（grape-skill-dev 场景通常用 grape-skill-issue 做可开发性分析/Spec/门控）。
+- 仅当场景含 `issue`/`issue-*` 节点才交办；若场景无该节点 → 评论说明「当前场景未包含该环节」，`next_step=a2a_need_clarify` 标注需人工确认，不发起 A2A。
 
-**第 3 步：发起 A2A**（issue_number 必填）
+**第 3 步：发起 A2A**（agent 取第 2 步结果 `issue`；issue_number 必填）
 ```bash
 grape a2a handoff --json '{
-  "agent": "grape-skill-issue",
+  "agent": "issue",
   "payload": {
     "repository": "'"$REPO_FULL_NAME"'",
     "account": "'"$ACCOUNT"'",
@@ -124,10 +128,10 @@ grape a2a handoff --json '{
 grape tasks complete --json '{
   "result_text": "结论：技能需求 <已收敛/待澄清/无需动作>。",
   "next_step": "a2a_issue",
-  "actions": ["项目/技能知识基线", "agent_type 判定", "技能需求引导", "发布技能需求单评论", "A2A 交办 grape-skill-issue"],
-  "conclusion": "已收敛技能需求单：agent_type={X} name={Y} 服务项目={owner/repo}；交办 grape-skill-issue",
+  "actions": ["项目/技能知识基线", "agent_type 判定", "技能需求引导", "发布技能需求单评论", "A2A 交办 issue agent"],
+  "conclusion": "已收敛技能需求单：agent_type={X} name={Y} 服务项目={owner/repo}；交办 issue",
   "artifacts": ["Issue #'"$ISSUE_NUMBER"' 需求单评论（comment id=XXXXXX）", "A2A event seq=XXXX"],
-  "issue_summary": "技能需求已收敛 | agent_type={X} | name={Y} | 交办 grape-skill-issue"
+  "issue_summary": "技能需求已收敛 | agent_type={X} | name={Y} | 交办 issue"
 }'
 ```
 > ✅ **结构化字段必填**：`actions[]`/`conclusion`/`artifacts[]`/`issue_summary` 服务端据此组装结构化 `_sd` 写入 archive——**只传 result_text 会丢结构化归档**。

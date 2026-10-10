@@ -25,11 +25,12 @@ skill-uploader 在 skill 创建流水线末端被触发，存在两个触发点�
 
 ### skill 目录定位
 
-- 从 PR 变更文件清单（`grape git-repo pulls files`）中筛出 `skills/` 前缀的目录路径。
-- 目录路径形态二选一：
-  - `skills/{agent_type}/{name}/`（如 `skills/coding/implementation/`）
+- 从 A2A context / PR 变更文件清单（`grape git-repo pulls files`）中筛出 skill 目录路径。
+- 目录路径形态（按优先级）：
+  - `.grape/skills/{agent_type}/{name}/`（**本流水线生成地**，如 `.grape/skills/coding/implementation/`）
+  - `skills/{agent_type}/{name}/`（兼容旧路径，如 `skills/coding/implementation/`）
   - `skills/{name}/`（如 `skills/grape-cli-guidance/`）
-- agent_type 取值：vod / issue / coding / qa / sre；若 skill 直接位于 `skills/{name}/`（无 agent_type 层），`--agent_type` 传该 skill 主要使用方，缺省 `sre`。
+- agent_type 取值：vod / issue / coding / qa / sre / chat；从目录路径（`.grape/skills/{agent_type}/`）或 A2A context 提取；若 skill 直接位于 `skills/{name}/`（无 agent_type 层），`--agent_type` 传该 skill 主要使用方，缺省 `sre`。
 
 ---
 
@@ -38,35 +39,38 @@ skill-uploader 在 skill 创建流水线末端被触发，存在两个触发点�
 ### 打包命令
 
 ```bash
-cd {worktree_root}                        # worktree 根（含 skills/ 目录）
-zip -r /tmp/{skill_name}.zip skills/{path}/   # path = agent_type/name 或 name
+# ⚠️ 从 name 目录开始打包，聚焦技能本身：进 name 父目录后打包 name，ZIP 顶层即 {name}/
+SKILL_PARENT=".grape/skills/{agent_type}"   # name 父目录（.grape/skills/{agent_type} 或兼容 skills/{agent_type}）
+cd "{worktree_root}/$SKILL_PARENT"
+zip -r /tmp/{skill_name}.zip {name}
 ```
 
 ### ZIP 结构要求
 
-服务端解包后需在根层看到 SKILL.md。正确结构：
+服务端解包后在**顶层**找到 SKILL.md。正确结构（顶层 = skill 的 name 目录）：
 
 ```
 {name}.zip
-└── skills/{path}/
+└── {name}/
     ├── SKILL.md
     └── references/
         ├── ...
 ```
 
-- **不要**把 worktree 外层目录（如 repo 根的 README.md、src/）打进 ZIP。
-- **不要**从 skill 目录内部打包（会导致 ZIP 内无 `skills/` 前缀，服务端可能无法定位）。
-- 打包后校验：`unzip -l /tmp/{name}.zip | head` 确认首层为 `skills/{path}/SKILL.md`。
+- **不要**把 `.grape/skills/{agent_type}/`、`skills/{agent_type}/` 或 worktree 外层（README、src/）打进 ZIP——打包层数过多会导致服务端无法定位。
+- **不要**从 `{name}/` 目录内部打包（会丢失 `{name}/` 层，服务端可能无法定位）。
+- 打包后校验：`unzip -l /tmp/{name}.zip | head` 确认首层为 `{name}/SKILL.md`。
 
 ### agent_type 推断
 
 | skill 目录路径 | --agent_type 取值 |
 |---------------|------------------|
-| `skills/coding/{name}/` | `coding` |
-| `skills/qa/{name}/` | `qa` |
-| `skills/sre/{name}/` 或 `skills/sre/` | `sre` |
-| `skills/issue/{name}/` | `issue` |
-| `skills/vod/{name}/` | `vod` |
+| `.grape/skills/coding/{name}/` 或 `skills/coding/{name}/` | `coding` |
+| `.grape/skills/qa/{name}/` | `qa` |
+| `.grape/skills/sre/{name}/` | `sre` |
+| `.grape/skills/issue/{name}/` | `issue` |
+| `.grape/skills/vod/{name}/` | `vod` |
+| `.grape/skills/chat/{name}/` | `chat` |
 | `skills/{name}/`（无 agent_type 层） | 从 A2A context 取；缺省 `sre` |
 
 ---

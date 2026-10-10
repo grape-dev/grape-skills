@@ -7,15 +7,14 @@
 
 ## 1. 安装与就绪检查
 
-grape CLI 由 worker 预装。使用前检查：
+`grape` 通常预装；**未装/版本过低可自行安装**（见 `references/grape-cli-installation.md`）。使用前检查：
 
 ```bash
-which grape          # 验证安装，无结果直接报障，不自行安装
-grape --version      # 确认版本
-grape commands       # 验证命令树可用
+grape --version    # 确认安装（应 >= 0.3.2）
+grape commands     # 验证命令树可用
 ```
 
-> ⚠️ grape 未安装时直接报障，不 curl 直连 API。401 报错说明 token 失效。
+> ⚠️ grape 未安装且无法安装时，输出「任务无法完成的理由」，不 curl 直连 API。401 报错说明 token 失效。
 
 ---
 
@@ -146,6 +145,8 @@ grape commands       # 验证命令树可用
 
 ## 6. 安全与边界
 
-- **token 使用范围**：上传/验证、上下文读取用 `$GRAPE_SESSION_TOKEN`；GitCode Issue 评论用 prompt 注入的 `$BOT_TOKEN`。不得从数据库/配置文件/日志/历史寻找其他 token。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（会话级 `tk_`）；`BOT_TOKEN`/`USER_TOKEN` 已不注入。`skills` 相关命令为 dual（`tk_` 可用）；如需 `user_only` 级操作需 `GRAPE_API_TOKEN`（`grape_`）/JWT，本技能一般用不到。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`user_accounts` 表、`configs/` 目录。
+- **403/401 处理**：403 → 停止并回复「需管理员/维护者权限」；401 → 说明凭据已失效，不换 token。
+- **`git-repo issues update` 为整体覆盖语义**：本技能不修改 Issue body，结果用 `git-repo issues comments create` 发布。
 - **token 不写入文件**：不将 token 写进日志、脚本、ZIP、Issue 评论或工具调用以外的地方。

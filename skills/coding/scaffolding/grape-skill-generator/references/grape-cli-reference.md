@@ -1,6 +1,6 @@
 # grape CLI 命令参考（事实基线完整副本）
 
-> 来源：cli-code-analysis-spec.md（CLI v0.2.8，58 paths / 68 operations）
+> 来源：cli-code-analysis-spec.md（CLI 契约；生成 skill 时以此为命令事实基线）
 > 用途：生成 skill 时引用 grape 命令的唯一事实来源，不编造
 
 ---
@@ -10,16 +10,12 @@
 | 项 | 内容 |
 |----|------|
 | 项目用途 | Grape Agentic DevOps 命令行客户端；契约驱动命令生成 + git 本地透传 |
-| 语言/框架 | Python ≥3.10 / click ≥8.0 + httpx ≥0.24；入口 `grape` = `src/cli:main` |
-| 版本 | `0.2.8`；核心机制：读 `/openapi.json` 按 `operationId` 自动生成命令树 |
-| operationId 拆分 | 首段→组名（`gitrepo`→`git-repo`），其余→嵌套动词链 |
-| 契约加载 | 本地缓存 > 远端 > 内置快照 `src/data/openapi.json` |
+| 语言/框架 | Python ≥3.10 / click ≥8.0 + httpx ≥0.24；入口 `grape` |
+| 版本 | 最低支持 **0.3.2**（`grape --version` 校验，见 SKILL Prerequisites） |
 | 认证三通道 | Bearer(默认) / PRIVATE-TOKEN / access_token |
 | Token 优先级 | `--token` > `GRAPE_SESSION_TOKEN`(tk_) > `GRAPE_API_TOKEN`(grape_) > config.json |
-| base_url 优先级 | `--base-url` > `GRAPE_BASE_URL` > `GRAPE_SERVER_URL` > config.json > `http://localhost:8000` |
-| 命令总数 | 68 契约 + 4 内置 = 72；只读 48 / 变更 19 / 异步轮询 1 / 本地透传 1 |
+| base_url 优先级 | `--base-url` > `GRAPE_BASE_URL` > `GRAPE_SERVER_URL` > config.json |
 | 帮助分类 | 5 类：Core workflows / Code & repositories / Agent Context / Account & platform / CLI utilities |
-| 错误信封 | 新 `{"detail":{"code","message"}}`，兼容旧 `{"message":"..."}` |
 
 ---
 
@@ -72,7 +68,7 @@
 | `git-repo branches --owner --repo [--per_page=50]` | GET | `/api/git-repo/{owner}/{repo}/branches` | 只读 |
 | `git-repo commits --owner --repo [--per_page=20]` | GET | `/api/git-repo/{owner}/{repo}/commits` | 只读 |
 | `git-repo contents --owner --repo --path [--ref] [--raw]` | GET | `/api/git-repo/{owner}/{repo}/contents/{path}` | 只读 |
-| `git-repo contents root --owner --repo [--ref]` | GET | `/api/git-repo/{owner}/{repo}/contents` | 只读 |
+| `git-repo contents root --owner --repo [--ref]` | GET | `/api/git-repo/{owner}/{repo}/contents` | 只读（列根目录，等价 `--path ""`） |
 | `git-repo tree --owner --repo [--ref] [--depth=single]` | GET | `/api/git-repo/{owner}/{repo}/tree` | 只读 |
 | `git-repo labels list --owner --repo` | GET | `/api/git-repo/{owner}/{repo}/labels` | 只读 |
 | `git-repo labels create --owner --repo --json` | POST | `/api/git-repo/{owner}/{repo}/labels` | **变更** |
@@ -103,14 +99,16 @@
 | `issues events --owner --repo --number` | GET | `/api/issues/{owner}/{repo}/{number}/events` | 只读 |
 | `issues pipeline --owner --repo --number` | GET | `/api/issues/{owner}/{repo}/{number}/pipeline` | 只读 |
 
-### knowledge（5）
+### knowledge（5）+ repos project info（知识基线）
+> ⚠️ 知识读取优先用 `repos project info`（项目知识基线：project-graph + project-capabilities）+ `knowledge stats/list/detail`；`knowledge content/context` 为契约能力但非首选。
 | 命令 | 方法 | 路径 | 变更性 |
 |------|------|------|--------|
+| `repos project info --owner --repo` | GET | `/api/repos/{owner}/{repo}/project-info` | 只读 |
 | `knowledge list [--repo] [--source] [--page=1] [--page_size=50] [--show_archived=False] [--sort] [--q]` | GET | `/api/knowledge` | 只读 |
 | `knowledge detail --knowledge_id` | GET | `/api/knowledge/{knowledge_id}` | 只读 |
-| `knowledge content [--repo] [--file] [--obs_key]` | GET | `/api/knowledge/content` | 只读 |
-| `knowledge context [--repo] [--agent_type] [--issue_num=0] [--scene_id]` | GET | `/api/knowledge/context` | 只读 |
 | `knowledge stats [--repo]` | GET | `/api/knowledge/stats` | 只读 |
+| `knowledge content [--repo] [--file] [--obs_key]` | GET | `/api/knowledge/content` | 只读（非首选） |
+| `knowledge context [--repo] [--agent_type] [--issue_num=0] [--scene_id]` | GET | `/api/knowledge/context` | 只读（非首选） |
 
 ### repos（5）
 | 命令 | 方法 | 路径 | 变更性 |
@@ -150,7 +148,7 @@
 
 | 命令 | 方法 | 路径 | 变更性 |
 |------|------|------|--------|
-| `tasks mine [--status] [--repo_key] [--sort_order=desc] [--mode=default] [--created_by_me] [--assignees]` | GET | `/api/tasks/mine` | 只读 |
+| `tasks current [--status] [--repo_key] [--sort_order=desc] [--mode=default]` | GET | `/api/tasks/current` | 只读（当前任务） |
 | `tasks start --task_id` | POST | `/api/tasks/{task_id}/start` | **变更** |
 | `tasks status --task_id --json` | PUT | `/api/tasks/{task_id}/status` | **变更** |
 | `tasks status get --task_id` | GET | `/api/tasks/{task_id}/status` | 只读（遮蔽） |
@@ -213,9 +211,9 @@ v0.2.2 移除 `grape api`。契约未覆盖的端点无法通过 CLI 调用，�
 
 | 项目 | 说明 |
 |------|------|
-| grape CLI | worker 包预装，`which grape` 无结果直接报障，不自行安装 |
+| grape CLI | 通常预装；**未装/版本过低可自行安装**（见 `references/grape-cli-installation.md`），不 curl 直连 |
 | `$GRAPE_SESSION_TOKEN` | 服务端注入，任务级临时，`grape` 自动读取，不需手动 export |
 | `$GRAPE_SERVER_URL` | 服务端注入，指向 API 地址 |
 | `$GRAPE_API_TOKEN` | 用户级 `grape_` token；Account & platform 类命令需要 |
 | 执行环境 | worker .venv，有 bash |
-| 降级行为 | grape 未安装时直接报障，不 curl 直连 |
+| 降级行为 | grape 未安装且无法安装时输出「任务无法完成」理由，不 curl 直连 |

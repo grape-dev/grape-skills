@@ -74,7 +74,7 @@ grape --version      # 确认版本
 | 命令 | 用途 |
 |------|------|
 | `grape tasks complete --json '{"result_text":"...","next_step":"a2a_issue"}'` | 自报完成 |
-| `grape a2a handoff --json '{"agent":"grape-skill-issue","payload":{...}}'` | A2A 交棒 grape-skill-issue（技能需求收敛后） |
+| `grape a2a handoff --json '{"agent":"issue","payload":{...}}'` | A2A 交棒 issue agent（非技能名） |
 
 ### 3.5.1 技能资产查询（技能创建需求引导用）
 

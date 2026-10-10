@@ -1,6 +1,6 @@
 # Grape 技能创建需求引导指南
 
-> 配套 `skills/vod/feedback-loop/grape-vod-cli/SKILL.md`。本技能是 **grape-skill-dev 流水线入口**：把用户「想要一个什么样的 grape 技能」的意图，引导收敛成**结构化技能需求单**，交棒 grape-skill-issue。
+> 配套 `skills/vod/feedback-loop/grape-vod-cli/SKILL.md`。本技能是 **grape-skill-dev 流水线入口**：把用户「想要一个什么样的 grape 技能」的意图（新建/改造均可），引导收敛成**结构化技能需求单**，交棒 issue agent（通常用 grape-skill-issue 技能）。
 > ⚠️ 所有 API 调用通过 grape CLI 完成，禁止 raw curl；评论 body 一律以 `[VOD Agent]` 开头。
 
 ## 一、先理解两件事（缺一不可）
@@ -20,7 +20,8 @@
 | 2 | **skill name**（必填） | 「技能叫什么名字？」（小写连字符，如 `blog-manager`） | kebab-case，= 目录名，≤64 字符，不与已有技能冲突 |
 | 3 | **description**（必填） | 「一句话描述这个技能做什么？」 | 含职责；对齐 skill-description.json 描述 |
 | 4 | **目标系统 / 操作对象** | 「这个技能要操作什么系统/服务/命令？」（如 hcloud、REST API、华为云、计算器） | 决定命令面：CLI/SDK/API；REST API 类需 API 地址/认证/文档 |
-| 5 | **验收 / 风险** | 「怎么算做好？涉及付费/删除/不可逆操作吗？」 | 危险场景（付费资源/删除/不可逆）要显式识别 |
+| 5 | **流程审批节点**（按需） | 「处理过程中需要哪些流程节点？（如需要用户输入补充 / 需要评审审批 / 需要任务通知；可都不选）」 | 是否需要 `awaiting-input`（用户输入）、`pending-review`/`review-pass`（评审审批）、`tasks notify`（任务通知）等，由技能职责 + issue 阶段设计决定，**不强制** |
+| 6 | **验收 / 风险** | 「怎么算做好？涉及付费/删除/不可逆操作吗？」 | 危险场景（付费资源/删除/不可逆）要显式识别 |
 
 ## 三、输出：技能需求单（评论发布模板）
 
@@ -43,6 +44,9 @@
 
 ## 服务项目
 （默认当前项目 {owner}/{repo}；技能服务于其 {开发/CI/部署/运维/对话} 环节，基于当前项目知识基线确认契合）
+
+## 流程审批节点
+{按需：需用户输入实时补充（awaiting-input / 评审审批 pending-review / 任务通知 tasks notify…）；无则写"无"}
 
 ## 验收标准
 - [ ] {可验证验收项 1}

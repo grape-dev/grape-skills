@@ -1,7 +1,5 @@
 # grape-cli Skill 撰写规范要点摘要
 
-> 来源：grape-cli-skill-authoring-spec.md（附件 fb84eb4e）
-> 基于 cli-code-analysis-spec.md 事实基线（CLI v0.2.8，58 paths / 68 operations）
 > 核心优先级：减少 token 消耗 > 约束 Agent 行为 > 降低幻觉
 > 执行原则：CLI 优先 · 任务上下文先行
 
@@ -9,8 +7,10 @@
 
 ## §1 文件结构
 
+> ⚠️ 生成的 skill 放在**项目根目录 `.grape/skills/{agent_type}/{skill_name}/`** 下；项目根若无该目录，先创建。
+
 ```
-skills/{agent_type}/{skill_name}/
+.grape/skills/{agent_type}/{skill_name}/
 ├── SKILL.md                          # 主文件（流程 + 约束 + 边界），≤130 行
 └── references/                       # 参考文件（按需拆分），每个 ≤250 行
     ├── grape-cli-reference.md         # CLI 命令参考（通用模板）
@@ -52,19 +52,30 @@ tools:
 - `tools` 只声明实际需要的工具；不用的不声明
 - `description` 第一句是定位，后续枚举职责
 
-### §2.2 正文段落顺序（固定）
+### §2.2 正文段落顺序（固定，参照现有 CLI 技能实践）
+
+> 以 grape-skills 库中 vod-cli / issue-cli / coding-cli / qa-cli / deploy-cli / chat-cli 的 SKILL.md 段落结构为基准。生成新 skill 时按下列顺序组织正文：
 
 ```
-## 安全硬约束（必须遵守）       ← 最先，约束行为底线
-# {技能标题}                    ← 一级标题
-## 定位                         ← Agent 职责边界
-## {业务前缀}规范               ← 如评论前缀、输出格式
-## 处理流程                     ← 核心步骤（①②③，⓪为任务上下文读取）
-## {领域规则}                   ← 如判断标准
-## 操作边界                     ← 能做/不能做表
-## 硬约束                       ← 流程级硬性规则
-## 参考                         ← references 文件索引
+# {技能标题}                                ← 一级标题（可选，多数技能在最前）
+## 安全硬约束（必须遵守）                   ← 最先，约束行为底线
+## Prerequisites（执行前必检…）              ← 版本 / 契约刷新 / 环境变量校验
+## 环境变量（服务端已注入，直接使用）          ← env 表（REPO_OWNER/REPO_NAME/ISSUE_NUMBER/BOT_USERNAME…）
+## 定位                                     ← Agent 职责边界 + 下游交办
+## {核心原则 / 评论前缀规范}（按需）           ← 如评论前缀、项目知识基线、验证 claim 等
+## 处理流程                                 ← runbook 引用 + 场景/入口判定
+## {领域规则 / 输出规范}（按需）              ← 如判断标准、报告格式
+## 操作边界                                 ← 能做/不能做表
+## 硬约束                                   ← 流程级硬性规则
+## 参考                                     ← references 索引（含「执行走查表（先读）」）
 ```
+
+**要点（对齐现有技能）**：
+- **Prerequisites 必含**：`grape --version`（≥最低版本）→ `grape refresh`（刷新契约，⚠️ 契约权威 = `grape commands` 实列）→ env `${VAR:+ok}` 校验 → 未通过输出「前置检查未通过」并结束。
+- **环境变量表必含**：`GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` / `REPO_OWNER` / `REPO_NAME` / `REPO_FULL_NAME` / `ACCOUNT`(actor，仅 A2A) / `ISSUE_NUMBER` / `GRAPE_SCENE_ID` / `BOT_USERNAME` 等，附敏感信息提示。
+- **处理流程 = runbook 引用**：正文写「⚠️ 先读 `references/{x}-runbook.md`，按走查表逐步执行，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**」+「本技能收尾一律用 `grape tasks complete`（情形一）」；详细步骤放 runbook。
+- **正文不改写**（如涉及修改 Issue）：结论/收敛一律 `issues comments create` 发布，`issues update` 不写 body（防覆盖原始描述）。
+- **A2A 交办 agent 名**（`coding`/`qa`/`sre`/`vod`/`issue`），非技能名。
 
 ### §2.3 安全硬约束（必须最先，≤5 条）
 
@@ -73,14 +84,19 @@ tools:
 - **第 2、3 条为所有 skill 必须包含的约束项，不可删改**：
   - 「CLI 优先」：凡 grape CLI 能做的走 CLI，禁止绕过直连 API
   - 「任务上下文先行」：执行前先读任务进展
+- **建议附加（对齐现有技能，按需）**：
+  - token 作用域：只用 `$GRAPE_SESSION_TOKEN`（`tk_`）；`user_only` 端点（auth/skills）对 `tk_` 返回 403 需 `grape_`/JWT
+  - 403/401 处理：403 → 停止并回复「需管理员/维护者权限」；401 → 说明凭据已失效，不换 token
+  - token 不写文件/日志/评论
+  - 正文不改写：涉及 Issue body 修改时，结论用 `issues comments create` 发布，`issues update` 不写 body
 
 ### §2.4 处理流程
 
-- 用编号步骤（①②③）而非 markdown 列表
-- 每个步骤：标题一行 + `-` 列表动作 + grape 命令内联示例 `grape <命令> --param {占位符}`
-- 引用 reference：`见 references/{file}.md §{章节}`
-- 步骤末尾标注是否必做：`（必须最先）` / `（必做）` / `（可选）`
-- **步骤⓪（必须最先，所有 skill 必须包含）**：读取任务上下文
+- **正文 = runbook 引用**：`## 处理流程` 段落写「⚠️ 先读 `references/{x}-runbook.md`，按走查表逐步执行（Step 概览……），**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**」+「⚠️ 本技能收尾一律用 `grape tasks complete`（情形一）」。
+- 详细走查放 `references/{x}-runbook.md`：编号步骤（Step 0/1/2…）+ 每步标题 + 确切命令（`grape <命令> --param {占位符}`）+ 必做标注 + 错误排查速查 + 明确禁止。
+- 复杂分支（如按评级/类型路由）在 runbook 中用分支表；正文仅给入口/判定概览。
+- 步骤末尾标注是否必做：`（必须最先）` / `（必做）` / `（可选）`。
+- **runbook Step 0（必须最先，所有 skill 必须包含）**：读取任务上下文 + Prerequisites 通过后再读 runbook。
 
 ### §2.5 操作边界表
 
@@ -97,17 +113,29 @@ tools:
 ```markdown
 ## 任务完成流程（必做）
 
-1. **输出人类可读的分析摘要**
-2. **调用 `grape tasks complete` 自报完成（必做）**：
+完成全部业务动作后，依次执行：
 
-   grape tasks complete --json '{
-     "result_text": "{按格式组织的结论}",
-     "next_step": "{下一步标识}"
-   }'
+1. **输出人类可读的分析摘要**：{分析对象}分析数量、发现的问题、已完成动作
+2. **调用 `grape tasks complete` 自报完成（必做）**：
 ```
 
-**result_text 格式**：按「结论 / 动作 / 产出 / 摘要」组织；动作逐条用 `•`；产出带可追溯标识
-**next_step 合法值**：`a2a_{目标agent}` / `reply_comment` / `done`
+> ⚠️ **结构化字段必填**：`actions[]` / `conclusion` / `artifacts[]` / `issue_summary` 服务端据此组装结构化 `_sd` 写入 archive——**只传 `result_text` 会丢结构化归档**（空数组/空串也会导致结构化框为空）。`result_text` 可选但仍建议给一句结论。
+
+```bash
+grape tasks complete --json '{
+  "result_text": "结论：Issue #{ISSUE_NUMBER} {处理结论}。\n\n动作：\n• {动作 1}\n• {动作 2}\n\n产出：\n- {产出 1（含可追溯 id，如 comment id / A2A seq / PR #N）}\n\n摘要：一句话概括本次处理结果。",
+  "next_step": "a2a_qa",
+  "actions": ["{动作 1}"，"{动作 2}"],
+  "conclusion": "完成情况总结：{结论}，{待办/后续}",
+  "artifacts": ["{产出 1：PR #N / 评论 id / A2A event seq}"],
+  "issue_summary": "已{动词} | {摘要要点} | 后续 {下一步}"
+}'
+```
+
+- **`result_text` 组织**：按「结论 / 动作 / 产出 / 摘要」；动作逐条 `•`；产出带可追溯标识（Issue #N / comment id / A2A `seq` / PR #N / commit sha）。
+- **`next_step` 合法值**：`a2a_{目标agent}` / `reply_comment` / `done`。
+- 传入结构化字段后，**无需再在答复末尾单独输出 JSON 块**。
+- 即便本轮无后续动作、或仅评论回复，也必须调用一次；若返回 `already:true`（任务已终态），属正常，忽略即可。
 
 ---
 
@@ -115,7 +143,7 @@ tools:
 
 每个使用 grape CLI 的 skill 必须包含此文件。章节：
 
-1. **安装与就绪检查** — grape 预装，`which grape` 无结果直接报障，不自行安装
+1. **安装与就绪检查** — 通常预装；未装/版本过低可自行安装（`pip install git+https://gitcode.com/grape-dev/grape-cli.git`），不 curl 直连
 2. **认证与配置** — `$GRAPE_SESSION_TOKEN` 自动注入，不需手动 export
 3. **常用命令** — **只列本 skill 实际用到的命令**，不列全量 68 个
 4. **命令限制与不存在的能力** — 命令遮蔽 + 无 grape api 逃生舱 + 不存在能力清单
@@ -171,7 +199,7 @@ grape <group> <verb> --help       # 查参数列表
 | `IssueUpdateBody` | `git-repo issues update` | — | `labels`, `assignee`, `milestone_id`, `state` |
 | `CommentBody` | `issues comments create` + `pulls comments create` | `body` | — |
 | `LabelCreateBody` | `git-repo labels create` | `name` | `color` |
-| `PRCreateBody` | `git-repo pulls create` | — | `title`, `head`, `base`, `inner_issue_nums`, `close_related_issue` |
+| `PRCreateBody` | `git-repo pulls create` | — | `title`, `head`, `base`, `related_issue_nums`, `auto_close_issues` |
 | `PRUpdateBody` | `git-repo pulls update` | — | `title`, `body`, `labels` |
 | `A2AHandoffBody` | `a2a handoff` | — | `agent`, `payload` |
 | `TaskStatusBody` | `tasks status` | — | `status` |
@@ -215,11 +243,16 @@ skill 编写完成后，逐项检查：
 - [ ] 安全硬约束在最前面，≤5 条
 - [ ] 安全硬约束包含「CLI 优先」条目（禁止绕过 CLI 直连 API）
 - [ ] 安全硬约束包含「任务上下文先行」条目（执行前先读任务进展）
-- [ ] 处理流程步骤⓪为任务上下文读取，标注（必须最先）
-- [ ] 处理流程有编号步骤，每步标注是否必做
+- [ ] 正文含 **Prerequisites**：`grape --version` / `grape refresh` / env `${VAR:+ok}` 校验
+- [ ] 正文含 **环境变量表**：`REPO_OWNER`/`REPO_NAME`/`ISSUE_NUMBER`/`BOT_USERNAME`/`GRAPE_SCENE_ID` 等（按需）
+- [ ] **处理流程 = runbook 引用**：正文「先读 `references/{x}-runbook.md`，照抄执行」+ 收尾情形势
+- [ ] runbook Step 0 为任务上下文读取，标注（必须最先）
+- [ ] runbook 有编号步骤 + 每步命令 + 必做标注 + 错误排查 + 明确禁止
 - [ ] 操作边界表区分能做/不能做
 - [ ] 任务完成流程包含 grape tasks complete 调用
-- [ ] result_text 按「结论/动作/产出/摘要」格式
+- [ ] result_text 按「结论/动作/产出/摘要」格式，结构化字段（actions/conclusion/artifacts/issue_summary）真实填充
+- [ ] A2A 交办用 **agent 名**（coding/qa/sre/vod/issue），非技能名
+- [ ] 建 PR 的 base 用 `$WORK_BRANCH`（不硬编码 main/dev）
 - [ ] grape-cli-reference.md 包含安装检查、认证配置、常用命令、限制声明、退出码
 - [ ] grape-cli-reference.md 包含命令遮蔽和不存在能力的声明
 - [ ] grape-cli-reference.md 包含「无 grape api 逃生舱」声明
@@ -228,6 +261,7 @@ skill 编写完成后，逐项检查：
 - [ ] path 参数用下划线名，wait 参数用连字符名
 - [ ] --json body 只用规范 §3.5 列出的字段
 - [ ] 查询命令带 --json-out
+- [ ] 涉及 Issue body 修改时：用 `issues comments create` 发布，`issues update` 不写 body（回填原始 body）
 - [ ] 已上收的能力在 SKILL.md 和 reference 中都做了声明
 - [ ] SKILL.md ≤130 行
 - [ ] reference 文件 ≤250 行

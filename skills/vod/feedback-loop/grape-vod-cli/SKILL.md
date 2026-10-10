@@ -3,7 +3,7 @@ name: grape-vod-cli
 version: 3.0.0
 description: |
   Grape 技能创建需求引导（CLI 版）。把「用户想创建一个什么样的 grape 技能」的一句话意图，引导收敛为结构化技能需求单。
-  通过全命令走查表（skill-dev-runbook）逐步执行：项目/技能知识基线 → 读上下文 → agent_type 判定 → 技能需求引导（名称/职责/目标系统/验收；服务项目=当前项目，触发场景固定无需引导）→ 收敛 → A2A 交办 grape-skill-issue → tasks complete 收尾。
+  通过全命令走查表（skill-dev-runbook）逐步执行：项目/技能知识基线 → 读上下文 → agent_type 判定 → 技能需求引导（新建/改造、名称/职责/目标系统/流程节点/验收；服务项目=当前项目，触发场景固定无需引导）→ 收敛 → A2A 交办 issue agent → tasks complete 收尾。
   职责：接管「新建/改造一个 grape 技能」的意图（README/文档托管仓库或 grape-skill-dev 场景），为技能生成流水线（issue → coding → qa → sre）提供输入。
   全部操作使用 grape CLI 命令行（含验证过的环境变量 $REPO_OWNER/$REPO_NAME/$ISSUE_NUMBER 等），评论以 [VOD Agent] 开头。
 tools:
@@ -59,13 +59,14 @@ tools:
 
 ## 定位
 
-本技能（grape-vod-cli）是 **grape-skill-dev 流水线的入口**（场景 `grape-skill-dev`：vod → issue → coding → qa → sre）。职责：**把用户"想要一个什么样的 grape 技能"的一句话意图，引导收敛成结构化技能需求单**。
+本技能（grape-vod-cli）是 **grape-skill-dev 流水线的入口**（场景 `grape-skill-dev`：vod → issue → coding → qa → sre）。职责：**把用户"想要一个什么样的 grape 技能"的一句话意图（新建 / 改造现有技能均可），引导收敛成结构化技能需求单**。
 
 - **不负责**：spec 设计、打标签、生成 skill、PR、部署（那是 issue/coding/qa/sre 各节点职责）。
-- **要理解两件事**：
-  1. **用户要建什么样的技能**（agent_type / name / description / 目标系统 / 验收）——决定后续生成什么技能。
+- **要理解三件事**：
+  1. **用户要建/改什么样的技能**（agent_type / name / description / 目标系统 / 验收）——决定后续生成什么技能（新建）或改造点（改造现有技能）。
   2. **技能服务的项目 = 当前项目**（环境变量/prompt 已注入，无需引导）——通过项目知识基线了解技术栈/已有 skills/工作流，确认技能与项目能力契合。
   3. 触发场景**固定**：技能配置进工作流后，Grape 自动调用本技能处理 issue，无需用户描述触发方式。
+  4. **流程审批节点**（按需）：该技能处理过程中是否需要「用户输入（awaiting-input）」「评审审批（pending-review/review-pass）」「任务通知（tasks notify）」等流程节点——是否需要由技能职责与 issue 阶段设计决定。
 - 技能需求单产出：经管道交棒下游，**不改写原始 Issue 描述**（收敛结论以评论发布）。
 
 ## Grape 技能家族速查（引导判定用）
@@ -97,7 +98,7 @@ Grape 官方技能是一条流水线的各段，`agent_type` 决定目录/职责
 | 引导用户说清技能需求（agent_type/name/职责/目标系统/触发/验收） | ✅ **必须做** |
 | 了解技能服务的项目（项目知识基线） | ✅ **必须做** |
 | 以评论发布收敛后的「技能需求单」（不改写原始 Issue body） | ✅ **可以做** |
-| A2A 交办 grape-skill-issue（技能需求收敛后） | ✅ **必须做** |
+| A2A 交办 issue agent（技能需求收敛后） | ✅ **必须做** |
 | A2A 前检查 pipeline 是否已有目标 a2a_event | ✅ **必须做（防重复交办）** |
 | agent_type 判定不清 / 需求模糊 | ❌ **不硬猜**——澄清（≤3 轮）或标「待澄清」**
 | 用 `issues update` 改写 Issue body/描述 | ❌ **禁止**（覆盖原始描述；收敛结论一律评论发布） |
