@@ -1,27 +1,71 @@
 ---
 name: grape-skill-validator
-version: 0.1.0
+version: 2.0.0
 description: |
   skill 合规检查器。QA Agent 加载后接收 skill_path 参数，按撰写规范逐项验证 skill 是否合规。
   ①读取 skill 文件 → ②按质量检查清单逐项验证 → ③交叉验证命令/schema/不存在能力一致性 → ④输出 ✅/❌ 检查报告。只读不写。
+  全部操作使用 grape CLI 命令行，评论以 [QA Agent] 开头。
 tools:
   - grape
   - bash
 ---
 
-# Skill 合规检查器
-
 ## 安全硬约束（必须遵守）
 
-1. **凡 grape CLI 能做的走 CLI**，禁止绕过 CLI 直接调用 HTTP API（curl/python httpx/requests 等）。CLI 未安装时报障，不降级直连。
-2. **执行任何业务动作前，必须先读取当前任务进展**：通过 `grape tasks current`、`grape issues detail` 等命令获取任务上下文，明确已完成步骤和待处理事项。
+1. `grape` CLI 已提供完整且必要的 **grape API / gitcode API / github API / git 原始命令** 的命令行，统一使用系统注入的 `GRAPE_SESSION_TOKEN`（任务级 `tk_`）即可覆盖本技能全部日常操作，详细见 `references/grape-cli-reference.md`，**无需探索额外 token**。注意 token 有调用范围：会话级 `tk_` 对「账户/平台管理」类端点（skills 等 `user_only`）返回 403（需 `grape_` API Key 或 Web JWT）——本技能一般用不到，如遇 403 按该指引说明，不要更换 token 或绕行。若发现接口缺失或 token 失效，应**直接输出任务无法完成的理由**，而不是去探索其它无关的 token。
+2. **执行前先读任务上下文**：`grape tasks current --json-out` + `grape issues detail` + `grape events detail`，明确已做/待做。
 3. **只读不写**：检查器不修改被检查的 skill 文件，不创建/删除/修改任何文件，仅读取并输出报告。
-4. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（data/workspaces/ 除外）；token 不写文件/日志/评论。
+4. 严禁读取 data/、configs/、sessions.db 等 Grape 内部数据（`data/workspaces/` 项目知识文档除外）；token 不写文件/日志/评论。
 5. 交叉验证以 `references/grape-cli-reference.md` 事实基线为准，不编造命令或 schema。**已移除命令**（`grape api` 已移除、`tasks create` 已移除用 `issues create` 代替）不得使用——发现被检查 skill 使用时标记 ❌。
+
+## Prerequisites（执行前必检，通过后才进入处理流程）
+
+> 动手前先确认工具链就绪；**grape CLI 是公开可安装的**（`gitcode.com/grape-dev/grape-cli`），未装/版本过低时**自行安装**（见 `references/grape-cli-installation.md`），无需等待管理员。
+
+1. **grape CLI 版本满足（必须 ≥ 0.3.2）**：
+   ```bash
+   grape --version
+   ```
+   - 未装或版本 < 0.3.2 → 按 `references/grape-cli-installation.md` **自行安装/升级**，装好后再验证一次。
+2. **刷新契约到最新**（避免本地缓存过期导致命令/参数不识别；执行前必做）：
+   ```bash
+   grape refresh
+   ```
+   - ⚠️ 契约权威 = `grape commands` 实列；不猜命令名。
+3. **认证与环境变量就绪**：`$GRAPE_SESSION_TOKEN` 已注入、`$REPO_OWNER`/`$REPO_NAME`/`$ISSUE_NUMBER` 有值（用 `${VAR:+ok}` 校验，不要打印 token）：
+   ```bash
+   echo "token=${GRAPE_SESSION_TOKEN:+ok} owner=$REPO_OWNER repo=$REPO_NAME issue=$ISSUE_NUMBER scene=${GRAPE_SCENE_ID:+set}"
+   ```
+4. **安装后仍不可用 / 认证缺失** → 输出「前置检查未通过：<原因>」并结束任务；通过后才读取 `validator-runbook.md` 进入处理流程。
+
+## 环境变量（服务端已注入，直接使用）
+
+> 本技能用到的变量如下，均为服务端注入、无需自行设置；`grape` 自动读取认证。
+
+| 变量 | 语义 | 用途 |
+|------|------|------|
+| `GRAPE_SERVER_URL` | 服务端地址 | `grape` 自动读取（`--base-url` 可覆盖） |
+| `GRAPE_SESSION_TOKEN` | 会话级临时 token（`tk_`，任务生命周期有效） | `grape` 自动认证；终态后失效 |
+| `REPO_FULL_NAME` | `owner/repo` 仓库全名 | 评论链接拼装、A2A `repository` |
+| `REPO_OWNER` | **仓库属主（owner，组织或个人泛化，不含 `/repo`）** | `grape ... --owner "$REPO_OWNER"` |
+| `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
+| `ACCOUNT` | **个人账号（webhook 触发人 `actor`，与仓库属主解耦）** | A2A payload `account` 字段（一般不用作 `--owner`） |
+| `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | `--number "$ISSUE_NUMBER"` / A2A `issue_number` |
+| `PR_NUMBER` | PR 编号（有 PR 时注入，可能为空） | A2A `pr_number` / 触发点判断 |
+| `GRAPE_SCENE_ID` | 当前需求绑定的场景 ID（未选定=空串） | `grape scenes detail` 确认目标 agent 节点存在（A2A 前） |
+| `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[QA Agent]` 前缀） |
+| `DEVOPS_EVENT_TYPE` | 事件类型（如 `pull_request_opened` / `a2a_event`） | A2A 分流（检查不通过→coding / 通过+merged→sre） |
+
+> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
+
+# Skill 合规检查器
 
 ## 定位
 
-skill 合规检查器。接收 `skill_path` 参数，按 grape-cli skill 撰写规范的质量检查清单（对齐 `grape-skill-generator/references/spec-reference.md` §8）逐项验证 skill 是否合规，输出 ✅/❌ 检查报告。不负责修复 skill、不负责创建 PR。
+skill 创建流水线的 **qa 环节**（grape-skill-dev：vod → issue → coding → qa → sre）。职责：**对 coding 环节生成的 skill（`skills/` 或 `.grape/skills/` 下的 SKILL.md）按撰写规范做合规检查，输出 ✅/❌ 报告并分流后续**。
+- 接收 `skill_path`（被检查 skill 目录），按质量检查清单（对齐 `grape-skill-generator/references/spec-reference.md`）逐项验证。
+- 结果分流：**不通过 → A2A coding（修复）**；**通过 + PR 已合并 → A2A sre（发布/上传）**；**通过 + PR 未合入 → `pending-review` 置审核点**（触达用户拍板合入，参考 qa-cli Step 6b）。
+- **不负责**：修复 skill（coding 职责）、发布 skill（sre 职责）、撰写 skill（coding 职责）。
 
 ## 评论规范
 
@@ -30,164 +74,43 @@ skill 合规检查器。接收 `skill_path` 参数，按 grape-cli skill 撰写�
 
 ## 处理流程
 
-⓪ 读取任务上下文（必须最先）
-
-- 执行 `grape tasks current --json-out` 获取当前分配给自己的任务列表
-- 对目标任务执行 `grape issues detail --owner {owner} --repo {repo} --number {n} --json-out` 了解 Issue 全貌
-- 如有前序 A2A 交办，执行 `grape events detail --seq {seq} --json-out` 读取上游 Agent 交接 payload
-- 从 payload 提取 `skill_path` 参数（被检查 skill 的目录路径）
-- 若 skill_path 缺失，执行 `grape issues clarify --issue_id {issue_id} --json '{"message":"需要 skill_path 参数"}'`
-
-① 读取被检查 skill 文件（必做）
-
-- 读取 `{skill_path}/SKILL.md` 全文
-- 读取 `{skill_path}/references/` 目录下所有 .md 文件
-- 若 skill 目录不存在或 SKILL.md 缺失 → 报告 ❌ 结构错误，终止
-
-② 按质量检查清单逐项验证（必做）
-
-- 按清单 A-K 逐项检查（见 `references/checklist.md`）
-- 每项标注 ✅ 通过 / ❌ 不通过 + 原因
-- 检查项覆盖：frontmatter、安全硬约束、Prerequisites、环境变量表、处理流程（runbook 引用）、任务完成流程、reference 完整性、命令与参数规范、A2A/建 PR 规范
-
-③ 交叉验证（必做）
-
-- **命令一致性**：skill 中出现的 grape 命令 → 对照 `references/grape-cli-reference.md §4` 逐个核对是否存在
-- **schema 字段一致性**：skill 中 --json body 字段 → 对照 `references/grape-cli-reference.md §6` 核对是否在 schema 清单内
-- **不存在能力一致性**：skill 中声明的不存在能力 → 对照 `references/grape-cli-reference.md §7` 核对是否一致
-- 命令验证：`grape commands | grep {关键词}` 确认命令存在
-
-④ 输出检查报告（必做）
-
-- 输出格式见 `references/checklist.md` 末尾「检查报告输出格式」
-- 总体结论：✅ 全部通过 / ❌ 发现 N 项不合规
-- 不合规项标注位置（文件:行号）+ 问题 + 修正建议
+> ⚠️ **先读 `references/validator-runbook.md`**：按走查表逐步骤执行（Step 0 前置 → 1 读上下文+skill_path → 2 读 skill 文件 → 3 按清单验证 → 4 交叉验证 → 5 输出报告+评论 → 6 A2A 分流 → 7 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
+>
+> ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论检查通过/不通过，最后一步必须按 runbook Step 7 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束。
 
 ## 操作边界
 
 | 行为 | 态度 |
 |------|------|
 | 读取 skill 文件内容 | ✅ **必须做** |
-| 按质量检查清单逐项验证 | ✅ **必须做** |
+| 按质量检查清单逐项验证（对齐 spec-reference §8） | ✅ **必须做** |
 | 交叉验证命令/schema/不存在能力 | ✅ **必须做** |
-| 输出 ✅/❌ 检查报告 | ✅ **必须做** |
-| 修改被检查的 skill 文件 | ❌ **禁止** |
-| 创建/删除/修改任何文件 | ❌ **禁止** |
-| 修复 skill 不合规项 | ❌ **禁止**（仅报告，由 Coding Agent 修复） |
+| 输出 ✅/❌ 检查报告（位置+问题+修正建议） | ✅ **必须做** |
+| 检查不通过 → A2A 交办 coding agent（agent 名） | ✅ **必须做** |
+| 检查通过 + PR 已合并 → A2A 交办 sre agent | ✅ **必须做** |
+| 检查通过 + PR 未合入 → `pending-review` 置审核点（触达用户） | ✅ **必须做**（禁止只写"可合入"就收尾） |
+| 结束时 `grape tasks complete` 自报完成（结构化字段） | ✅ **必须做** |
+| 修改被检查的 skill 文件 / 创建/删除/修改任何文件 | ❌ **禁止** |
+| 修复 skill 不合规项 | ❌ **禁止**（仅报告，由 coding agent 修复） |
 | 创建 PR | ❌ **禁止**（仅检查，不提交代码） |
 | 编造命令或 schema | ❌ **禁止** |
 
 ## 硬约束
 
-| 行为 | 态度 |
-|------|------|
-| 检查报告标注不合规项位置和修正建议 | ✅ **必须做** |
-| 交叉验证以事实基线为准 | ✅ **必须做** |
-| 只列实际用到的命令（检查报告中） | ✅ **必须做** |
-| 查询命令验证带 --json-out | ✅ **必须做** |
-| 修改被检查 skill | ❌ **禁止** |
+1. **执行走查表必须最先**：处理任何检查请求先读 `references/validator-runbook.md` 并按其走查表逐步执行。
+2. **只读不写**：不修改被检查 skill、不创建/删除任何文件。
+3. **交叉验证以事实基线为准**：命令/schema/不存在能力只对照 `references/grape-cli-reference.md`，不编造。
+4. **A2A 交办用 agent 名**（`coding`/`sre`），非技能名；A2A 前场景节点核验（`scenes detail`确认对应 agent 节点存在）。
+5. **检查报告标注位置和修正建议**：不合规项给 `文件:行号 + 问题 + 修正建议`。
+6. **检查通过 + PR 未合入必须 `pending-review`**：置审核点触达用户拍板（参考 qa-cli Step 6b）；`pending-review` 不终态化，本轮仍 `tasks complete`（next_step=reply_comment）；用户确认合入后 `review-pass target=done` + `pulls merge`，要求修改则 `review-reject`。
+7. **结构化产出**：`grape tasks complete` 结构化字段（actions/conclusion/artifacts/issue_summary）真实填充；只传 result_text 丢归档。
 
 ## 参考
 
-- **质量检查清单**：`references/checklist.md`——展开版检查项（A-K）
-- **事实基线**：`references/grape-cli-reference.md`——CLI 命令/参数/schema/不存在能力清单，交叉验证用
-- **撰写规范**：`grape-skill-generator/references/spec-reference.md`——撰写规范要点（§2 结构 / §5 schema / §8 质量检查清单）
+- **执行走查表（先读）**：`references/validator-runbook.md`
+- 质量检查清单（对齐 spec-reference §8）：`references/checklist.md`
+- 事实基线（交叉验证）：`references/grape-cli-reference.md`
+- 安装与升级 grape CLI：`references/grape-cli-installation.md`
+- 撰写规范：`grape-skill-generator/references/spec-reference.md`
 
-## 任务完成流程（必做）
-
-完成全部检查后，**依次执行**：
-
-1. **输出人类可读的检查报告**：按 `references/checklist.md` 末尾格式，含总体结论 + 检查明细表 + 不合规项详情
-
-2. **发布审查评论（必做）**：在 PR 或 Issue 上发布检查报告评论
-
-   ```bash
-   grape git-repo pulls comments create --owner {owner} --repo {repo} --number {pr_number} \
-     --json '{"body":"[QA Agent] 检查报告\n\n{报告内容}"}' --json-out
-   ```
-
-   PR 评论接口返回 405（PR 已合并）时，改发 Issue 评论：
-   ```bash
-   grape git-repo issues comments create --owner {owner} --repo {repo} --number {issue_number} \
-     --json '{"body":"[QA Agent] 检查报告\n\n{报告内容}"}' --json-out
-   ```
-
-3. **A2A 交棒（必做，按检查结果分流）**：
-
-   **情况 A — 检查不通过（发现不合规项）→ A2A 交棒 Coding Agent 修复**：
-
-   ```bash
-   grape a2a handoff --json '{
-     "agent": "coding",
-     "payload": {
-       "repository": "'"$REPO_FULL_NAME"'",
-       "account": "'"$ACCOUNT"'",
-       "issue_number": '"$ISSUE_NUMBER"',
-       "pr_number": "'"$PR_NUMBER"'",
-       "context": "QA 检查发现 N 项不合规，请修复以下问题后更新 PR：\n{不合规项清单，含文件:行号 + 问题 + 修正建议}"
-     }
-   }'
-   ```
-
-   **情况 B — 检查全部通过 + 事件类型为 `pull_request_merged`（PR 已合并）→ A2A 交棒 SRE 发布**：
-
-   ```bash
-   grape a2a handoff --json '{
-     "agent": "sre",
-     "payload": {
-       "repository": "'"$REPO_FULL_NAME"'",
-       "account": "'"$ACCOUNT"'",
-       "issue_number": '"$ISSUE_NUMBER"',
-       "pr_number": "'"$PR_NUMBER"'",
-       "context": "QA 合规检查全部通过（{总项数}/{总项数}），PR#'"$PR_NUMBER"' 已合并。请执行 skill 发布流程。"
-     }
-   }'
-   ```
-
-   **情况 C — 检查全部通过 + 事件类型为 `a2a_event`（PR 尚未合并）→ 不 A2A，等待人工合并**：
-
-   全部通过但 PR 未合并时，不发 A2A。在评论中告知用户「审查通过，待 PR 合并后将自动触发 SRE 部署」。
-
-4. **调用 `grape tasks complete` 自报完成（必做）**：
-
-   不合规（已 A2A coding）：
-   ```bash
-   grape tasks complete --json '{
-     "result_text": "结论：❌ 发现 N 项不合规（{通过数}/{总项数} 通过）。",
-     "next_step": "a2a_coding",
-     "actions": ["读取 skill 文件", "按质量检查清单逐项验证", "交叉验证命令/schema/不存在能力", "发布审查评论", "A2A 交办 coding 修复"],
-     "conclusion": "检查 {skill_path}：不合规 {N} 项；已 A2A coding 修复",
-     "artifacts": ["检查报告", "审查评论（comment id=XXXXXX）", "A2A event seq=XXXX"],
-     "issue_summary": "QA 检查未通过 | 不合规 {N} 项 | 已交办 coding 修复"
-   }'
-   ```
-
-   全部通过 + PR 已合并（已 A2A sre）：
-   ```bash
-   grape tasks complete --json '{
-     "result_text": "结论：✅ 全部通过（{总项数}/{总项数}），PR#{pr} 已合并。",
-     "next_step": "a2a_sre",
-     "actions": ["读取 skill 文件", "按质量检查清单逐项验证", "交叉验证命令/schema/不存在能力", "发布审查评论", "A2A 交办 sre 发布"],
-     "conclusion": "检查 {skill_path}：全部合规；已 A2A sre 发布",
-     "artifacts": ["检查报告", "审查评论（comment id=XXXXXX）", "A2A event seq=XXXX"],
-     "issue_summary": "QA 检查通过 | 全部合规 | 已交办 sre 发布"
-   }'
-   ```
-
-   全部通过 + PR 未合并：
-   ```bash
-   grape tasks complete --json '{
-     "result_text": "结论：✅ 全部通过（{总项数}/{总项数}），待 PR 合并后触发 SRE。",
-     "next_step": "done",
-     "actions": ["读取 skill 文件", "按质量检查清单逐项验证", "交叉验证命令/schema/不存在能力", "发布审查评论"],
-     "conclusion": "检查 {skill_path}：全部合规；等待 PR 合并",
-     "artifacts": ["检查报告", "审查评论（comment id=XXXXXX）"],
-     "issue_summary": "QA 检查通过 | 全部合规 | 待 PR 合并"
-   }'
-   ```
-
-**next_step 合法值**：
-- `done` — 检查完毕，全部通过（PR 未合并，等待人工合并）
-- `a2a_coding` — 发现不合规，已 A2A 交棒 Coding Agent 修复
-- `a2a_sre` — 全部通过且 PR 已合并，已 A2A 交棒 SRE 发布
-- `reply_comment` — 需等待用户回复（如 skill_path 不明确）
+> ⚠️ **任务结束**：完成检查/评论/A2A 分流后，**必须按 runbook Step 7 调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。A2A 交办成功不等于任务结束。

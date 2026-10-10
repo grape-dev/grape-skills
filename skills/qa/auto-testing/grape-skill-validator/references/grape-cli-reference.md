@@ -24,15 +24,14 @@
 
 ## 2. 安装检查（grape CLI）
 
-`grape` 由运维/部署侧预装，agent **一般不需也不应自行安装**。使用前验证：
+`grape` 通常预装；**未装/版本过低可自行安装**（见 `references/grape-cli-installation.md`）。使用前验证：
 
 ```bash
-grape --version    # 确认安装，输出 grape 0.2.8
+grape --version    # 确认安装（应 >= 0.3.2）
 grape commands     # 验证命令树可用
 ```
 
-- `which grape` 无结果 → 直接回复「当前执行环境未安装 grape CLI」，**不要**自行安装，也**不要**改用 curl 直连。
-- 401 报错说明 `$GRAPE_SESSION_TOKEN` 已失效（任务级临时 token）。
+> ⚠️ grape 未安装且无法安装时，输出「任务无法完成的理由」，不 curl 直连 API。401 报错说明 token 失效。
 
 ---
 
@@ -94,12 +93,20 @@ grape commands     # 验证命令树可用
 
 > v0.2.x 路径前缀 `/api/repos/` → `/api/git-repo/`；`--provider` 已移除。
 
-### issues（5）
+### issues（5+ 流程状态）
+| 命令 | 方法 | 路径 | 变更性 |
+|------|------|------|--------|
 | `issues list --owner --repo` | GET | `/api/issues/{owner}/{repo}` | 只读 |
 | `issues create --owner --repo --json` | POST | `/api/issues/{owner}/{repo}` | 变更 |
 | `issues detail --owner --repo --number` | GET | `/api/issues/{owner}/{repo}/{number}` | 只读 |
 | `issues events --owner --repo --number` | GET | `/api/issues/{owner}/{repo}/{number}/events` | 只读 |
 | `issues pipeline --owner --repo --number` | GET | `/api/issues/{owner}/{repo}/{number}/pipeline` | 只读 |
+
+**流程状态命令（审查/交付决策用，交叉验证 qa 等 skill 时核对）：**
+| `issues awaiting-input --issue_id --json` | POST | 待澄清（置 awaiting_input + 触达用户） | 变更 |
+| `issues pending-review --issue_id --json` | POST | 置待人工拍板审核点（审查通过未合入） | 变更 |
+| `issues review-pass --issue_id --json` | POST | 审核通过（target=done 完成 / processing 继续） | 变更 |
+| `issues review-reject --issue_id --json` | POST | 审核打回 | 变更 |
 
 ### knowledge / repos / scenes（11）
 | `knowledge list [--repo] [--source] [--page] [--page_size=50] [--show_archived=False] [--sort] [--q]` | GET | `/api/knowledge` | 只读 |
@@ -179,11 +186,11 @@ grape commands     # 验证命令树可用
 | `IssueUpdateBody` | `git-repo issues update` | — | `labels=""`, `assignee=""`, `milestone_id=0`, `state=""` |
 | `CommentBody` | issues/pulls comments create | `body` | — |
 | `LabelCreateBody` | `git-repo labels create` | `name` | `color="#d73a4a"` |
-| `PRCreateBody` | `git-repo pulls create` | — | `title=""`, `head=""`, `base=""`, `inner_issue_nums=""`, `close_related_issue=false` |
+| `PRCreateBody` | `git-repo pulls create` | — | `title=""`, `head=""`, `base=""`, `related_issue_nums=[]`, `auto_close_issues=false` |
 | `PRUpdateBody` | `git-repo pulls update` | — | `title=""`, `body=""`, `labels=""` |
 | `A2AHandoffBody` | `a2a handoff` | — | `agent=""`, `payload={}` |
 | `TaskStatusBody` | `tasks status` | — | `status=""` |
-| `TaskSelfCompleteBody` | `tasks complete` | — | `task_id=""`, `result_text=""`, `next_step=""`, `conclusion=""`, `issue_summary=""` |
+| `TaskSelfCompleteBody` | `tasks complete` | — | `task_id=""`, `result_text=""`, `next_step=""`, `actions=[]`, `conclusion=""`, `artifacts=[]`, `issue_summary=""` |
 | `TaskClarifyBody` | `tasks clarify` | — | `message=""` |
 | Free-form JSON | `issues create` | — | title/description/assignee/scene_id/is_subtask_mode 等 |
 | multipart | `skills upload` | `--file` | 表单字段 |
@@ -216,6 +223,6 @@ grape commands     # 验证命令树可用
 
 **退出码**：0 成功 · 1 通用错误 · 2 用法错误 · ≥400 HTTP 透传 · 130 Ctrl+C · git 退出码透传
 
-**认证**：`$GRAPE_SESSION_TOKEN` 服务端注入自动读取；`$GRAPE_SERVER_URL` 服务端注入；token 任务级临时；`GRAPE_CLI_MODE`（WORKER/USER/ALL）过滤可见命令；grape 未安装直接报障，不 curl 直连。
+**认证**：`$GRAPE_SESSION_TOKEN` 服务端注入自动读取；`$GRAPE_SERVER_URL` 服务端注入；token 任务级临时；`GRAPE_CLI_MODE`（WORKER/USER/ALL）过滤可见命令；grape 未安装且无法安装时输出「任务无法完成」理由，不 curl 直连。
 
 **命令验证**：`grape commands | grep <关键词>` 或 `grape <group> <verb> --help`
