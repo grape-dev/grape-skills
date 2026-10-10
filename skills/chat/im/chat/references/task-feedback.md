@@ -1,4 +1,4 @@
-# 一般问询：意见反馈 / 需求引导（inquiry-handling）
+﻿# 一般问询：意见反馈 / 需求引导（task-feedback）
 
 当用户提出建议、新需求或问题反馈（非任务场景、非实施启动审批）时，执行本流程，帮助用户把想法**明确成可开发的 Issue**。
 
@@ -43,16 +43,18 @@
 信息补充到位后，创建 Issue（不带标签），正文模板：
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
+grape git-repo issues create --owner {owner} --repo {repo} \
+  --json '{
     "title": "<清晰的需求标题>",
     "body": "**提交人**: @用户飞书昵称 (Feishu ID: xxx)\n**渠道**: 飞书\n**时间**: 当前时间\n**归属**: 🤖 Chat Agent 本身 / 📦 当前仓库\n\n**需求描述**:\n> 用户核心需求\n\n**使用场景**:\n> 场景说明\n\n**预期效果**:\n> 期望结果\n\n**验收标准**:\n> 可衡量的完成标准\n\n---\nauto-submitted by Chat Agent Feishu feedback"
-  }' \
-  $VCS_API_BASE/repos/{owner}/{repo}/issues
+  }'
 ```
 
-> **重要**：创建 Issue 使用用户自己的 `$USER_TOKEN`。创建后会触发该仓库 webhook 事件，由于是用户本人（非 bot）创建，**不会被 self-comment 过滤**，issue agent 会正常分诊处理该 Issue。
+> **重要**：本技能默认用会话 token（`$GRAPE_SESSION_TOKEN`）创建；若 prompt 仍注入 `$USER_TOKEN` 且需以用户本人身份创建（避免 self-comment 过滤、让 issue agent 正常分诊），用一次性参数：
+> ```bash
+> grape --token "$USER_TOKEN" git-repo issues create --owner {owner} --repo {repo} --json '{"title":"...","body":"..."}'
+> ```
+> 若建 Issue 后 issue agent 因 self-comment 过滤未分诊，在回复中如实提示用户。
 
 ## 4. 回复用户
 
