@@ -199,7 +199,7 @@ grape <group> <verb> --help       # 查参数列表
 | `IssueUpdateBody` | `git-repo issues update` | — | `labels`, `assignee`, `milestone_id`, `state` |
 | `CommentBody` | `issues comments create` + `pulls comments create` | `body` | — |
 | `LabelCreateBody` | `git-repo labels create` | `name` | `color` |
-| `PRCreateBody` | `git-repo pulls create` | — | `title`, `head`, `base`, `related_issue_nums`, `auto_close_issues` |
+| `PRCreateBody` | `git-repo pulls create` | — | `title`, `body`, `head`, `base`, `related_issue_nums`, `auto_close_issues` |
 | `PRUpdateBody` | `git-repo pulls update` | — | `title`, `body`, `labels` |
 | `A2AHandoffBody` | `a2a handoff` | — | `agent`, `payload` |
 | `TaskStatusBody` | `tasks status` | — | `status` |

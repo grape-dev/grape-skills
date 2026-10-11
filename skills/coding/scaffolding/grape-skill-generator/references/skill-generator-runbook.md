@@ -72,12 +72,13 @@ mkdir -p ".grape/skills/{agent_type}/{name}"
 grape git add ".grape/skills/{agent_type}/{name}/" && grape git commit -m "feat(skills): add {name} skill"
 grape git push origin "feat/issue-$ISSUE_NUMBER"
 
-# 建 PR（base 用 $WORK_BRANCH，不硬编码 main；关联字段用 related_issue_nums/auto_close_issues）
+# 建 PR（base 用 $WORK_BRANCH，不硬编码 main；关联字段用 related_issue_nums/auto_close_issues；body 必带，生成的 PR 才有完整描述）
 grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json '{
     "title": "feat: add {name} skill",
     "head": "feat/issue-'"$ISSUE_NUMBER"'",
     "base": "'"$WORK_BRANCH"'",
+    "body": "## 概述\n\n新增 {agent_type} 技能 {name}：{技能职责一句话}（按 grape-cli skill 撰写规范生成）。\n\n## 改动\n- 新增 `.grape/skills/{agent_type}/{name}/SKILL.md`\n- 新增 `.grape/skills/{agent_type}/{name}/references/`（grape-cli-reference / {业务 guide} 等）\n\n## 后续\n- 请 QA 审查技能规范合规性（skill 合规检查器验证 frontmatter/安全硬约束/runbook 等）",
     "related_issue_nums": ["'"$REPO_FULL_NAME"'#'"$ISSUE_NUMBER"'"],
     "auto_close_issues": true
   }' --json-out
