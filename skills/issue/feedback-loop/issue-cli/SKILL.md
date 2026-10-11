@@ -85,9 +85,6 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 ### 守门不修 bug
 可以打标签、发评论、分配负责人，但**不要直接写代码修 bug**。
 
-### ⚠️ 任务通知硬规则（不可跳过）
-处理结束、责任人最终确定后（含机器人接管），必须用 `grape tasks notify` 上报任务（幂等）。见 runbook Step 6。
-
 ### 超出能力范围时主动请求支援
 超出范围任务通过 A2A 交办：代码实现→coding；PR 审查→qa；构建/部署/运维→sre；需求不清→vod。见 runbook Step 5 与 Agent 列表。
 
@@ -102,9 +99,9 @@ Prompt 包含同仓库历史事件，处理前先看最近事件，避免重复�
 
 ## 处理流程
 
-> ⚠️ **先读 `references/issue-runbook.md`**：处理任何 Issue 按走查表逐步骤执行（Step 1 读上下文 → 2 知识基线 → 3 深度分析 → 4 按评级动作 → 5 A2A → 6 任务通知 → 7 评论回复 → 8 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**；**起步只读 runbook，guide 按 Step 指示按需 read**（勿一次性读全部 references）。
+> ⚠️ **先读 `references/issue-runbook.md`**：处理任何 Issue 按走查表逐步骤执行（Step 1 读上下文 → 2 知识基线 → 3 深度分析 → 4 按评级动作 → 5 A2A → 6 评论回复 → 7 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**；**起步只读 runbook，guide 按 Step 指示按需 read**（勿一次性读全部 references）。
 >
-> ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook Step 8 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
+> ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook Step 7 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 
 ## 操作边界
 
@@ -115,7 +112,6 @@ Prompt 包含同仓库历史事件，处理前先看最近事件，避免重复�
 | 回复 Issue、追问澄清 | ✅ **鼓励做** |
 | 生成 Spec（评级 ready 后） | ✅ **必须做** |
 | A2A 交办 coding（评级 ready） | ✅ **必须做**（未 ready 不交办） |
-| 任务通知 notify 上报（责任人确定后） | ✅ **必须做** |
 | 结束时 `grape tasks complete` 自报完成 | ✅ **必须做** |
 | 直接写代码、修改文件 | ❌ **禁止** |
 | 提交 PR、合并 PR | ❌ **禁止** |
@@ -138,4 +134,4 @@ Prompt 包含同仓库历史事件，处理前先看最近事件，避免重复�
 - Spec 生成：`references/spec-generation.md`；评论回复：`references/comment-guide.md`；有效性检查（子步骤）：`references/issue-validity-check.md`
 - Grape CLI 全命令：`references/grape-cli-reference.md`
 
-> ⚠️ **任务结束**：完成所有业务动作后，**必须按 runbook Step 8 先输出摘要并调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。
+> ⚠️ **任务结束**：完成所有业务动作后，**必须按 runbook Step 7 先输出摘要并调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。

@@ -131,18 +131,7 @@ grape a2a handoff --json '{
 - ⚠️ `issue_number` 必填；`pr_number` 有则填、无则不填，严禁混用。
 - ⚠️ **重复 A2A 检查**：pipeline 已含目标 agent 的 `a2a_event` → 不要重复交办，只发评论回复。
 
-### Step 6 · 任务通知（处理结束责任人确定后必做，幂等）
-> assignee 用 `$BOT_USERNAME`（机器人接管）或实际责任人 VCS 用户名，不写死 `grape_bot` 字面量。
-```bash
-grape tasks notify --json '{
-  "assignee": "'"$BOT_USERNAME"'",
-  "repo_key": "'"$REPO_FULL_NAME"'",
-  "issue_number": '"$ISSUE_NUMBER"',
-  "task_description": "Issue #'$ISSUE_NUMBER' 已分配给你，请处理：<简要任务描述>"
-}'
-```
-
-### Step 7 · 判断"是否已实现" + 评论回复（必做，除非是机器人自己的评论）
+### Step 6 · 判断"是否已实现" + 评论回复（必做，除非是机器人自己的评论）
 **① 核对需求是否已实现（目标分支 `$WORK_BRANCH`，Step 2 ① 解析）——避免重复开发/误判**：
 ```bash
 grape git log --oneline -20 --all                                     # 本地裸库核对合并历史
@@ -153,7 +142,7 @@ grape git-repo commits --owner "$REPO_OWNER" --repo "$REPO_NAME" --per_page 20 -
 
 **② 发评论**：按 `references/comment-guide.md` 格式，body 以 `[issue agent]` 开头，基于知识基线与分析结论。
 
-### Step 8 · 任务完成流程（必做，任何分支都必须执行到最后）
+### Step 7 · 任务完成流程（必做，任何分支都必须执行到最后）
 > ⚠️ **强约束：本技能收尾 = 调 `grape tasks complete`（情形一）**。任何分支最后一步都必须调用，**评论发完 ≠ 任务完成**；只调 complete，不再输出 JSON 块。
 
 按分支选定 `next_step`：
@@ -168,7 +157,7 @@ grape git-repo commits --owner "$REPO_OWNER" --repo "$REPO_NAME" --per_page 20 -
 grape tasks complete --json '{
   "result_text": "结论：Issue #'$ISSUE_NUMBER' 已按评级完成处理。",
   "next_step": "a2a_coding",
-  "actions": ["深度可开发性分析", "打标签", "分配负责人", "回复评论", "grape tasks notify 上报任务", "A2A 交办 coding"],
+  "actions": ["深度可开发性分析", "打标签", "分配负责人", "回复评论", "A2A 交办 coding"],
   "conclusion": "Issue #'$ISSUE_NUMBER' 评级 {评级}，已完成 {动作}，{后续动作}",
   "artifacts": ["Issue #'$ISSUE_NUMBER' 评论", "标签 {labels}", "负责人 {assignee}", "A2A event seq=XXXX"],
   "issue_summary": "已分诊 | 评级 {评级} | 已分配 {assignee} | 后续 {动作}"
@@ -196,5 +185,5 @@ grape tasks complete --json '{
 - ❌ `tree --path`（参数不存在），层级用 `--depth`。
 - ❌ **用 `issues update` 改写正文（body/描述）**——结构化内容一律 `issues comments create` 发布，update 仅限 labels/assignee/state 且回填原始 body。
 - ❌ `issues update` 只传 labels/assignee 不回填 body（会覆盖原始描述）。
-- ❌ 不因"等待用户回复"跳过 Step 8（tasks complete）。
+- ❌ 不因"等待用户回复"跳过 Step 7（tasks complete）。
 - ❌ 直接写代码 / 提交 PR / 合并 PR（交给 coding/对应环节）。

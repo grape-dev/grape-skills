@@ -98,6 +98,4 @@ grape a2a handoff --json '{
 
 ⚠️ **字段规则（A2A 服务端强制校验）：** `issue_number` 必填（当前 Issue 的真实编号）；**无法确定 issue_number 就不要调用 A2A**。`pr_number` 有则填（PR 编号）、无则不填，严禁将 PR 编号填入 issue_number。
 
-### 通知责任人（必做）
-
-责任人确定后调用 `grape tasks notify` 创建任务（详见 SKILL.md「任务通知硬规则」）。
+> ℹ️ 分配责任人后**不发送任务通知**（`tasks notify` 已停用，避免打扰用户）。

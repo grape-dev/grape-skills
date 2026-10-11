@@ -71,22 +71,7 @@ grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
   --json '{"body":"'"$ISSUE_BODY"'","assignee":"younger_eric"}'
 ```
 
-### 7.1 通知责任人 / 确保任务存在（必做）
-
-**在分配动作完成后（处理结束、责任人最终确定时），调用 `grape tasks notify`** 创建任务（接口幂等，换人时自动关闭原责任人任务）：
-
-```bash
-grape tasks notify --json '{
-  "assignee": "younger_eric",
-  "repo_key": "{owner}/{repo}",
-  "issue_number": {number},
-  "task_description": "Issue #{number} 已分配给你，请处理：<简要任务描述>"
-}'
-```
-
-- assignee 必须是仓库有效成员（GitCode 用户名）
-- 未注册平台 → 返回 `{ok:false}`，在 Issue 评论说明
-- 已注册未绑飞书 → 任务仍创建，仅跳过飞书通知
+> ℹ️ 分配责任人后**不发送任务通知**（`tasks notify` 已停用）——不在分配/处理时打扰用户。
 
 ### 8. 检查跨仓同步
 
