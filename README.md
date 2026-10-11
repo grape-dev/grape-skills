@@ -126,6 +126,8 @@ pip install git+https://gitcode.com/grape-dev/grape-cli.git
 4. New/modified scenes mount registered skills (or register them in the same PR).
 5. Submit the PR — maintainers review and decide.
 
+See [CONTRIBUTING](CONTRIBUTING.md) for details. This project is MIT-licensed ([LICENSE](LICENSE)); please read our [Code of Conduct](CODE_OF_CONDUCT.md) and report vulnerabilities privately per [SECURITY](SECURITY.md).
+
 ## Versioning
 
 - Default branch: `main`.

@@ -126,6 +126,8 @@ pip install git+https://gitcode.com/grape-dev/grape-cli.git
 4. 新增/修改场景 → 挂载已注册技能（引用未注册则同 PR 注册）。
 5. 提交 PR → 维护者审核合入。
 
+详细流程见 [CONTRIBUTING](CONTRIBUTING.zh.md)。本项目以 MIT 协议开源（[LICENSE](LICENSE)），请阅读并遵守 [行为准则](CODE_OF_CONDUCT.md)，漏洞请按 [SECURITY](SECURITY.md) 私密报告。
+
 ## 版本管理
 
 - 默认分支 `main`；
