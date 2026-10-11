@@ -33,7 +33,7 @@
 
 - 每个场景为 `scenes/` 下一个子目录，含 `scene.json` + `README.md`。
 - 工作流节点通过 `skill` 字段挂载**已注册**技能；引用未注册技能必须在**同一 PR** 内注册。
-- **只改 `scenes/<场景>/scene.json`**——它是场景市场同步的唯一数据源；不要改动 `pipelines.json`（历史遗留快照）。
+- **只改 `scenes/<场景>/scene.json`**——它是场景市场同步的唯一数据源。
 - `next` 必须指向存在的节点 id，`handoff` 为合法枚举（`a2a`/`complete`），不得有悬空引用。
 
 ## 提交信息

@@ -33,7 +33,7 @@ A skill lives at `skills/<agent_type>/<sub_scene>/<skill>/`:
 
 - Each scene is a directory under `scenes/` with `scene.json` + `README.md`.
 - Workflow nodes mount **registered** skills via the `skill` field. Referencing an unregistered skill requires registering it **in the same PR**.
-- **Edit only `scenes/<scene>/scene.json`** — it is the single source of truth synced to the scene marketplace. Do not edit `pipelines.json` (legacy snapshot).
+- **Edit only `scenes/<scene>/scene.json`** — it is the single source of truth synced to the scene marketplace.
 - `next` must point to an existing node id; `handoff` must be a valid enum (`a2a`/`complete`); no dangling references.
 
 ## Commit Messages

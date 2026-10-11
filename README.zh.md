@@ -29,7 +29,6 @@ Grape Skills 是 Grape 的官方技能仓库，维护两类由 Grape 平台在�
 ```
 grape-skills/
 ├── skill-description.json   # 技能注册清单（key → name/agent_type/sub_scene/path/description）
-├── pipelines.json           # 历史遗留场景快照——请勿改动
 ├── scenes/<scene>/          # 场景定义（场景同步唯一数据源）
 │   ├── scene.json           # 工作流节点（挂载已注册技能）
 │   └── README.md
@@ -99,7 +98,7 @@ grape-skills/
 
 ## 场景
 
-- 场景同步**只认** `scenes/<场景>/scene.json`（唯一数据源；`pipelines.json` 为历史遗留）。
+- 场景同步**只认** `scenes/<场景>/scene.json`（唯一数据源）。
 - 工作流节点通过 `skill` 字段挂载已注册技能。
 - 引用未注册技能，必须**同 PR 注册**（「注册与引用同 PR 上线」）。
 

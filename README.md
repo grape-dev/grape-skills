@@ -29,7 +29,6 @@ Grape Skills is the official skills repository of Grape. It maintains two kinds 
 ```
 grape-skills/
 ├── skill-description.json   # Skill registry (key → name/agent_type/sub_scene/path/description)
-├── pipelines.json           # Legacy scene snapshot — do not edit
 ├── scenes/<scene>/          # Scene definitions (unique sync source)
 │   ├── scene.json           # Workflow nodes (mount registered skills)
 │   └── README.md
@@ -99,7 +98,7 @@ Every skill **must** be registered in `skill-description.json`, with `path` matc
 
 ## Scenes
 
-- Sync reads **only** `scenes/<scene>/scene.json` (unique sync source; `pipelines.json` is legacy).
+- Sync reads **only** `scenes/<scene>/scene.json` (unique sync source).
 - Workflow nodes mount registered skills via the `skill` field.
 - Referencing an unregistered skill requires **registering it in the same PR** (register & reference in one PR).
 
