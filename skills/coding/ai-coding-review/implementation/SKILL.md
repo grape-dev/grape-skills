@@ -151,7 +151,7 @@ tools:
 1. **Issue 评论**：`[Coding Agent]` 前缀（告知 PR/澄清追问/降级说明）
 2. **PR**：`grape git-repo pulls create`（title/head/base/字段按 4.4）+ `pulls update` 补 body/labels
 3. **PR 评论**：`[Coding Agent]` 前缀（修改完成告知/追问）
-4. **任务文档**：`docs/spec.md`（PRD）+ `tasks/plan.md` + `tasks/todo.md`（feature 必出）
+4. **任务文档**：`docs/issue-{n}/spec.md`（PRD）+ `docs/issue-{n}/plan.md` + `docs/issue-{n}/task.md`（feature 必出）
 5. **A2A 请求**：`{"agent":"qa","payload":{"repository","account","issue_number","pr_number(有则填)","context"}}`
 6. **任务完成**（tasks complete）：结构见 4.8
 
@@ -175,7 +175,7 @@ grape tasks complete --json '{
   "result_text":  "结论：{场景}处理完毕（{完成摘要}）",
   "actions":      ["需求理解: {确认/追问}", "文档方案: spec/plan/todo", "编码: {n} 个原子提交", "自审查: {通过}", "PR: #{pn}", "评论: Issue/PR", "A2A: qa"],
   "conclusion":   "{已实现并创建 PR #{pn}，待 QA 审查 / 已按审查意见修改完成}",
-  "artifacts":    ["PR #{pn}", "分支 feat/issue-{n}", "docs/spec.md, tasks/plan.md", "评论: {位置}"],
+  "artifacts":    ["PR #{pn}", "分支 feat/issue-{n}", "docs/issue-{n}/spec.md, plan.md, task.md", "评论: {位置}"],
   "issue_summary":"{完成摘要——实现内容/测试/PR 一句话}",
   "next_step":    "a2a_qa 或 等待用户反馈"
 }'

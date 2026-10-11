@@ -93,7 +93,7 @@ grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --
 ### Step 3 · 文档 + 方案（所有 feature 开发必做）
 ```bash
 # 分别读取 references/spec-driven-development.md、planning-and-task-breakdown.md 后编写
-# 产出 docs/spec.md、tasks/plan.md、tasks/todo.md，并在 Issue 评论告知（body 以 [Coding Agent] 开头）
+# 产出 docs/issue-$ISSUE_NUMBER/spec.md（需求文档）、plan.md（方案设计）、task.md（任务拆解），并在 Issue 评论告知（body 以 [Coding Agent] 开头）
 ```
 
 ### Step 4 · 编码 + 测试（所有开发任务必做）

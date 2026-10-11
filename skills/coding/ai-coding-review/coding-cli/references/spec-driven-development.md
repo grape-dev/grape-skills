@@ -135,7 +135,7 @@ With the validated spec, generate a technical implementation plan:
 
 > Follow `planning-and-task-breakdown` for the dependency-graph mapping and vertical-slicing mechanics behind these steps; it is the canonical source. The bullets above are a lightweight summary; if they ever diverge, `planning-and-task-breakdown` takes precedence.
 >
-> **Output convention:** Save the plan to `tasks/plan.md` and the task list to `tasks/todo.md`, per the `/plan` command convention. Create `tasks/` if it does not exist. Downstream commands (`/build`, etc.) expect these paths.
+> **Output convention:** Save the plan to `docs/issue-{n}/plan.md` and the task list to `docs/issue-{n}/task.md`（当前 Issue 专属目录，按 `{n}` 为 Issue 编号；需求文档另存 `docs/issue-{n}/spec.md`）。Create `docs/issue-{n}/` if it does not exist. Downstream review tooling expects these paths.
 
 The plan should be reviewable: the human should be able to read it and say "yes, that's the right approach" or "no, change X."
 

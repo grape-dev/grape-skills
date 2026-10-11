@@ -37,12 +37,12 @@ grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --
 - 复杂度：简单（单文件 <50 行）/ 中等 / 大型（跨模块/架构/外部服务集成——不得低估）
 
 ### A3 · 需求文档 + 方案设计（所有 feature 必做）
-- `references/spec-driven-development.md` → 写 `docs/spec.md`
-- `references/planning-and-task-breakdown.md` → 写 `tasks/plan.md` + `tasks/todo.md`
+- `references/spec-driven-development.md` → 写 `docs/issue-{n}/spec.md`
+- `references/planning-and-task-breakdown.md` → 写 `docs/issue-{n}/plan.md` + `docs/issue-{n}/task.md`
 - Issue 评论告知方案：
 ```bash
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"body":"[Coding Agent] 方案已输出：docs/spec.md（需求文档）+ tasks/plan.md（任务拆解）"}'
+  --json '{"body":"[Coding Agent] 方案已输出：docs/issue-{n}/spec.md（需求文档）+ docs/issue-{n}/plan.md（方案设计）+ docs/issue-{n}/task.md（任务拆解）"}'
 ```
 
 ### A4 · 代码实现（TDD + 增量；直接在当前 worktree 分支 feat/issue-{n} 上工作）
@@ -158,7 +158,7 @@ grape tasks complete --json '{
   "result_text":  "结论：{场景}处理完毕（{完成摘要}）",
   "actions":      ["需求理解: {确认/追问}", "文档方案: spec/plan/todo", "编码: {n} 个原子提交", "自审查: {通过}", "PR: #{pn}", "评论: Issue/PR", "A2A: qa"],
   "conclusion":   "{已实现并创建 PR #{pn}，待 QA 审查 / 已按审查意见修改完成}",
-  "artifacts":    ["PR #{pn}", "分支 feat/issue-{n}", "docs/spec.md, tasks/plan.md", "评论: {位置}"],
+  "artifacts":    ["PR #{pn}", "分支 feat/issue-{n}", "docs/issue-{n}/spec.md, plan.md, task.md", "评论: {位置}"],
   "issue_summary":"{完成摘要——实现内容/测试/PR 一句话}",
   "next_step":    "a2a_qa 或 等待用户反馈"
 }'

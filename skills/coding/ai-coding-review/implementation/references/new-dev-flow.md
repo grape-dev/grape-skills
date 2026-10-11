@@ -79,13 +79,13 @@ git push origin feat/issue-{number}
 
 所有 feature 开发都必须执行。
 
-读取 `references/spec-driven-development.md`，编写 PRD 保存到 `docs/spec.md`，评论告知。
+读取 `references/spec-driven-development.md`，编写 PRD 保存到 `docs/issue-{number}/spec.md`，评论告知。
 
 ### 能力五：方案设计
 
 所有 feature 开发都必须执行。
 
-读取 `references/planning-and-task-breakdown.md`，输出任务到 `tasks/plan.md` 和 `tasks/todo.md`，评论告知。
+读取 `references/planning-and-task-breakdown.md`，输出任务到 `docs/issue-{number}/plan.md` 和 `docs/issue-{number}/task.md`，评论告知。
 
 ### 能力六：代码实现
 
