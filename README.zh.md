@@ -17,7 +17,9 @@
 
 ## 简介
 
-Grape Skills 是 Grape 的官方内容仓库，维护两类由 Grape 平台在构建/部署时拉取的内容：
+Grape Skills 围绕 DevOps 的全生命周期，为 Agent 提供各类最佳场景的实践。在 AI Native 的 DevOps 下，这些实践包含了个人与 Agent、组织与 Agent 之间的运行规则和方法论，让 AI Native 的最佳实践可以更方便地应用到各种项目中去。
+
+Grape Skills 是 Grape 的官方技能仓库，维护两类由 Grape 平台在构建/部署时拉取的内容：
 
 - **技能（skills/）**：按 `agent_type / sub_scene / skill` 三层目录存放，构建期通过 clone / 卷挂载拉取。
 - **场景（scenes/）**：每个场景一个子目录，`scene.json` 定义工作流（挂载已注册技能），是同步到前端场景市场的**唯一数据源**。

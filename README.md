@@ -17,7 +17,9 @@
 
 ## Overview
 
-Grape Skills is the official content repository of Grape. It maintains two kinds of content, pulled by the Grape platform at build/deploy time:
+Grape Skills spans the full DevOps lifecycle, equipping Agents with best-practice playbooks across every scenario. Under AI-native DevOps, these playbooks encode the operating rules and methodologies for human–Agent and organization–Agent collaboration, making AI-native best practices easy to apply to any project.
+
+Grape Skills is the official skills repository of Grape. It maintains two kinds of content, pulled by the Grape platform at build/deploy time:
 
 - **Skills (`skills/`)** — organized as `agent_type / sub_scene / skill` three-level directories, fetched via build-time clone / volume-mount.
 - **Scenes (`scenes/`)** — one directory per scene; its `scene.json` defines the workflow (mounting registered skills) and is the **single source of truth** synced to the frontend scene marketplace.
