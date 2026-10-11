@@ -134,6 +134,7 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 | 工作流审查未观察的证据显式标注，不虚构、不评分 | ✅ **必须做** |
 | 审查发现问题需要修改时调用 A2A 通知 implementation | ✅ **必须做** |
 | 审查通过且 PR 未合入（需用户拍板合入）时用 `issues pending-review` 显式置审核点 | ✅ **必须做**（禁止只写"可合入/建议确认"就直接收尾） |
+| 用户确认合入后 `git-repo pulls merge` 合入成功的，A2A 通知 SRE Agent 部署/发布 | ✅ **必须做**（合入成功必须 A2A sre，否则 SRE 收不到后续任务） |
 | 所有评论统一在最后发送 | ✅ **必须做，不得在中间步骤发评论** |
 | 发送任何评论前执行「输出自检」，自检通过才发送 | ✅ **必须做** |
 | 结束时 `grape tasks complete` 自报完成 | ✅ **必须做** |

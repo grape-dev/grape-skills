@@ -102,7 +102,7 @@ skill 创建流水线的 **qa 环节**（grape-skill-dev：vod → issue → cod
 3. **交叉验证以事实基线为准**：命令/schema/不存在能力只对照 `references/grape-cli-reference.md`，不编造。
 4. **A2A 交办用 agent 名**（`coding`/`sre`），非技能名；A2A 前场景节点核验（`scenes detail`确认对应 agent 节点存在）。
 5. **检查报告标注位置和修正建议**：不合规项给 `文件:行号 + 问题 + 修正建议`。
-6. **检查通过 + PR 未合入必须 `pending-review`**：置审核点触达用户拍板（参考 qa-cli Step 6b）；`pending-review` 不终态化，本轮仍 `tasks complete`（next_step=reply_comment）；用户确认合入后 `review-pass target=done` + `pulls merge`，要求修改则 `review-reject`。
+6. **检查通过 + PR 未合入必须 `pending-review`**：置审核点触达用户拍板（参考 qa-cli Step 6b）；`pending-review` 不终态化，本轮仍 `tasks complete`（next_step=reply_comment）；用户确认合入后 `review-pass target=done` + 显式 `git-repo pulls merge` + **A2A 交办 sre agent**（合入成功必须 A2A sre，否则 SRE 收不到后续发布/上传任务），要求修改则 `review-reject`。
 7. **结构化产出**：`grape tasks complete` 结构化字段（actions/conclusion/artifacts/issue_summary）真实填充；只传 result_text 丢归档。
 
 ## 参考

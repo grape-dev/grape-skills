@@ -98,10 +98,34 @@ grape issues pending-review --issue_id "$ISSUE_ID" \
 ```
 
 - **用户评论续接**（平台恢复 processing 后，下一轮 qa 事件按用户回复判定）：
-  - 用户同意合入/完成 → `review-pass target=done` **并处理 PR 合入**（仅最终合入决策）：`grape issues review-pass --issue_id "$ISSUE_ID" --json '{"target":"done","evidence":"用户确认合入（评论 {id}）"}' --json-out`，随后 `grape git-repo pulls merge ...` 合入 PR。
-  - 用户同意继续下一环节（非最终合入）→ `review-pass target=processing`。
-  - 用户要求修改/打回 → `review-reject`（打回重做或转澄清）。
-- ⚠️ `pending-review` 不终态化——**本轮仍走 Step 6 `tasks complete` 收尾（next_step=reply_comment）**；`review-pass target=done` 才置 completed 并合入 PR。
+  - 用户同意合入/完成 → `review-pass target=done` **并处理 PR 合入 + A2A 通知 sre**（仅最终合入决策；⚠️ **合入成功后必须 A2A 交办 sre，否则 SRE Agent 收不到后续发布/上传任务**）：
+    ```bash
+    # ① 标记审核通过（仅 pending_review 态有效）
+    grape issues review-pass --issue_id "$ISSUE_ID" --json '{"target":"done","evidence":"用户确认合入（评论 {id}）"}' --json-out
+    # ② 显式合入 PR（409 冲突/不可合并 → 评论说明原因，不强行合并）
+    grape git-repo pulls merge --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out
+    # ③ 合入成功 → A2A 通知 sre agent（payload 同情况 B，否则 SRE 收不到后续任务）
+    grape a2a handoff --json '{
+      "agent": "sre",
+      "payload": {
+        "repository": "'"$REPO_FULL_NAME"'",
+        "account": "'"$ACCOUNT"'",
+        "issue_number": '"$ISSUE_NUMBER"',
+        "pr_number": '"${PR_NUMBER:-0}"',
+        "context": "skill 合规检查全部通过（{总项数}/{总项数}），用户确认合入，PR #'"${PR_NUMBER:-0}"' 已合入。请执行 skill 发布/上传流程。"
+      }
+    }' --json-out
+    ```
+    - 若 `pulls merge` 失败（409/不可合并）→ 评论说明不可合入原因，**不 A2A sre**，不强行合并。
+  - 用户同意继续下一环节（非最终合入）→ `review-pass target=processing`：
+    ```bash
+    grape issues review-pass --issue_id "$ISSUE_ID" --json '{"target":"processing","evidence":"用户确认（评论 {id}）"}' --json-out
+    ```
+  - 用户要求修改/打回 → `review-reject`（打回重做或转澄清）：
+    ```bash
+    grape issues review-reject --issue_id "$ISSUE_ID" --json '{"target":"processing","reason":"用户要求修改：{要点}"}' --json-out
+    ```
+- ⚠️ `pending-review` 不终态化——**本轮仍走 Step 6 `tasks complete` 收尾（next_step=reply_comment）**；`review-pass target=done` 才置 completed 并合入 PR + **A2A 通知 sre**（next_step=a2a_sre）。
 - ⚠️ 需用户补充信息（非拍板）→ 用 `awaiting-input`，不混用。
 
 > ⚠️ **A2A 交办的是 agent（coding/sre），不是技能名**；A2A 前若场景未绑定跳过核验，绑定则先 `SCENE_NODES` 确认对应 agent 节点存在，未命中 → 评论说明 + 收尾。
@@ -109,7 +133,7 @@ grape issues pending-review --issue_id "$ISSUE_ID" \
 ### Step 6 · 任务完成流程（必做，任何分支都必须执行到最后）
 > ⚠️ **强约束：收尾 = `grape tasks complete`（情形一）**，最后一个动作；评论发完 ≠ 任务完成。结构化字段**必须真实填充**。
 
-按分支选定 `next_step`：不通过已 A2A coding→`a2a_coding`；通过+merged 已 A2A sre→`a2a_sre`；通过未合入已置 pending-review→`reply_comment`。
+按分支选定 `next_step`：不通过已 A2A coding→`a2a_coding`；通过+merged 已 A2A sre / 用户确认合入后已完成 merge+A2A sre→`a2a_sre`；通过未合入已置 pending-review→`reply_comment`。
 
 ```bash
 grape tasks complete --json '{
@@ -134,7 +158,9 @@ grape tasks complete --json '{
 | PR 评论 405（已合并） | 改发 Issue 评论（`git-repo issues comments create`） |
 | `grape commands | grep` 无结果 | 被检查 skill 命令可能编造 → 记 ❌ 命令一致性不合规 |
 | `pending-review` 返回 changed:false | 已终态/已退出（幂等）——忽略，按已置审核点处理收尾 |
-| `pulls merge` 失败（409 冲突） | 评论说明不可合入原因，不强行合并（review-pass 后） |
+| `pulls merge` 失败（409 冲突） | 评论说明不可合入原因，不强行合并；**不 A2A sre** |
+| `pulls merge` 成功 | **必须跟随 A2A 交办 sre agent**（`a2a handoff agent=sre`），否则 SRE Agent 收不到后续发布/上传任务 |
+| `a2a handoff` 非 2xx / 超时 | 重试 ≤3 次；仍失败 → 评论说明 + next_step 标注人工介入 |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能一般不涉及 |
 
@@ -145,4 +171,5 @@ grape tasks complete --json '{
 - ❌ 编造命令或 schema（交叉验证以事实基线为准）。
 - ❌ 修复 skill 不合规项 / 创建 PR（仅报告与分流）。
 - ❌ **检查通过 + PR 未合入时，只写"可合入/待合并"就收尾**——必须 `pending-review` 置审核点（触达用户拍板）。
+- ❌ **`pulls merge` 成功后不 A2A 通知 sre**（`git-repo pulls merge` 是显式动作，完成后必须 `a2a handoff agent=sre`，否则 SRE 收不到后续任务）。
 - ❌ 不因"等待"跳过 Step 6（tasks complete）。
