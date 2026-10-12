@@ -2,17 +2,8 @@
 
 ## 执行前提
 
-- 项目知识基线已就绪（prompt 注入或 `.project-info/` 落地路径可读取）
+- 项目知识基线已就绪（已在 runbook Step 2 通过 `repos project info` / prompt 注入读取，本文件**不再重复读取**）
 - Issue 尚未被处理过（无标签且无负责人），或用户补充了信息需要重新分析
-
-## 前置步骤：读取项目知识
-
-读取 prompt「项目知识基线」章节末尾标注的全文副本路径（可用 read tool 读取）：
-
-- `{project-info-path}/project-graph.md` — 项目架构图
-- `{project-info-path}/project-capabilities.md` — 项目能力特性
-
-如果 prompt 标注 `[degraded]`，允许基于 README + grape CLI 降级分析。
 
 ## 四维分析（按 1→2→3→4 顺序执行，每步必须输出结论）
 
@@ -69,7 +60,32 @@
 
 ### 维度 2: 技术可行性
 
-**目标**：基于项目架构，判断该需求在技术上是否可实现。
+**目标**：基于项目架构 + **grape 平台能力**，判断该需求在技术上是否可实现。
+
+**0. grape 平台能力评估（先做，重点——涉及 grape 平台操作时）**
+> **⚠️ 可开发性分析需重点看用户诉求：若涉及 grape 平台相关操作，先评估 grape CLI 接口是否能够完成。**
+
+- 用户诉求若是「用 grape 平台做 X」（建/删/查仓库、打标签、管 Issue/PR、调 skills、管场景等）：
+  - **核实 grape CLI 是否有对应命令**：`grape commands {关键词}` / `grape <group> --help`，确认操作可执行、参数满足诉求。
+  - **有对应命令且参数满足** → 该项可行，继续下文模块判断。
+  - **grape CLI 无对应命令**（如用户要「删除一个仓库」，而 grape CLI 没有提供删除仓库的命令）→ **该需求不具备可开发性**，直接判 `not-feasible`（`infeasible` 理由写明「grape CLI 未提供该能力」），不进入后续维度。
+  - 可用命令清单以服务端契约/`grape commands` 实列为准，**不编造命令**；拿不准先查再判。
+
+**0.5 流程场景设计评估（独立重点，务必确认并在 Spec 落档）**
+> **⚠️ 需单独查看用户对技能内「澄清 / 审批 / 通知」等流程场景的设计，并强调其重要性，以免在 coding 阶段遗失。**
+
+- 在生成 Spec 前，**显式确认**用户对技能处理流程中这几类节点的设计意图：
+
+| 流程场景 | 对应机制 | 需确认要点 |
+|---------|---------|-----------|
+| **澄清** | `issues awaiting-input` | 技能处理中在哪些环节需要用户补充输入？澄清追问后是否置 awaiting-input 触达用户？ |
+| **审批** | `issues pending-review` / `review-pass` / `review-reject` | 技能审查/交付决策点是否需要用户拍板？通过/驳回后的流转？ |
+| **通知** | `tasks notify` 等 | 是否需要任务通知？通知对象与时机？（如责任人确定后上报） |
+| 其他流程控制 | change/close 等 | 是否需要状态变更/关闭等环节？ |
+
+- **确认结果必须写入 Spec**（如 Spec 的 Technical Approach / 流程设计段注明「含 awaiting-input 澄清节点 / pending-review 审批节点 / 通知」等），**确保 coding 阶段生成技能时保留这些节点，不因只盯功能实现而丢掉流程设计**。
+- 若用户未明确/无流程节点诉求 → Spec 注明「无额外流程节点设计」，正常按基础流程生成。
+- 对应命令能力用 `grape commands` 实列核实（同第 0 步），不编造。
 
 1. **定位涉及模块** — 对照 `project-graph.md` 的 Module Dependency Graph，确定需求涉及的模块
 2. **检查模块间依赖** — 涉及的模块之间是否存在循环依赖或强耦合？
@@ -80,15 +96,16 @@
 | 架构冲突 | 需求与现有架构不兼容 | 对照 Architecture Overview |
 | 技术限制 | 使用的技术栈不支持该特性 | 对照 Tech Stack |
 | 权限不足 | 需要的 API/服务当前无权限 | 对照 External Integrations |
+| **grape CLI 能力缺失** | 需求需 grape 平台操作但 CLI 无对应命令 | 对照 `grape commands` 实际命令 |
 | 性能瓶颈 | 实现后可能导致性能问题 | 基于模块复杂度评估 |
 
 4. **输出可行性评级**：
 
 | 评级 | 条件 |
 |------|------|
-| `feasible` | 无技术阻碍，涉及模块清晰 |
+| `feasible` | 无技术阻碍（含 grape CLI 能力具备），涉及模块清晰 |
 | `conditional` | 有可解决的技术条件（需额外配置/依赖） |
-| `infeasible` | 存在不可逾越的技术阻碍 |
+| `infeasible` | 存在不可逾越的技术阻碍（**含 grape CLI 无对应能力**） |
 
 ### 维度 3: 依赖就绪性
 
