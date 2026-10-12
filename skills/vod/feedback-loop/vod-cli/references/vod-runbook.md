@@ -89,9 +89,9 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
   --json '{"body":"[VOD Agent] 您指的是……？请补充：1) … 2) …"}'
 
 # ② 显式声明进入待澄清（关键：请求体 questions 必填，与追问一致；成功返回 changed:true）
-#    ⚠️ --issue_id 是需求卡片内部 id（int），可用 `grape issues detail` 出参的 `id` 字段；若不确定用
-#      ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')"
-grape issues awaiting-input --issue_id "${ISSUE_ID:-$ISSUE_NUMBER}" \
+#    ⚠️ `--issue_id` 必须是需求卡片内部 id（int），即 `grape issues detail` 出参的 `id` 字段，**不是 ISSUE_NUMBER，不能兜底**；先解析再使用：
+ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')"   # 解析失败/为空 → 记解析失败并收尾，不要传 ISSUE_NUMBER
+grape issues awaiting-input --issue_id "$ISSUE_ID" \
   --json '{
     "questions": "[VOD Agent] 您指的是……？请补充：1) … 2) …",
     "reason": "需求四要素缺失，需开发者补充"

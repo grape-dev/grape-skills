@@ -74,9 +74,10 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[VOD Agent] 请补充：1) … 2) … 3) …"}'
 
-# ② 显式声明进入待澄清（关键：questions 必填；--issue_id 用 issues detail 的 id，若不确定用 ISSUE_NUMBER）
-#    ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')"
-grape issues awaiting-input --issue_id "${ISSUE_ID:-$ISSUE_NUMBER}" \
+# ② 显式声明进入待澄清（关键：questions 必填）
+#    ⚠️ `--issue_id` 必须是需求卡片内部 id（int），即 `grape issues detail` 出参的 `id` 字段，**不是 ISSUE_NUMBER，不能兜底**；先解析再使用：
+ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')"   # 解析失败/为空 → 记 awaiting-input 解析失败并收尾，不要传 ISSUE_NUMBER
+grape issues awaiting-input --issue_id "$ISSUE_ID" \
   --json '{
     "questions": "[VOD Agent] 技能需求信息不完整，请补充：<列出缺失要素>",
     "reason": "技能需求六要素缺失，需开发者补充"
