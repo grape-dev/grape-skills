@@ -1,6 +1,6 @@
 ﻿---
 name: qa-cli
-version: 2.1.0
+version: 2.2.0
 description: |
   PR 全生命周期审查 + 工作流质量审查（Agent Work Loop 五维模型）。pr 技能的平替与增强（CLI 版）：
   在代码审查基础上，增加对仓库 AI 编码工作流（AGENTS.md、spec、技能、Hook、CI 门禁、经验沉淀）的证据化审查，
@@ -56,6 +56,8 @@ tools:
 | `GRAPE_WORK_BRANCH` | 目标合入分支（PR 的 base；缺省取仓库默认分支，如 main/master） | 变更检视/工作流审查判断基准；runbook Step A1 解析为 `$WORK_BRANCH` |
 | `AGENT_NAME` | Agent 显示名 | 评论 body 前缀 `[$AGENT_NAME]`（构造 `--json` 时用双引号展开） |
 | `DEVOPS_EVENT_TYPE` | 事件类型（如 `pull_request_opened`） | 判断入口/是否执行配置检查 |
+| `GRAPE_LINKED_REPOS` | 关联仓库列表 JSON（场景高级选项配置） | 关联仓库联合审查（见 §4.9） | 场景配置了关联仓库时 |
+| `GRAPE_LINKED_WORKTREES` | 关联仓库 worktree 路径列表 JSON（平台自动初始化） | 读取关联仓库代码 | qa 任务且有 linked_repos 时 |
 
 > ⚠️ **`GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能是长期分支（`dev`/`weekly-xx`）**或 `feat/issue-N`（N 不一定等于当前 Issue/PR 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
 > - **默认采用服务端注入值作为 PR 审查的基准确认**；未注入时以 PR 的 `base.ref`（>= 仓库默认分支）为 `$WORK_BRANCH`。
@@ -89,6 +91,8 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 >
 > ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook Step 7 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 
+**关联仓库（多仓库联合审查）**：当 `$GRAPE_LINKED_REPOS` 非空时，表示本需求涉及多个关联仓库（如前端+后端）。平台会自动为每个关联仓库初始化 worktree（`$GRAPE_LINKED_WORKTREES`）。QA Agent 需要对每个关联仓库的 PR 也进行审查，并做联合验证（接口契约一致性等），详见 §4.9。
+
 ## 输出规范
 
 ```markdown
@@ -113,6 +117,11 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 
 ### 合并检查
 - ✅ 安全通过 / ✅ 审查通过 / ⚠️ 测试未确认
+
+### 关联仓库联合审查（当 `$GRAPE_LINKED_REPOS` 非空时）
+- 仓库: owner/repo-x — PR #N — ✅ 审查通过
+- 仓库: owner/repo-y — PR #M — ⚠️ 接口不一致
+- 联合验证: ✅ 一致 / ⚠️ 发现不一致（列出具体项）
 ```
 
 ## 输出自检（发评论前必做）
@@ -144,6 +153,41 @@ PR body / commit message 里的 `fixes #N`、`tests pass`、`small fix` 都是 c
 | 回复 Token、密码等敏感信息 | ❌ **禁止** |
 | curl 直连 `api.gitcode.com` / 探索其它 token | ❌ **禁止** |
 | 探索 workspace、Grape 系统文件 | ❌ **禁止** |
+
+## §4.9 关联仓库联合审查（当 `$GRAPE_LINKED_REPOS` 非空时）
+
+当场景配置了关联仓库时，QA Agent 需要对主仓库和每个关联仓库的 PR 分别审查，并做联合验证。
+
+### 环境变量
+
+| 变量 | 格式 | 说明 |
+|------|------|------|
+| `GRAPE_LINKED_REPOS` | `[{"repo_key":"gitcode:owner/repo","branch":"main"},...]` | 场景高级选项中配置的关联仓库列表 |
+| `GRAPE_LINKED_WORKTREES` | `[{"repo_key":"gitcode:owner/repo","branch":"main","dir":"/path/to/worktree"},...]` | 平台自动初始化的 worktree 路径 |
+
+> 如果 `GRAPE_LINKED_WORKTREES` 为空，QA Agent 可通过 `grape git-repo pulls list` 查询关联仓库的 PR。
+
+### 联合审查流程
+
+1. **解析关联仓库列表**：读取 `$GRAPE_LINKED_REPOS` 获取所有关联仓库
+2. **主仓库 PR 审查**：按正常流程审查主仓库 PR
+3. **关联仓库 PR 审查**：对每个关联仓库：
+   - 查询该仓库是否有对应 Issue 的 PR（`grape git-repo pulls list --owner <owner> --repo <repo> --state open`，过滤 `feat/issue-{N}` 分支）
+   - 如果有 PR：对该 PR 执行代码审查 + 安全扫描，通过 `grape git-repo pulls comments create` 在关联仓库 PR 上发总结评论
+   - 如果无 PR：跳过（coding agent 可能未对该仓库做改动）
+4. **联合验证**：检查主仓库和关联仓库的改动是否兼容：
+   - 前后端接口契约一致性（如前端调用的 API 路径与后端定义一致）
+   - 数据模型字段匹配（前端传参与后端接收参数一致）
+   - 跨仓库依赖变更影响（如后端改了响应格式，前端是否同步适配）
+5. **联合审查结论**：在主仓库 PR 的总结评论中附「关联仓库联合审查」章节
+
+### 关键约束
+
+- 关联仓库无 PR 时不阻塞主仓库审查流程
+- 联合验证发现不一致时记录为 Required 级别问题，通过 A2A 通知 Coding Agent 修复
+- 每个关联仓库的总结评论发到对应仓库的 PR 上，不发到主仓库
+- 联合验证结论汇总在主仓库 PR 的总结评论中
+- 关联仓库审查使用 `grape git-repo pulls` 系列命令（grape CLI 透传），不走 curl 直连
 
 ## 参考
 

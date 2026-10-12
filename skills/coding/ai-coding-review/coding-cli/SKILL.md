@@ -1,6 +1,6 @@
 ﻿---
 name: coding-cli
-version: 3.0.0
+version: 3.1.0
 description: |
   代码实现与 PR 创建/优化（CLI 版）。通过全命令走查表（coding-runbook）逐步执行：知识基线 → 读 Issue/PR 上下文 → 需求理解 → 文档/方案 → 编码/测试 → 自审查 → 建 PR → A2A → tasks complete 收尾。
   通过 A2A 协议被 issue skill 调用时执行新开发；或被 PR skill 调用时根据审查意见优化 PR 代码实现。全部操作使用 grape CLI 命令行（含 grape git）。评论以 [Coding Agent] 开头。
@@ -70,6 +70,8 @@ tools:
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[Coding Agent]` 前缀） |
 | `BOT_USERNAME` | Bot 在 VCS 平台的用户名（GitCode/GitHub/GitLab 等均可） | `grape git config user.name` 的 git 身份（见 Prerequisites 4 / runbook Step 0）；Issue 分配 `assignee` 也用它 |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要处理 |
+| `GRAPE_LINKED_REPOS` | 关联仓库列表 JSON（场景高级选项配置） | 关联仓库多仓库开发（见 §4.9） | 场景配置了关联仓库时 |
+| `GRAPE_LINKED_WORKTREES` | 关联仓库 worktree 路径列表 JSON（平台自动初始化） | 关联仓库多仓库开发（见 §4.9） | coding 任务且有 linked_repos 时 |
 
 > ⚠️ **`GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能是长期分支（`dev`/`weekly-xx`），**也可能叫 `feat/issue-N`（N 不一定等于当前 Issue 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
 > - **默认采用服务端注入值作为 PR base / 开发分支基准**，即使它叫别的 Issue 分支（如 `feat/issue-2`），也不要因名字含其它 Issue 号就丢弃/改写为 main。
@@ -134,6 +136,8 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
 >
 > ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 
+**关联仓库（多仓库开发）**：当 `$GRAPE_LINKED_REPOS` 非空时，表示本需求涉及多个关联仓库（前端+后端等）。平台会自动为每个关联仓库初始化 worktree（`$GRAPE_LINKED_WORKTREES`）。Coding Agent 须主仓库与每个关联仓库都完成开发并各建 PR，详见 §4.9。
+
 ### 场景识别
 
 收到事件或 A2A 调用后，先判断触发场景：
@@ -158,6 +162,7 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
 | 代码优化场景修改完成后必须在 PR 评论告知 | ✅ **必须做** |
 | 每个提交一个原子变更 | ✅ **必须做** |
 | 只通过 `grape` CLI 获取信息、执行操作 | ✅ **必须做**（不得 curl 直连） |
+| 关联仓库多仓库开发（当 `$GRAPE_LINKED_REPOS` 非空时） | ✅ **必须做**（见 §4.9：每个关联仓库建分支+PR，不直推基线） |
 | 结束时 `grape tasks complete` 自报完成 | ✅ **必须做** |
 | 仅实现当前 Issue 描述的内容 | ✅ **保持范围** |
 | 直接合并 PR | ❌ **禁止**（仅创建，等待人工审批） |
@@ -172,10 +177,32 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
 3. **建 PR 后必发评论、必 A2A 通知 QA**：跳过错失审查与交付链路。
 4. **交办必带 issue_number**：A2A 无法确定 issue_number 则不调用，在评论中说明。
 5. **A2A 失败降级**：重试 ≤3 次；仍失败 → 评论说明并标注需人工介入，不得静默跳过交办。
-6. **结构化产出**：`grape tasks complete` 的结构化字段（`actions[]`/`conclusion`/`artifacts[]`/`issue_summary`）**must 真实填充**，只传 `result_text` 会丢结构化归档（空数组/空串也会导致结构化框为空）。
+6. **结构化产出**：`grape tasks complete` 的结构化字段（`actions[]`/`conclusion`/`artifacts[]`/`issue_summary`）**must 真实填充**，只传 `result_text` 会丢结构化归档（空数组/空串也会导致结构化框为空）。多仓库场景（`$GRAPE_LINKED_REPOS` 非空）：`actions[]`/`artifacts[]` 分别列出**每个仓库**的开发与 PR 结果（含 PR 编号），A2A context 同样列出全部仓库的 PR。
 7. **只用一个 token**：只用注入的 `$GRAPE_SESSION_TOKEN`，不探测 `BOT_*`/`USER_*`/其它 token，token 不落日志/评论/文件。
 8. **git 身份预置**：进入 worktree 后、首次 `grape git commit` 前先 `grape git config user.name/user.email`（见 Prerequisites 4 / runbook Step 0），避免 commit 被拒。
 9. **命令出错先看完整错误**：runbook 命令失败先去 `tail` 截断看完整 stderr，再按「错误排查速查」处理，**不反复盲试**同一命令。
+
+## §4.9 关联仓库多仓库开发（当 `$GRAPE_LINKED_REPOS` 非空时）
+
+**触发条件**：`$GRAPE_LINKED_REPOS` 非空（场景高级选项配置了关联仓库，如前端+后端）。平台已为每个关联仓库初始化 worktree（`$GRAPE_LINKED_WORKTREES`）。
+
+**五条铁律（违反 = 严重事故）**：
+1. **严禁直接 push 关联仓库的基线分支**（`main`/`dev` 等）——基线分支是部署/合入基线，直推等于绕过 PR 审查与代码追溯；
+2. **必须为每个关联仓库建 `feat/issue-{N}` 开发分支**，在开发分支上 commit / push / 建 PR；
+3. **每个关联仓库必须建 PR**——只改代码不建 PR = 任务未完成；
+4. **禁止在部署机生产检出目录（如 `/home/*/projects/*`）上直接改动**——必须在 `grape`/受控 worktree 目录中操作；
+5. 每个关联仓库独立开发，不混淆代码。
+
+**执行流程（每个关联仓库）**：
+1. 取 `$GRAPE_LINKED_WORKTREES`（JSON 数组，每项 `repo_key`/`branch`/`dir`）；
+2. 进入对应 worktree 目录，确认当前分支为 `feat/issue-{N}`（不是则 `git checkout -b feat/issue-{N} origin/<base>`）；
+   - 若关联仓库无 worktree（`$GRAPE_LINKED_WORKTREES` 为空）→ `grape git clone` 到受控临时目录 + `git checkout -b feat/issue-{N} origin/<base>`；
+3. 识别项目结构并实现对应功能（同主仓库 TDD + 原子提交）→ `grape git commit -m "feat(issue-{N}): <关联仓库实现>"` → `grape git push origin feat/issue-{N}`；
+4. **建 PR（必做）**：`grape git-repo pulls create --owner <owner> --repo <repo> --head feat/issue-{N} --base <该仓库基线>`，title 统一 `feat(issue-{N}): <功能描述>`。
+
+**收尾联动**：
+- A2A 通知 QA 时，`context` 中列出**所有仓库**的 PR 编号与链接（主仓 + 各关联仓）；
+- `grape tasks complete` 的 `actions[]`/`artifacts[]` 分别列出每个仓库的 PR 结果。
 
 ## 参考
 
