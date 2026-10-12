@@ -1,13 +1,20 @@
 # grape-skill-generator 执行走查表（skill-generator-runbook）
 
-> 目的：把「按规范生成 grape-cli skill」的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
+> 目的：把「按规范生成/修复 grape-cli skill」的**每一步要做什么 + 用哪条确切命令**固化下来，Agent **照着执行、不要查 `--help` / `grape commands`**。
 > 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`（owner/repo）、`$GRAPE_WORK_BRANCH`（目标合入分支）、`$BOT_USERNAME`、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`（grape 自动读取）。
 > ⚠️ **owner 只用 `$REPO_OWNER`**；`$ACCOUNT` 是触发人 actor，**仅用于 A2A payload `account` 字段**。
 > **评论前缀硬规**：所有评论 body 一律以 `[Coding Agent]` 开头。
+> ⚠️ **git 前缀原则**：仓库类 git 操作（branch/fetch/merge/checkout/add/commit/push/ls-remote 等）**一律走 `grape git`**（凭据经 `GIT_CONFIG` 进程内注入、token 零暴露）；**禁用裸 `git`**——否则无凭据注入、push/私有拉取必然失败。
+
+### 防抖纪律（场景 A/B 共用，必须遵守）
+
+1. **一条命令取到即继续**：`issues detail` 已含阶段/事件/路线图全貌，不必重复调 `git-repo issues get`；按需才取 `comments list` / `events list`。
+2. **命令失败先看完整错误**：先把 `| tail -N` 截断去掉看完整 stderr，再按「错误排查速查」处理，**不重复相同命令试错**（5xx 用 `tasks wait`/`grape git ls-remote` 兜底，见错误排查表）。
+3. **只核验差异点**：QA 已给出「真字段/假字段」结论时按结论改；仅与被改点直接相关才 `--help`/源码核验，不做全量二次审计。
 
 ---
 
-## 统一流程（生成 grape-cli skill）
+## 统一流程 · 场景 A：生成 grape-cli skill
 
 ### Step 0 · 前置 + 读任务上下文（必须最先）
 ```bash
@@ -30,7 +37,7 @@ grape skills list --repo "$REPO_FULL_NAME" --q "{name}" --json-out 2>/dev/null |
 grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path ".grape/skills/{agent_type}" --json-out 2>/dev/null || true
 grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path "skills/{agent_type}" --json-out 2>/dev/null || true
 ```
-- 已存在同名 → 回复「已存在——可复用/更新」，进入 Step 10 收尾（next_step=reply_comment）。
+- 已存在同名 → 回复「已存在——可复用/更新」，进入 Step 8 收尾（next_step=reply_comment）。
 - 不存在 → 继续。
 
 ### Step 2 · 读取 references 三件套（必做，生成前必须先读）
@@ -69,7 +76,13 @@ WORK_BRANCH="${GRAPE_WORK_BRANCH:-main}"
 grape git status   # 确认在 feat/issue-{n}
 # ⚠️ 生成的 skill 放在项目根 `.grape/skills/{agent_type}/{name}/`；目录不存在先创建
 mkdir -p ".grape/skills/{agent_type}/{name}"
-grape git add ".grape/skills/{agent_type}/{name}/" && grape git commit -m "feat(skills): add {name} skill"
+# ⚠️ `.grape/` 在 .gitignore 中——整目录 add 会触发 ignored 警告（rc=1），须按文件逐一 add（已跟踪文件不受 ignore 影响）
+grape git add \
+  .grape/skills/{agent_type}/{name}/SKILL.md \
+  .grape/skills/{agent_type}/{name}/references/{reference-file}.md \
+  .grape/skills/{agent_type}/{name}/references/{another-file}.md   # 实际存在的文件清单
+grape git status   # 确认 M 状态后再 commit；若仍被 ignore 拒绝，用 `grape git add -f <文件>`
+grape git commit -m "feat(skills): add {name} skill"
 grape git push origin "feat/issue-$ISSUE_NUMBER"
 
 # 建 PR（base 用 $WORK_BRANCH，不硬编码 main；关联字段用 related_issue_nums/auto_close_issues；body 必带，生成的 PR 才有完整描述）
@@ -105,7 +118,7 @@ else
 fi
 ```
 - **A2A 交办的是 agent（qa）**，不是某个审查技能；qa agent 用哪个技能由它决定。
-- 未命中 qa 节点 → 评论说明「当前场景未配置 QA 审查环节」，进入 Step 10（next_step=done/reply_comment）。
+- 未命中 qa 节点 → 评论说明「当前场景未配置 QA 审查环节」，进入 Step 8（next_step=done/reply_comment）。
 
 **第 3 步：发起 A2A**（qa agent；issue_number 必填，pr_number 填新 PR 编号）
 ```bash
@@ -143,6 +156,93 @@ grape tasks complete --json '{
 
 ---
 
+## 场景 B：修复 QA 反馈的合规问题（a2a_event，从 qa agent 触发）
+
+> 触发判定：A2A context `/ 评论` 含「审查发现问题」「不合规」「QA 反馈」「请修复」等 → 本场景；含「生成」「创建」→ 场景 A。
+> 进入前已通过 SKILL「Prerequisites」。**只定点修复，不重复场景 A 的生成步骤（不重新读三件套全量生成）。**
+
+### Step B1 · 读任务上下文 + 定位被修复 skill（必做）
+```bash
+grape tasks current --json-out
+grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out
+grape events detail --seq {seq} --json-out                       # QA 交棒 payload
+grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out     # 确认 PR 与 head 分支
+grape git-repo pulls files --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 定位被修复 skill 路径
+```
+- 从 payload/评论提取不合规项清单（`文件:行号 + 问题 + 修正建议`）+ 被修复 skill 目录（`.grape/skills/{agent_type}/{name}/` 或 `skills/{agent_type}/{name}/`）。
+
+### Step B2 · 同步 PR 分支到本地 worktree（必做）
+> ⚠️ 一律走 `grape git`（凭据注入）；worktree 未就绪/无 skill 目录时同步：
+```bash
+grape git fetch origin
+grape git branch -a
+# 本地无 feat/issue-N → 基于 PR base 重建；已有则 fast-forward 合并 PR head
+grape git checkout -b "feat/issue-$ISSUE_NUMBER" "origin/$WORK_BRANCH" 2>/dev/null || true
+grape git merge "origin/feat/issue-$ISSUE_NUMBER" --quiet || grape git rebase "origin/feat/issue-$ISSUE_NUMBER"
+grape git status   # 确认 skill 目录文件已就位
+```
+- 确认 skill 目录文件与 `pulls files` 内容一致；不一致 → 评论说明同步失败原因，进入 Step B7 收尾。
+
+### Step B3 · 按 QA 反馈定点修复（必做）
+- 逐条对照不合规项修改对应文件（SKILL.md / references/*.md），只动被修复 skill 目录内文件。
+- 修复原则（决策固化为规则，不临场纠结）：
+  - **保持原 runbook 结构**：仅替换/修正命令内容与字段，不重整编号、不连锁改 SKILL.md 步骤引用；
+  - 命令/字段以 `references/grape-cli-reference.md` 事实基线为准，QA 已给结论的直接按结论改；
+  - 版本号：内容修复 → `+0.0.x`；行为/流程变更 → `+0.x.0`（bump frontmatter `version`）。
+
+### Step B4 · 自检（必做）
+- 变更文件行数 ≤ 限制（SKILL.md ≤130、reference ≤250）。
+- grep 残留旧命令/字段（如 `tasks notify`/`awaiting-input`/已删命令）→ 应只剩「禁止使用」提示语境：
+  ```bash
+  grep -rn "tasks notify\|awaiting-input\|<旧字段名>" ".grape/skills/{agent_type}/{name}/" || true
+  ```
+- 自检不过 → 修复后重检；无法修复 → 评论说明，不推送。
+
+### Step B5 · 提交 + 推送 + 评论告知（必做）
+```bash
+# ⚠️ 一律走 grape git；.grape/ 被 ignore → 按文件逐一 add（同场景 A Step 6）
+grape git add \
+  .grape/skills/{agent_type}/{name}/SKILL.md \
+  .grape/skills/{agent_type}/{name}/references/{file}.md
+grape git status
+grape git commit -m "fix(skills): {修复摘要}（{agent_type}/{name}）"
+grape git push origin "feat/issue-$ISSUE_NUMBER"
+
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  --json '{"body":"[Coding Agent] 已按 QA 反馈修复：{不合规项清单 + 修复摘要}，PR #'"$PR_NUMBER"' 已更新（commit {sha}）。"}'
+```
+
+### Step B6 · A2A 交棒 qa agent 复审（必做）
+> 修复后**必须 A2A 回 qa 复审**（与场景 A 一致）；pipeline 已有进行中的 `qa:a2a_event` → 不重复 A2A，只发评论。
+```bash
+# 场景核验（同场景 A Step 7 第 1/2 步）确认 qa 节点命中后发起：
+grape a2a handoff --json '{
+  "agent": "qa",
+  "payload": {
+    "repository": "'"$REPO_FULL_NAME"'",
+    "account": "'"$ACCOUNT"'",
+    "issue_number": '"$ISSUE_NUMBER"',
+    "pr_number": '"$PR_NUMBER"',
+    "context": "QA 反馈的不合规项已修复：{清单}。PR #'"$PR_NUMBER"' 已更新（commit {sha}），请复审。"
+  }
+}' --json-out
+```
+
+### Step B7 · 任务完成流程（必做，任何分支都必须执行到最后）
+```bash
+grape tasks complete --json '{
+  "result_text": "结论：QA 反馈的 {N} 项不合规已修复，PR #'"$PR_NUMBER"' 已更新。",
+  "next_step": "a2a_qa",
+  "actions": ["定位被修复 skill", "同步 PR 分支", "定点修复 {N} 项不合规", "自检", "commit+push 更新 PR", "Issue 评论告知", "A2A 交棒 qa 复审"],
+  "conclusion": "已按 QA 反馈修复 {agent_type}/{name}（{N}/{N} 项），PR #'"$PR_NUMBER"' 待复审",
+  "artifacts": ["PR #'"$PR_NUMBER"'（commit {sha}）", "Issue 评论（comment id=XXXXXX）"],
+  "issue_summary": "QA 反馈修复完成 | {agent_type}/{name} | PR #'"$PR_NUMBER"' 待复审"
+}'
+```
+> `already:true` 忽略。**然后结束任务**。
+
+---
+
 ## 错误排查速查
 
 | 现象 | 处理 |
@@ -151,6 +251,8 @@ grape tasks complete --json '{
 | `unknown request field(s): ...` | `--json` 字段不在允许集，看 `grape <g> <v> --help` Body fields 删多余字段 |
 | `pulls create` 字段错误 | 关联字段用 `related_issue_nums`/`auto_close_issues`；报错删掉只留 title/head/base |
 | `grape skills list` 不存在/403 | 跳过，用 `git-repo contents` 查仓库 skills/ 目录 |
+| `pulls get` / API 返回 5xx | 用 `grape tasks wait --task-id` 或 `grape` 内置退避（默认 timeout 120s / interval 3s）重试，**不要 sleep 固定时长**；仍失败用 `grape git ls-remote origin` 核对远端 ref 落盘后继续 |
+| `grape git add <目录>` rc=1（ignored） | `.grape/` 在 .gitignore 中——按文件逐一 `grape git add <文件>`（见 Step 6），仍拒绝用 `grape git add -f <文件>` |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能一般不涉及 |
 | 自检未通过 | 修复后重检；无法修复 → 评论说明，不建 PR |
@@ -158,7 +260,9 @@ grape tasks complete --json '{
 ## 明确禁止
 
 - ❌ 不编造命令/参数（命令只引事实基线）。
+- ❌ 不用裸 `git`（branch/fetch/merge/checkout/add/commit/push/ls-remote 等一律走 `grape git`，保证凭据注入、token 零暴露）。
 - ❌ A2A 交办写技能名（如 `grape-skill-validator`）——交办 **agent**（`qa`）。
 - ❌ 建 PR 硬编码 `base: main`——用 `$WORK_BRANCH`。
 - ❌ 改生成目录以外文件 / 直接合并 PR。
-- ❌ 不因"等待"跳过 Step 8（tasks complete）。
+- ❌ 场景 B 重复场景 A 的生成步骤（不重读三件套全量生成，只定点修复）。
+- ❌ 不因"等待"跳过最终 Step（tasks complete）——回复/交办后即算本轮完成，必须收尾。

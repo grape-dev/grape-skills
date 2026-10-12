@@ -1,9 +1,9 @@
 ---
 name: grape-skill-generator
-version: 2.0.0
+version: 2.1.0
 description: |
-  grape-cli skill 生成器。按撰写规范为指定 agent_type 生成 grape-cli skill。
-  ①接收 agent_type + 技能需求单 → ②查重 → ③读 references 三件套 → ④生成 SKILL.md + references/ → ⑤自检 → ⑥建 PR → ⑦A2A 交棒 QA agent。
+  grape-cli skill 生成器。按撰写规范为指定 agent_type 生成 grape-cli skill；并处理 QA 反馈的合规修复。
+  ①接收 agent_type + 技能需求单 → ②查重 → ③读 references 三件套 → ④生成 SKILL.md + references/ → ⑤自检 → ⑥建 PR → ⑦A2A 交棒 QA agent；修复 QA 反馈走 runbook 场景 B（定点修复 → A2A 复审）。
   全部操作使用 grape CLI 命令行。
 tools:
   - grape
@@ -62,8 +62,18 @@ tools:
 
 ## 定位
 
-接收 `agent_type`（chat/vod/issue/coding/qa/sre）+ 技能需求单（由 grape-vod-cli 澄清 / grape-skill-issue 交办），按撰写规范生成该 agent 的 grape-cli skill。不负责测试（QA agent 职责）/ 发布（SRE agent 职责）/ Issue 分类（Issue agent 职责）。
-- **A2A 交办的是 agent**：本技能生成完成后交棒 **qa agent**（qa agent 决定用哪个审查技能）；技能生成的输入来自 **coding agent 职责范围**（本技能即 coding 侧的执行）。
+接收 `agent_type`（chat/vod/issue/coding/qa/sre）+ 技能需求单（由 grape-vod-cli 澄清 / grape-skill-issue 交办），按撰写规范生成该 agent 的 grape-cli skill；同时负责按 QA 反馈修复既有 skill 的合规问题。不负责测试（QA agent 职责）/ 发布（SRE agent 职责）/ Issue 分类（Issue agent 职责）。
+- **A2A 交办的是 agent**：本技能生成/修复完成后交棒 **qa agent**（qa agent 决定用哪个审查技能）；技能生成的输入来自 **coding agent 职责范围**（本技能即 coding 侧的执行）。
+
+## 场景识别
+
+收到事件或 A2A 调用后，先判断触发场景：
+
+| A2A context / 事件特征 | 场景 | 执行流程 |
+|----------------------|------|---------|
+| 含「审查发现问题」「不合规」「QA 反馈」「请修复」 | **修复 QA 反馈** | `skill-generator-runbook.md` 场景 B（定点修复 → A2A 复审） |
+| 含「生成」「创建新技能」 | **生成新 skill** | `skill-generator-runbook.md` 场景 A |
+| 其他 | 不做处理，结束 | — |
 
 ## 评论规范
 
@@ -72,9 +82,9 @@ tools:
 
 ## 处理流程
 
-> ⚠️ **先读 `references/skill-generator-runbook.md`**：按走查表逐步骤执行（Step 0 前置 → 1 任务上下文 → 2 读需求单 → 3 查重 → 4 读三件套 → 5 生成 SKILL.md → 6 生成 references → 7 自检 → 8 建 PR → 9 A2A QA → 10 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
+> ⚠️ **先读 `references/skill-generator-runbook.md`**：按场景走查表逐步骤执行（场景 A：Step 0 前置+读上下文 → 1 查重 → 2 读三件套 → 3 生成 SKILL.md → 4 生成 references → 5 自检 → 6 建 PR → 7 A2A QA → 8 收尾；场景 B：B1 读上下文定位 → B2 同步 PR 分支 → B3 定点修复 → B4 自检 → B5 提交推送 → B6 A2A 复审 → B7 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
 >
-> ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：最后一步必须按 runbook Step 10 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束。
+> ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：最后一步必须按 runbook 对应场景收尾步骤调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束。
 
 ## 领域规则：命令选取
 
@@ -95,12 +105,15 @@ tools:
 
 | 行为 | 态度 |
 |------|------|
+| 按场景识别结果执行对应走查表（场景 A 生成 / 场景 B 修复） | ✅ **必须做** |
 | 生成 SKILL.md + references 按 spec | ✅ **必须做** |
-| 创建 PR 后 Issue 评论告知 | ✅ **必须做** |
-| 创建 PR 后 A2A 交棒 QA agent | ✅ **必须做**（先场景校验 qa 节点） |
+| 场景 B 按 QA 反馈定点修复（不重读三件套全量生成） | ✅ **必须做** |
+| 创建 PR / 更新 PR 后 Issue 评论告知 | ✅ **必须做** |
+| 创建 PR / 修复后 A2A 交棒 QA agent | ✅ **必须做**（先场景校验 qa 节点） |
 | 命令引用以 grape-cli-reference.md 事实基线为准 | ✅ **必须做** |
 | 编造不存在的命令/参数 | ❌ **禁止** |
 | 用 `$BOT_USERNAME` 之外的写操作身份 | ❌ **禁止** |
+| 裸 `git`（一律走 `grape git`，保证凭据注入） | ❌ **禁止** |
 | 修改生成目录（`.grape/skills/{agent_type}/{name}/`）以外文件 | ❌ **禁止** |
 | 直接合并 PR | ❌ **禁止** |
 | curl 直连 API（CLI 能做的） | ❌ **禁止** |
@@ -114,6 +127,8 @@ tools:
 - 生成物遵循新规范：含 **Prerequisites**（grape --version / refresh / env 校验）、**环境变量表**（含 REPO_OWNER/BOT_USERNAME）、**runbook 引用**、**正文不改写**（comments 发布，`issues update` 不写 body）、A2A 交办 **agent**（非技能名）
 - 建 PR 的 `base` 用 `$WORK_BRANCH`（环境变量配置值，禁止硬编码 main/dev）
 - 不存在的能力清单同步最新（skills upload/delete 已存在，不列为不存在）
+- 仓库类 git 操作一律走 `grape git`（裸 `git` 无凭据注入，禁止）；`.grape/` 被 .gitignore，add 按文件逐一执行（见 runbook Step 6 / B5）
+- 场景 B 修复：只定点改 QA 点名文件与字段，保持原 runbook 结构，不重编号、不重复场景 A 生成步骤
 
 ## 任务完成流程（必做）
 
@@ -141,4 +156,4 @@ grape tasks complete --json '{
 - 撰写规范要点：`references/spec-reference.md`
 - agent_type→命令映射：`references/command-matrix.md`
 
-> ⚠️ **任务结束**：完成所有业务动作（生成/自检/建 PR/A2A QA）后，**必须按 runbook Step 10 调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。A2A 交办成功不等于任务结束。
+> ⚠️ **任务结束**：完成所有业务动作（生成/自检/建 PR/A2A QA，或修复 QA 反馈）后，**必须按 runbook 对应场景收尾步骤调用 `grape tasks complete` 自报完成，然后**结束任务**，不要继续思考或等待输入。A2A 交办成功不等于任务结束。
