@@ -35,15 +35,21 @@
 
 > ⚠️ **这不是共性命令**：是否使用取决于**当前流程的 issue 阶段设计**与**用户诉求**。生成 skill 时按该技能承担的环节（澄清/审查/交付决策）判断是否纳入，不强制。
 
-| 场景 | 命令 | 用途 | 常见归属 agent |
-|------|------|------|---------------|
-| 待用户补充输入 | `grape issues awaiting-input --issue_id {issue_id} --json '{"questions":["..."]}' --json-out` | 显式声明「待用户澄清补充」，置 awaiting_input + 触达用户（澄清追问后收尾用） | vod / issue |
-| 待人工拍板审核点 | `grape issues pending-review --issue_id {issue_id} --json '{"decision_points":[{"type":"merge","options":[...]}]}' --json-out` | 审查通过但 PR 未合入、需用户拍板时置审核点（触达用户） | qa |
-| 审核通过（继续/完成） | `grape issues review-pass --issue_id {issue_id} --json '{"target":"done","evidence":"..."}' --json-out` | 用户确认后通过；`target=done` 完成 / `target=processing` 继续 | qa |
-| 审核驳回 | `grape issues review-reject --issue_id {issue_id} --json '{"reason":"..."}' --json-out` | 用户驳回 | qa |
-| 任务通知/上报 | `grape tasks notify --json '{"assignee":"{user}","repo_key":"{owner}/{repo}","issue_number":{n},"task_description":"..."}'` | 责任人最终确定（含机器人接管）后上报任务（幂等） | issue / vod 等有分配环节的 agent |
+| 场景 | 命令 | 用途与口径 |
+|------|------|-----------|
+| 待用户补充输入 | `grape issues awaiting-input --issue_id {issue_id} --json '{"questions":"...","reason":"..."}' --json-out` | 显式声明「待用户澄清补充」，置 awaiting_input + 触达用户（澄清追问后收尾用）。**大部分情况**是 vod/issue 在用，但以用户需求为准，不限于此 |
+| 待人工拍板审核点 | `grape issues pending-review --issue_id {issue_id} --json '{"review_points":"...","references":"..."}' --json-out` | 审查通过但 PR 未合入、需用户拍板时置审核点（触达用户）。**大部分情况**是 qa 在用，但不绝对 |
+| 审核通过（继续/完成） | `grape issues review-pass --issue_id {issue_id} --json '{"target":"done","evidence":"..."}' --json-out` | 用户确认后通过；`target=done` 完成 / `target=processing` 继续。随 pending-review 配套 |
+| 审核驳回 | `grape issues review-reject --issue_id {issue_id} --json '{"reason":"..."}' --json-out` | 用户驳回。随 pending-review 配套 |
 
-> 用法要点：`awaiting-input` 仅 vod/issue 会话可用；`pending-review`/`review-pass`/`review-reject` 仅在 pending_review 态有效（幂等，`changed:false` 忽略）；`pending-review` 不终态化，本轮仍走 `tasks complete` 收尾。
+> **`issue_id` 获取方式（这些命令共用，必填）**：`issue_id` 是需求卡片内部 id（int），**不是 issue 编号**——用 `grape issues detail --owner {owner} --repo {repo} --number {n} --json-out` 出参的 `id` 字段：
+> ```bash
+> ISSUE_ID="$(grape issues detail --owner {owner} --repo {repo} --number {n} --json-out | jq -r '.id')"
+> grape issues awaiting-input --issue_id "$ISSUE_ID" --json '{"questions":"...","reason":"..."}' --json-out
+> ```
+> 解析失败/为空 → 记「issue_id 解析失败」并收尾，**不要传 issue number 兜底**。
+
+> 用法要点：`pending-review`/`review-pass`/`review-reject` 仅在 pending_review 态有效（幂等，`changed:false` 忽略）；`pending-review` 不终态化，本轮仍走 `tasks complete` 收尾。
 
 ---
 
