@@ -38,7 +38,7 @@ grape --version      # 确认版本
 | `grape tasks current --json-out` | 获取分配给自己的任务 |
 | `grape issues detail --owner {owner} --repo {repo} --number {n} --json-out` | Issue 全貌（含阶段/事件/pipeline） |
 | `grape events detail --seq {seq} --json-out` | 读取前序 A2A 交接 payload |
-| `grape issues clarify --issue_id {id} --json '{"message":"..."}'` | 向上游提问（回复 Issue 澄清） |
+| `grape issues clarify --issue_id ${GRAPE_ISSUE_ID:-{id}} --json '{"message":"..."}'` | 向上游提问（--issue_id 优先用注入的 `$GRAPE_ISSUE_ID`） |
 | `grape commands [pattern]` | 列出可调用命令（命令发现） |
 
 ### 3.2 知识与项目上下文
@@ -57,7 +57,7 @@ grape --version      # 确认版本
 |------|------|
 | `grape issues pipeline --owner {owner} --repo {repo} --number {n} --json-out` | Issue pipeline（防重复 A2A 检查） |
 | `grape issues list --owner {owner} --repo {repo} --json-out` | Issue 列表（历史全貌/判断重复） |
-| `grape issues awaiting-input --issue_id {issue_id} --json '{"questions":"...","reason":"..."}' --json-out` | 澄清时显式声明待用户补充（置 awaiting_input + 触达；vod/issue 会话可用，changed:true=成功） |
+| `grape issues awaiting-input --issue_id {issue_id} --json '{"questions":"...","reason":"..."}' --json-out` | 澄清时显式声明待用户补充（置 awaiting_input + 触达；vod/issue 会话可用，changed:true=成功）。`--issue_id` 用注入的 `$GRAPE_ISSUE_ID`（未注入降级 `issues detail` 的 `id`），非 ISSUE_NUMBER |
 
 ### 3.4 GitCode Issue 评论与更新
 

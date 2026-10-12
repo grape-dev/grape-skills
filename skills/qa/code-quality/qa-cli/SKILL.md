@@ -51,6 +51,7 @@ tools:
 | `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
 | `ACCOUNT` | **个人账号（webhook 触发人 `actor`，与仓库属主解耦）** | A2A payload `account` 字段（一般不用作 `--owner`） |
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | A2A `issue_number` |
+| `GRAPE_ISSUE_ID` | 需求卡片内部 id（issue 表主键，int） | `pending-review`/`review-pass`/`review-reject` 的 `--issue_id` 用此值（非 ISSUE_NUMBER）；未注入时降级用 `issues detail` 解析 |
 | `PR_NUMBER` | PR 编号 | `--number "$PR_NUMBER"` / A2A `pr_number` |
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串） | `grape scenes detail --scene_id "$GRAPE_SCENE_ID"` 取场景节点，判断 A2A 目标 |
 | `GRAPE_WORK_BRANCH` | 目标合入分支（PR 的 base；缺省取仓库默认分支，如 main/master） | 变更检视/工作流审查判断基准；runbook Step A1 解析为 `$WORK_BRANCH` |

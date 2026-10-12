@@ -42,9 +42,9 @@
 | 审核通过（继续/完成） | `grape issues review-pass --issue_id {issue_id} --json '{"target":"done","evidence":"..."}' --json-out` | 用户确认后通过；`target=done` 完成 / `target=processing` 继续。随 pending-review 配套 |
 | 审核驳回 | `grape issues review-reject --issue_id {issue_id} --json '{"reason":"..."}' --json-out` | 用户驳回。随 pending-review 配套 |
 
-> **`issue_id` 获取方式（这些命令共用，必填）**：`issue_id` 是需求卡片内部 id（int），**不是 issue 编号**——用 `grape issues detail --owner {owner} --repo {repo} --number {n} --json-out` 出参的 `id` 字段：
+> **`issue_id` 获取方式（这些命令共用，必填）**：`issue_id` 是需求卡片内部 id（int），**不是 issue 编号**——**优先用已注入的环境变量 `$GRAPE_ISSUE_ID`**；未注入时才降级用 `grape issues detail` 出参的 `id` 字段：
 > ```bash
-> ISSUE_ID="$(grape issues detail --owner {owner} --repo {repo} --number {n} --json-out | jq -r '.id')"
+> ISSUE_ID="${GRAPE_ISSUE_ID:-$(grape issues detail --owner {owner} --repo {repo} --number {n} --json-out | jq -r '.id')}"
 > grape issues awaiting-input --issue_id "$ISSUE_ID" --json '{"questions":"...","reason":"..."}' --json-out
 > ```
 > 解析失败/为空 → 记「issue_id 解析失败」并收尾，**不要传 issue number 兜底**。

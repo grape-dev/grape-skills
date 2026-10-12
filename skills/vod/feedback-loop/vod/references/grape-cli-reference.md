@@ -37,7 +37,7 @@ grape --version      # 确认版本（≥0.3.2）
 |------|------|
 | `grape tasks current --json-out` | 获取分配给自己的任务 |
 | `grape issues detail --owner {owner} --repo {repo} --number {n} --json-out` | Issue 全貌（含阶段/事件/pipeline） |
-| `grape issues clarify --issue_id {id} --json '{"message":"..."}'` | 向上游提问（回复 Issue 澄清） |
+| `grape issues clarify --issue_id ${GRAPE_ISSUE_ID:-{id}} --json '{"message":"..."}'` | 向上游提问（--issue_id 优先用注入的 `$GRAPE_ISSUE_ID`） |
 | `grape commands [pattern]` | 列出可调用命令（命令发现） |
 
 ### 3.2 知识与项目上下文

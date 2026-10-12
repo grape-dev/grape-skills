@@ -81,8 +81,8 @@ grape git-repo contents --owner {owner} --repo {repo} --path "" --json-out     #
 # A2A 交办 Issue Agent（专属命令）
 grape a2a handoff --json '{"agent":"issue","payload":{...}}'
 
-# 显式声明进入待澄清（需求不清晰需用户补充时；仅 vod/issue 会话 token；--issue_id=需求卡片内部 id，出参 changed:true 成功 / false 幂等）
-grape issues awaiting-input --issue_id {issue_id} \
+# 显式声明进入待澄清（需求不清晰需用户补充时；仅 vod/issue 会话 token；--issue_id=需求卡片内部 id，优先 $GRAPE_ISSUE_ID 未注入降级 issues detail 的 id；出参 changed:true 成功 / false 幂等）
+grape issues awaiting-input --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} \
   --json '{"questions":"[VOD Agent] 请问：…","reason":"需求四要素缺失"}'
 
 # 任务自报完成（收尾必做，见 SKILL「任务完成流程」；会话 token 自动定位任务，无需 --task_id；结构化字段必传，服务端据此组装 archive）

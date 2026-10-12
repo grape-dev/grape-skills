@@ -22,7 +22,7 @@ grape events detail --seq {seq} --json-out   # 读前序 A2A payload（vod/issue
 grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out  # 读技能需求单
 ```
 - 从上下文/评论提取 `agent_type`（chat/vod/issue/coding/qa/sre）+ 技能需求单（name/description/目标系统/验收）。
-- 信息不全 → 澄清追问：`grape issues clarify --issue_id {issue_id} --json '{"message":"..."}'`（issue_id 从 issues detail 取）。
+- 信息不全 → 澄清追问：`grape issues clarify --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} --json '{"message":"..."}'`（issue_id 优先用注入的 `$GRAPE_ISSUE_ID`，未注入才用 `issues detail` 的 `id`）。
 
 ### Step 1 · 查重（必做）
 ```bash

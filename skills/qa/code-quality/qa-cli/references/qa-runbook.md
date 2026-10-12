@@ -19,9 +19,10 @@
 grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out   # 取 head.sha / base.ref
 WORK_BRANCH="${GRAPE_WORK_BRANCH:-$(grape git-repo pulls get --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$PR_NUMBER" --json-out | jq -r '.base.ref // "main"')}"
 echo "work_branch=$WORK_BRANCH"   # 缺省仓库默认分支，不要写死 main
-# 解析需求卡片内部 id（pending-review / review-pass / review-reject 的 --issue_id 用，非 issue 编号）
-ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id' 2>/dev/null)"
-echo "issue_id=$ISSUE_ID"
+# 需求卡片内部 id（pending-review / review-pass / review-reject 的 --issue_id 用，非 issue 编号）
+# ⚠️ 优先用已注入的环境变量 $GRAPE_ISSUE_ID；未注入时才降级用 issues detail 解析（兜底）
+ISSUE_ID="${GRAPE_ISSUE_ID:-$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id' 2>/dev/null)}"
+echo "issue_id=$ISSUE_ID"   # 解析为空 → 说明无法确定 issue_id，与 issue 编号不混用
 ```
 - ⚠️ **`$GRAPE_WORK_BRANCH` 语义（重要，避免误判）**：它是**整个仓库/场景的开发基线分支**，可能叫长期分支（`dev`/`weekly-xx`）**或 `feat/issue-N`（N 不一定等于当前 Issue/PR 编号，是场景配置的基线名）**——不是"当前 Issue 的专属分支"。
   - **默认采用 `$GRAPE_WORK_BRANCH` 作为 PR 审查的基准确认**；若该变量未注入，则以 PR 的 `base.ref`（>= 仓库默认分支）为 `$WORK_BRANCH`。

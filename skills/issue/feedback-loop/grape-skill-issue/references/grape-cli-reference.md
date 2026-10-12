@@ -42,7 +42,7 @@ grape issues detail --owner {owner} --repo {repo} --number {n} --json-out   # Is
 grape issues events --owner {owner} --repo {repo} --number {n} --json-out    # Issue 事件流
 grape issues pipeline --owner {owner} --repo {repo} --number {n} --json-out  # Issue 路线图（查重复 A2A）
 grape events detail --seq {seq} --json-out                              # 读取 A2A 交接 payload
-grape issues clarify --issue_id {issue_id} --json '{"message":"..."}'  # 向上游提问（issue_id 从 tasks current 或 issues detail 获取）
+grape issues clarify --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} --json '{"message":"..."}'  # 向上游提问（--issue_id 优先用注入的 $GRAPE_ISSUE_ID，未注入才从 issues detail 的 id 取）
 ```
 
 ### GitCode Issue 操作

@@ -49,6 +49,7 @@ tools:
 | `REPO_NAME` | 仓库名 = `${REPO_FULL_NAME#*/}` | `grape ... --repo "$REPO_NAME"` |
 | `ACCOUNT` | **个人账号（webhook 触发人 `actor`，与仓库属主解耦）** | A2A payload `account` 字段（一般不用作 `--owner`） |
 | `ISSUE_NUMBER` | Issue 编号（数字，无 # 前缀） | `--number "$ISSUE_NUMBER"` / 分支 `feat/issue-{n}` / A2A |
+| `GRAPE_ISSUE_ID` | 需求卡片内部 id（issue 表主键，int） | `awaiting-input` 等 `--issue_id` 用此值（非 ISSUE_NUMBER）；未注入降级用 `issues detail` 解析 |
 | `GRAPE_WORK_BRANCH` | 目标合入分支/工作基线（缺省取仓库默认分支） | 建 PR 的 `base` |
 | `GRAPE_SCENE_ID` | 当前需求绑定的场景 ID（未选定=空串） | `grape scenes detail` 确认 qa 节点存在（A2A 前） |
 | `BOT_USERNAME` | Bot 在 VCS 平台的用户名（GitCode/GitHub/GitLab 等均可） | `grape git config user.name` |

@@ -21,7 +21,7 @@ echo "scene_id=${GRAPE_SCENE_ID:+set}"
 SCENE_NODES="$(grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out 2>/dev/null)"
 echo "scene_agents: $(echo "$SCENE_NODES" | jq -r '[.nodes[]?.tag // .nodes[]?.skill] | unique | join(",")' 2>/dev/null)"
 ```
-- 从 payload/context 提取 `skill_path`（被检查 skill 目录）；缺失 → `grape issues clarify --issue_id {issue_id} --json '{"message":"需要 skill_path 参数"}'`。
+- 从 payload/context 提取 `skill_path`（被检查 skill 目录）；缺失 → `grape issues clarify --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} --json '{"message":"需要 skill_path 参数"}'`（--issue_id 优先用注入的 `$GRAPE_ISSUE_ID`）。
 - 场景未绑定（`$GRAPE_SCENE_ID` 空）→ 跳过核验，按常见约定路由（coding/sre）。
 
 ### Step 1 · 读被检查 skill 文件（必做）
@@ -90,8 +90,8 @@ grape a2a handoff --json '{
 > ⚠️ **审查通过 = 交付决策点**。凡检查通过且 PR **未合入**、需用户确认是否合入的，**必须用 `pending-review` 显式置审核点**（触达用户拍板）；**禁止在评论里只写"可合入/待合并"就直接收尾**——无审核点则用户无触达、状态不一致。
 
 ```bash
-# ISSUE_ID 用 issues detail 的 id（若不确定用 ISSUE_NUMBER）
-ISSUE_ID="$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')"
+# ISSUE_ID 优先用已注入环境变量 $GRAPE_ISSUE_ID；未注入才降级用 issues detail 解析
+ISSUE_ID="${GRAPE_ISSUE_ID:-$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')}"
 # ① 置审核点（review_points=审查结论，references=PR#；changed:true=成功）
 grape issues pending-review --issue_id "$ISSUE_ID" \
   --json '{"review_points":"PR #'"${PR_NUMBER:-0}"' skill 合规检查全部通过（{总项数}/{总项数}），请确认是否合入","references":"PR #'"${PR_NUMBER:-0}"'"}' --json-out
