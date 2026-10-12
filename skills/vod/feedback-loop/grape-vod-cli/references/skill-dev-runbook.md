@@ -43,15 +43,17 @@ grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --
 - **非技能需求 / 纯咨询 / 无关** → Step 4c（说明 / 转对应流程）
 
 ### Step 3 · 技能需求引导（≤3 轮，一次 1-3 个问题）
-对照 `references/skill-requirement-guide.md` §二 要素引导（agent_type / name / description / 目标系统 / 验收风险 + **流程审批节点**）。**服务项目 = 当前项目（环境变量/prompt 已注入），无需引导；触发场景固定（工作流自动调用本技能），无需引导**。
+对照 `references/skill-requirement-guide.md` §二 要素引导（agent_type / name / description / 目标系统 / 流程审批节点 + **自定义环境变量** / 验收风险）。**服务项目 = 当前项目（环境变量/prompt 已注入），无需引导；触发场景固定（工作流自动调用本技能），无需引导**。
 
 > 💡 **流程审批节点（按需了解）**：判断该技能处理过程中是否需要额外的流程节点——如「用户输入补充（awaiting-input）」「评审审批（pending-review/review-pass）」「任务通知（tasks notify）」等。是否需要由技能职责 + issue 阶段设计决定，**不强制每个技能都要**；只有用户诉求或职责要求时才引导确认。
+>
+> 💡 **自定义环境变量（按需了解）**：技能是否需要注入自定义 env（如目标系统 API Key、Base URL、配置项）。需要时与用户确认**变量名称**，且命名须遵循 GRAPE 约束（全大写、非空、不以 `GRAPE_` 开头、不与系统保留变量冲突、密钥带 `_KEY/_TOKEN` 等后缀）——**命名违规会被拒绝注入，技能读不到变量**，确认时即校验并给出合规替代名。
 
 追问用评论：
 
 ```bash
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"body":"[VOD Agent] 为了给您生成合适的技能，请补充：\n1) 这个技能承担哪类职责（chat/vod/issue/coding/qa/sre）？\n2) 技能叫什么名字（小写连字符，如 blog-manager）？\n3) 它会操作什么系统/服务？\n4) 处理过程中需要哪些流程节点？（如：需要用户输入补充 / 需要评审审批 / 需要任务通知；可都选或都不选）"}'
+  --json '{"body":"[VOD Agent] 为了给您生成合适的技能，请补充：\n1) 这个技能承担哪类职责（chat/vod/issue/coding/qa/sre）？\n2) 技能叫什么名字（小写连字符，如 blog-manager）？\n3) 它会操作什么系统/服务？\n4) 处理过程中需要哪些流程节点？（如：需要用户输入补充 / 需要评审审批 / 需要任务通知；可都选或都不选）\n5) 它需要哪些凭据/配置项？（如目标系统 API Key、地址；变量名须全大写，如 CLOUD_API_KEY）"}'
 ```
 
 判定要点见 `skill-requirement-guide.md` §四（agent_type 速查）+ §七（常见口径）。

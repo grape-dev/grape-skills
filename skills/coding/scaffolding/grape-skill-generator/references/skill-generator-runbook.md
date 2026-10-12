@@ -59,6 +59,19 @@ grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path "skills
 - 只引用 `references/grape-cli-reference.md` 中实际存在的命令；agent_type 相关命令从 `command-matrix.md` 选取
 - `--json body` 字段只用 spec §5 的 schema，不编造
 
+### Step 3b · 沉淀 skill 开发过程文档（必做，随 skill 一并提交）
+> 生成过程文档放项目根 `.grape/docs/{name}/`，与 `.grape/skills/` 同一 commit/PR 提交（见 Step 6 add）。
+> **spec.md 来源于 issue agent 交付的 Spec/技能需求单**：coding 负责将其落入 `.grape/docs/{name}/spec.md` 并提交，不自行编造内容；plan/task 由 coding 按需求单生成。
+
+```bash
+mkdir -p .grape/docs/{name}
+# 写 .grape/docs/{name}/spec.md  —— 需求/规格（来源：issue agent 交付的 Spec/需求单，原样落盘）
+# 写 .grape/docs/{name}/plan.md  —— 方案/计划（实现顺序/依赖/风险）
+# 写 .grape/docs/{name}/task.md  —— 任务拆解清单（逐项验收/验证）
+```
+- `{name}` = skill 目录名（kebab-case）；文档只描述开发过程事实，不重复 SKILL.md/references 已固化内容。
+- 说明：`.grape/` 在 .gitignore 中，add 须按文件逐一执行（同 `.grape/skills/`，见 Step 6）。
+
 ### Step 4 · 生成 references/（必做，在 `.grape/skills/{agent_type}/{name}/references/`）
 - `references/grape-cli-reference.md`：按 spec §3（安装/认证/常用命令/限制/退出码/安全）+ 只列该 skill 用到的命令
 - `references/{domain-guide}.md`：agent_type 专属业务规则/判断标准/话术
@@ -76,11 +89,15 @@ WORK_BRANCH="${GRAPE_WORK_BRANCH:-main}"
 grape git status   # 确认在 feat/issue-{n}
 # ⚠️ 生成的 skill 放在项目根 `.grape/skills/{agent_type}/{name}/`；目录不存在先创建
 mkdir -p ".grape/skills/{agent_type}/{name}"
+# ⚠️ 开发过程文档放在 `.grape/docs/{name}/`（见 Step 3b），随本 PR 一并提交
 # ⚠️ `.grape/` 在 .gitignore 中——整目录 add 会触发 ignored 警告（rc=1），须按文件逐一 add（已跟踪文件不受 ignore 影响）
 grape git add \
   .grape/skills/{agent_type}/{name}/SKILL.md \
   .grape/skills/{agent_type}/{name}/references/{reference-file}.md \
-  .grape/skills/{agent_type}/{name}/references/{another-file}.md   # 实际存在的文件清单
+  .grape/skills/{agent_type}/{name}/references/{another-file}.md \
+  .grape/docs/{name}/spec.md \
+  .grape/docs/{name}/plan.md \
+  .grape/docs/{name}/task.md   # 实际存在的文件清单（skill 文件 + 开发过程文档）
 grape git status   # 确认 M 状态后再 commit；若仍被 ignore 拒绝，用 `grape git add -f <文件>`
 grape git commit -m "feat(skills): add {name} skill"
 grape git push origin "feat/issue-$ISSUE_NUMBER"
@@ -91,7 +108,7 @@ grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
     "title": "feat: add {name} skill",
     "head": "feat/issue-'"$ISSUE_NUMBER"'",
     "base": "'"$WORK_BRANCH"'",
-    "body": "## 概述\n\n新增 {agent_type} 技能 {name}：{技能职责一句话}（按 grape-cli skill 撰写规范生成）。\n\n## 改动\n- 新增 `.grape/skills/{agent_type}/{name}/SKILL.md`\n- 新增 `.grape/skills/{agent_type}/{name}/references/`（grape-cli-reference / {业务 guide} 等）\n\n## 后续\n- 请 QA 审查技能规范合规性（skill 合规检查器验证 frontmatter/安全硬约束/runbook 等）",
+    "body": "## 概述\n\n新增 {agent_type} 技能 {name}：{技能职责一句话}（按 grape-cli skill 撰写规范生成）。\n\n## 改动\n- 新增 `.grape/skills/{agent_type}/{name}/SKILL.md`\n- 新增 `.grape/skills/{agent_type}/{name}/references/`（grape-cli-reference / {业务 guide} 等）\n- 新增 `.grape/docs/{name}/`（spec.md 需求 / plan.md 方案 / task.md 任务拆解）\n\n## 后续\n- 请 QA 审查技能规范合规性（skill 合规检查器验证 frontmatter/安全硬约束/runbook 等）",
     "related_issue_nums": ["'"$REPO_FULL_NAME"'#'"$ISSUE_NUMBER"'"],
     "auto_close_issues": true
   }' --json-out

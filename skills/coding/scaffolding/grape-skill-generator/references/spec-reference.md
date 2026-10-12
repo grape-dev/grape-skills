@@ -18,6 +18,20 @@
     └── {technical-guide}.md           # 技术指南（可选）
 ```
 
+> ⚠️ **skill 开发过程文档一并提交**：生成 skill 过程中的需求/规格、方案、任务拆解等文档，统一放**项目根 `.grape/docs/{skill_name}/`** 下，随 skill 的 PR **一并提交**（与 `.grape/skills/` 同一 commit/PR）：
+
+```
+.grape/docs/{skill_name}/
+├── spec.md                            # 需求/规格文档（来源于 issue agent 交付的 Spec/需求单，非 coding 生成）
+├── plan.md                            # 方案/计划文档（实现顺序/依赖/风险）
+└── task.md                            # 任务拆解清单（逐项验收/验证）
+```
+
+- `{skill_name}` = skill 目录名（kebab-case）。
+- **spec.md 来源**：由 **issue agent** 交付的 Spec / 技能需求单提供（coding 不自行编造内容）；coding 负责把该 Spec 落入 `.grape/docs/{skill_name}/spec.md` 并**随 PR 提交**。
+- plan/task 由 coding 按需求单生成；文档只描述 skill 开发过程事实，不重复 SKILL.md/references 中已固化的流程内容（避免冗余）。
+- commit 时与 skill 文件一起 `grape git add`（`.grape/` 被 .gitignore，须按文件逐一 add，同 `.grape/skills/`）。
+
 ### 拆分原则
 
 | 内容 | 放 SKILL.md | 放 references/ |
@@ -72,10 +86,25 @@ tools:
 
 **要点（对齐现有技能）**：
 - **Prerequisites 必含**：`grape --version`（≥最低版本）→ `grape refresh`（刷新契约，⚠️ 契约权威 = `grape commands` 实列）→ env `${VAR:+ok}` 校验 → 未通过输出「前置检查未通过」并结束。
-- **环境变量表必含**：`GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` / `REPO_OWNER` / `REPO_NAME` / `REPO_FULL_NAME` / `ACCOUNT`(actor，仅 A2A) / `ISSUE_NUMBER` / `GRAPE_SCENE_ID` / `BOT_USERNAME` 等，附敏感信息提示。
+- **环境变量表必含**：`GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` / `REPO_OWNER` / `REPO_NAME` / `REPO_FULL_NAME` / `ACCOUNT`(actor，仅 A2A) / `ISSUE_NUMBER` / `GRAPE_SCENE_ID` / `BOT_USERNAME` / `GRAPE_ISSUE_ID`（awaiting-input 等 `--issue_id` 用）等，附敏感信息提示。
 - **处理流程 = runbook 引用**：正文写「⚠️ 先读 `references/{x}-runbook.md`，按走查表逐步执行，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**」+「本技能收尾一律用 `grape tasks complete`（情形一）」；详细步骤放 runbook。
 - **正文不改写**（如涉及修改 Issue）：结论/收敛一律 `issues comments create` 发布，`issues update` 不写 body（防覆盖原始描述）。
 - **A2A 交办 agent 名**（`coding`/`qa`/`sre`/`vod`/`issue`），非技能名。
+
+#### 自定义环境变量命名约束（skill 用到场景自定义变量时必遵守）
+
+> 场景「高级选项 → custom_fields」注入的自定义环境变量，须满足三条红线，否则被**拒绝注入**（保存端报错 / 注入端跳过），skill 将读不到该变量。规则权威：`src/scene_custom_env.py`，本文档仅说明。
+
+| 规则 | 约束 | 违反示例 → 报错 |
+|------|------|----------------|
+| ① 非空 | 变量名不能为空 | 空 →「自定义环境变量名不能为空」 |
+| ② 全大写 | 符合 `[A-Z][A-Z0-9_]*`（首字符大写字母） | `my_api_key` / `MyKey` →「需使用大写字母（如 MY_API_KEY）」 |
+| ③ 不与系统保留冲突 | 不能以 `GRAPE_` 开头；不能等于保留集合中的名字 | `GRAPE_APP` / `ISSUE_NUMBER` / `REPO_OWNER` / `BOT_USERNAME` / `GRAPE_SESSION_TOKEN` / `GRAPE_ISSUE_ID` 等 →「与系统保留环境变量冲突，请更换名称」 |
+
+- **系统保留命名空间**：`GRAPE_*` 前缀全部保留；显式保留集合含 `REPO_FULL_NAME / REPO_OWNER / REPO_NAME / ACCOUNT / BOT_USERNAME / ISSUE_NUMBER / PR_NUMBER / GRAPE_SERVER_URL / GRAPE_WORK_BRANCH / GRAPE_SCENE_ID / GRAPE_SESSION_TOKEN / GRAPE_CLI_MODE / GRAPE_ISSUE_ID / GIT_ASKPASS` 等——**凡平台已注入的变量均不可自定义覆盖**。
+- **密钥语义后缀**（大小写不敏感自动判定 `is_secret=true` 掩码）：`_KEY` `_SK` `_SECRET` `_TOKEN` `_PASSWORD` `_PWD` `_CREDENTIALS`（如 `HUAWEI_AK`、`CLOUD_API_KEY`）。
+- **注入范围 scope**：`all` / `vod` / `issue` / `coding` / `qa` / `sre`；缺省 `["all"]`。
+- **skill 读取**：变量名原样注入 env，`os.environ.get('MY_API_KEY')` / `printenv MY_API_KEY` 直接读；**不要回显敏感值到日志/评论**。
 
 ### §2.3 安全硬约束（必须最先，≤5 条）
 
@@ -262,6 +291,7 @@ skill 编写完成后，逐项检查：
 - [ ] --json body 只用规范 §3.5 列出的字段
 - [ ] 查询命令带 --json-out
 - [ ] 涉及 Issue body 修改时：用 `issues comments create` 发布，`issues update` 不写 body（回填原始 body）
+- [ ] 用到场景自定义变量时：变量名全大写（`[A-Z][A-Z0-9_]*`）、非空、不以 `GRAPE_` 开头、不与系统保留变量冲突（REPO_* / ISSUE_NUMBER / GRAPE_* / BOT_USERNAME / ACCOUNT 等）；密钥变量带 `_KEY/_SK/_TOKEN/_PASSWORD` 等后缀
 - [ ] 已上收的能力在 SKILL.md 和 reference 中都做了声明
 - [ ] SKILL.md ≤130 行
 - [ ] reference 文件 ≤250 行
