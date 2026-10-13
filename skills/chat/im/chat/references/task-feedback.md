@@ -50,7 +50,7 @@ grape git-repo issues create --owner {owner} --repo {repo} \
   }'
 ```
 
-> **重要**：创建 Issue 用会话 token（`$GRAPE_SESSION_TOKEN`，`grape` 自动读取，无需显式 `--token`）；`$USER_TOKEN` 已不注入，勿尝试用用户身份写入。
+> **重要**：创建 Issue 用会话 token（`$GRAPE_SESSION_TOKEN`，`grape` 自动读取，无需显式 `--token`）。
 
 ## 4. 回复用户
 

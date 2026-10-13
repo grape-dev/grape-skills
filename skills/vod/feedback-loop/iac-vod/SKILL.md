@@ -38,7 +38,7 @@ tools:
 | `DEVOPS_EVENT_TYPE` | 事件类型（issue_opened / vod_signal 等）| 场景路由（A/B）| 全部 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
-本技能不涉及 `HUAWEI_AK/SK`（SRE 域）与 `USER_GITCODE_TOKEN`（Chat 域）。
+本技能不涉及 `HUAWEI_AK/SK`（SRE 域）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 

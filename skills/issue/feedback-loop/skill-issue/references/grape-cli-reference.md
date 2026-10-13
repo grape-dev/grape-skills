@@ -11,7 +11,7 @@
 ## §2 认证（平台注入，自动读取）
 
 - grape CLI **自动读取**服务端注入的 `$GRAPE_SESSION_TOKEN`——不需要也不允许手动传 token
-- git 操作：用 **`grape git clone/log` 透传**（凭据由 grape 内部换短期凭证）——`$GIT_ASKPASS`/`$BOT_GITCODE_TOKEN` 已不注入，不依赖
+- git 操作：用 **`grape git clone/log` 透传**（凭据由 grape 内部换短期凭证）
 - ❌ 禁止 `curl`/`requests` 直连平台 API（含 api.gitcode.com）——平台交互一律 grape CLI
 
 ## §3 本技能使用子集（照抄执行，不 help 探索）
@@ -93,7 +93,7 @@ grape tasks complete --json '{"result_text": "<一句话结论>", "actions": ["<
 
 ## §6 安全边界
 
-- 只用平台注入 token（`$GRAPE_SESSION_TOKEN`）；`GIT_ASKPASS`/`BOT_*`/`USER_*` 已不注入，严禁寻找/读取其他 token
+- 只用平台注入 token（`$GRAPE_SESSION_TOKEN`）；严禁寻找/读取其他 token
 - token 不得落盘（不写文件/日志/评论/脚本）
 - 403/无权限 → 立即停止该操作并回复用户（不找替代 token、不绕行）
 - 长命令（create/update/handoff 等）用 `--json @file.json` 避免转义出错

@@ -1,4 +1,4 @@
----
+﻿---
 name: grape-skill-generator
 version: 2.1.0
 description: |
@@ -56,7 +56,7 @@ tools:
 | `AGENT_NAME` | Agent 显示名 | 评论正文前缀 `[Coding Agent]` |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要处理 |
 
-> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
+> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。
 
 # Skill Generator（grape-cli skill 生成器）
 

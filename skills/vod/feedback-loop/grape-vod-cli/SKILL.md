@@ -1,4 +1,4 @@
----
+﻿---
 name: grape-vod-cli
 version: 3.0.0
 description: |
@@ -54,7 +54,7 @@ tools:
 | `AGENT_NAME` | Agent 显示名 | 需引用 Agent 身份处（评论默认用 `[VOD Agent]` 前缀） |
 | `DEVOPS_EVENT_TYPE` | 事件类型 | 判断入口/是否需要 A2A |
 
-> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
+> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。
 
 # Grape 技能创建需求引导
 

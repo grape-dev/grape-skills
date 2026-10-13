@@ -159,7 +159,7 @@ grape commands     # 验证命令树可用
 
 ## 6. 安全与边界
 
-- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（会话级 `tk_`）；`BOT_TOKEN`/`USER_TOKEN` 已不注入。`skills` 相关命令为 dual（`tk_` 可用）；如需 `user_only` 级操作需 `GRAPE_API_TOKEN`（`grape_`）/JWT，本技能一般用不到。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（会话级 `tk_`）。`skills` 相关命令为 dual（`tk_` 可用）；如需 `user_only` 级操作需 `GRAPE_API_TOKEN`（`grape_`）/JWT，本技能一般用不到。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`user_accounts` 表、`configs/` 目录。
 - **403/401 处理**：403 → 停止并回复「需管理员/维护者权限」；401 → 说明凭据已失效，不换 token。
 - **`git-repo issues update` 为整体覆盖语义**：本技能不修改 Issue body，结果用 `git-repo issues comments create` 发布。

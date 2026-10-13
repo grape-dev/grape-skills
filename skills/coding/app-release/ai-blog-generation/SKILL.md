@@ -40,7 +40,6 @@ tools:
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘、不写评论**。
 **AI 模型配置（ai-models.yaml）不是环境变量**——从知识基线读取（`image.url/key/model` + `video.url/key/model`），读取不到 → 见 4.5 降级。
-本技能不涉及 `BOT_TOKEN`/`BOT_USERNAME`/`USER_GITCODE_TOKEN`（旧版 VCS API 时代，已废弃）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 

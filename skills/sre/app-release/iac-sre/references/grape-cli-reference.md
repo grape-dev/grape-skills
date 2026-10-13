@@ -24,7 +24,7 @@ grape --version      # 确认版本（≥0.3.2）
 | `$GRAPE_SERVER_URL` | 服务端注入，指向 API 地址 |
 | Token 优先级 | `--token` > `GRAPE_SESSION_TOKEN` > `GRAPE_API_TOKEN` > config.json |
 | base_url 优先级 | `--base-url` > `GRAPE_BASE_URL` > `GRAPE_SERVER_URL` > config.json > `http://localhost:8000` |
-| git 克隆认证 | **`grape git` 透传**（`grape git clone/checkout/log`）——凭据由 grape 按会话 token 内部换短期凭证，**不依赖 `GIT_ASKPASS`/`$BOT_GITCODE_TOKEN`** |
+| git 克隆认证 | **`grape git` 透传**（`grape git clone/checkout/log`）——凭据由 grape 按会话 token 内部换短期凭证 |
 
 ## 3. 常用命令（iac-sre 实际用到的子集）
 
@@ -92,7 +92,7 @@ grape --version      # 确认版本（≥0.3.2）
 
 ## 6. 安全与边界
 
-- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）；`$BOT_GITCODE_TOKEN`/`GIT_ASKPASS` 等平台凭据已不注入，不得读取/依赖。不得从数据库、配置文件、日志、历史中寻找其他 token。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）。不得从数据库、配置文件、日志、历史中寻找其他 token。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`user_accounts` 表、`managed_repos` 表、`configs/` 目录（含 `global-bot-token.json` 等）。`data/workspaces/` 项目知识文档除外。
 - **403/401 处理**：命令返回 403 或权限不足时，停止操作并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行手段。
 - **华为云凭证**：只用 `HUAWEI_AK/SK` 环境变量映射（A3 export）——禁用 hcloud CLI profile 里的凭据（权限不一致），不写 .tf 不 printenv。

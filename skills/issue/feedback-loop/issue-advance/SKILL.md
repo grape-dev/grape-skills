@@ -43,7 +43,7 @@ tools:
 | `GRAPE_SCENE_ID` | 当前 Issue 绑定的场景 ID（未选定=空串）| `grape scenes detail` 取场景节点——A2A 前确认 coding 节点存在（防悬空交办）| 场景任务 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
-本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（SRE 域）与 `USER_GITCODE_TOKEN`（Chat 域）。
+本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（SRE 域）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 

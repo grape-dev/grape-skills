@@ -78,7 +78,7 @@ tools:
 > - 仅当场景/基线明确指向其它 base（stacked PR 依赖等）才改，并在 PR body/评论说明。
 > - 优先级：`GRAPE_WORK_BRANCH`（权威）> 仓库默认分支（`git-repo repo` 的 `default_branch`）> `main` 探测（不存在则 `master`）。
 
-> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
+> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。
 
 ## 定位
 

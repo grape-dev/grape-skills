@@ -41,7 +41,7 @@ tools:
 | `BLOG_HOST` | 博客系统地址（**外部解析值，非平台注入**——从知识基线 project-info/member/blog-config.yaml 或 Issue 正文/评论解析）| 博客系统验证与 Spec 发布目标 | 博客场景解析 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
-本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（iac 域）与 `USER_GITCODE_TOKEN`（Chat 域）。`BLOG_HOST` 解析不到 → 评论询问用户并**继续流程**（Spec 标注「发布目标待用户提供」——不阻塞内容生成交办——sre 发布前再落实，见 runbook B1）。
+本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（iac 域）。`BLOG_HOST` 解析不到 → 评论询问用户并**继续流程**（Spec 标注「发布目标待用户提供」——不阻塞内容生成交办——sre 发布前再落实，见 runbook B1）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 

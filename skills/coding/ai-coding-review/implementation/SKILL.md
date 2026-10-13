@@ -48,7 +48,7 @@ tools:
 | `GRAPE_LINKED_WORKTREES` | 关联仓库 worktree 路径列表 JSON（平台自动初始化）| 关联仓库多仓库开发（见 4.9）| coding 任务且有 linked_repos 时 |
 
 派生变量：`REPO_NAME` = `${REPO_FULL_NAME#*/}`。敏感变量（token 类）**不 printenv、不落盘**。
-本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（SRE 域）与 `USER_GITCODE_TOKEN`（Chat 域）。
+本技能不涉及 `HUAWEICLOUD_SDK_AK/SK`（SRE 域）。
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 

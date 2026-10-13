@@ -78,7 +78,7 @@ grape refresh        # 契约保鲜（失败重试 ≤2 次后回退内置快照
 
 ## 6. 安全与边界
 
-- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）；`$BOT_GITCODE_TOKEN` 等平台 token 已不注入。不得从数据库、配置文件、日志、历史中寻找其他 token。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）。不得从数据库、配置文件、日志、历史中寻找其他 token。
 - **403/401 处理**：API 返回 403 或权限不足时，停止操作并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行手段。
 - **token 不写入文件**：不将 token 写进日志、脚本、Issue 评论或工具调用以外的地方。
 - 华为云 AK/SK 只经环境变量 / hcloud CLI profile 读取，绝不要求用户在对话中输入（三选项协议见 SKILL「Agent Protocol」章节）。

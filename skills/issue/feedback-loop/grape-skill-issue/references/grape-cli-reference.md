@@ -199,7 +199,7 @@ grape refresh               # 重拉最新契约
 
 ## 6. 安全与边界
 
-- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（会话级 `tk_`）；`BOT_TOKEN`/`USER_TOKEN` 已不注入。`user_only` 端点（auth/skills 等）对 `tk_` 返回 403，需 `GRAPE_API_TOKEN`（`grape_`）或 Web JWT——本技能一般用不到。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（会话级 `tk_`）。`user_only` 端点（auth/skills 等）对 `tk_` 返回 403，需 `GRAPE_API_TOKEN`（`grape_`）或 Web JWT——本技能一般用不到。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`configs/`、`user_accounts` 表、`managed_repos` 表——不得读取。
 - **403/401 处理**：
   - 403（无权限）→ 立即停止该操作，回复用户「该操作需要管理员/维护者权限，请在 仓库设置中手动配置」。

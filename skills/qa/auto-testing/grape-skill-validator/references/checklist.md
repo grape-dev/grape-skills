@@ -47,9 +47,9 @@
 - **失败**：缺少任务上下文先行约束
 
 ### B4. 只用 $GRAPE_SESSION_TOKEN（token 作用域）
-- **检查**：安全硬约束/认证说明是否只用 `$GRAPE_SESSION_TOKEN`，未引入 `$BOT_TOKEN` 等旧 token；`user_only` 端点（auth/skills）说明需 `grape_`/JWT
+- **检查**：安全硬约束/认证说明是否只用 `$GRAPE_SESSION_TOKEN`，未引入旧版平台 token 名（`BOT_*`/`USER_*` 等已删除的注入变量）；`user_only` 端点（auth/skills）说明需 `grape_`/JWT
 - **通过**：token 说明正确
-- **失败**：引用了已不注入的 `$BOT_TOKEN`/`$USER_TOKEN`
+- **失败**：引用了旧版平台 token 名（`BOT_*`/`USER_*` 类）
 
 ### B5. 正文不改写声明（如涉及 Issue body 修改）
 - **检查**：涉及修改 Issue/P更新内容的 skill，是否声明「结论用 `issues comments create` 发布，`issues update` 不写 body（防覆盖原始描述）」

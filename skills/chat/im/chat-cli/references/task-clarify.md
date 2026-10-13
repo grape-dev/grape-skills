@@ -75,7 +75,7 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {nu
   --json '{"body": "**补充需求澄清**（由任务处理对话整理）：\n\n## 背景\n<原 Issue 核心内容>\n\n## 澄清后的需求\n- **使用场景**：<用户补充>\n- **预期效果**：<用户补充>\n- **验收标准**：<用户补充>\n\n---\n补充人：<用户昵称>（通过 Chat 对话整理）"}'
 ```
 
-> **重要**：回帖用会话 token（`$GRAPE_SESSION_TOKEN`，`grape` 自动读取，无需显式 `--token`）；`$USER_TOKEN` 已不注入，勿尝试用用户身份写入。
+> **重要**：回帖用会话 token（`$GRAPE_SESSION_TOKEN`，`grape` 自动读取，无需显式 `--token`）。
 
 ## 6. 回复用户
 

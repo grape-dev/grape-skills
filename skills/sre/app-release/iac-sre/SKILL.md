@@ -48,7 +48,7 @@ tools:
 HUAWEI_AK="${HUAWEI_AK:-${HUAWEICLOUD_SDK_AK:-}}"; HUAWEI_SK="${HUAWEI_SK:-${HUAWEICLOUD_SDK_SK:-}}"
 ```
 （凭据值只进 env 不进 prompt——不回显到日志/评论）
-本技能不涉及 `USER_GITCODE_TOKEN`（Chat 域）。
+
 
 ## 三、前置检查门（自愈 → 重试 → STOP）
 

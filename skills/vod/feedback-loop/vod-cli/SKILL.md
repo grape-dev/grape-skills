@@ -55,7 +55,7 @@ tools:
 | `AGENT_NAME` | Agent 显示名 | 评论/回复署名（默认仍用固定前缀 `[VOD Agent]`） |
 | `DEVOPS_EVENT_TYPE` | 事件类型（如 `issue_opened`） | 判断入口/是否需要 A2A |
 
-> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。`BOT_TOKEN`/`USER_TOKEN` 已不注入，无需关注。
+> ⚠️ 上述 token/URL 类变量为敏感信息：**不要 printenv 打印、不要写入日志/评论/文件**（平台已有脱敏）。
 
 # 开发者声音分析与 Issue 审视
 

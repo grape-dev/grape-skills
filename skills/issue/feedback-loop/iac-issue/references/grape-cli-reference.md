@@ -151,7 +151,7 @@ CLI 移除 `grape api` 通用兜底命令。契约未覆盖的端点无法通过
 
 ## 6. 安全与边界
 
-- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）；`$BOT_GITCODE_TOKEN` 等平台 token 已不注入。不得从数据库、配置文件、日志、历史中寻找其他 token。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）。不得从数据库、配置文件、日志、历史中寻找其他 token。
 - **禁止访问的内部数据路径**：`data/sessions.db`、`user_accounts` 表、`managed_repos` 表、`configs/` 目录（含 `global-bot-token.json` 等）。`data/workspaces/` 项目知识文档除外。
 - **403/401 处理**：API 返回 403 或权限不足时，停止操作并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行手段。
 - **token 不写入文件**：不将 token 写进日志、脚本、Issue 评论或工具调用以外的地方。
