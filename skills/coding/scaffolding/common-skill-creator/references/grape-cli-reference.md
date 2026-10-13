@@ -23,12 +23,12 @@
 ```bash
 grape git-repo repo --owner "$OWNER" --repo "$REPO" --json-out          # 默认分支（--base 可覆盖）
 grape git-repo pulls list --state open --per_page 100 --json-out        # 幂等查重（head.ref 匹配）
-grape git-repo pulls create --json '{"title":"...","head":"...","base":"...","related_issue_nums":["owner/repo#N"],"auto_close_issues":true}'
+grape git-repo pulls create --json '{"title":"...","head":"...","base":"...","related_issue_nums":["12"],"auto_close_issues":true}'
 grape git-repo pulls update --number "$PR_NUMBER" --json '{"body":"..."}'   # 补 PR body（幂等双保险）
 grape git-repo pulls get --number "$PR_NUMBER" --json-out               # base 校验
 ```
 
-> **契约字段（服务端 PRCreateBody 实测）**：关联 Issue 用 `related_issue_nums: ["owner/repo#N"]` + `auto_close_issues: true`——**不是** `inner_issue_nums`/`close_related_issue`（那是服务端 translate 后的 GitCode 内部名——pydantic 会静默忽略，关联/自动关闭不生效）。
+> **契约字段（服务端 PRCreateBody 实测，对齐 coding-cli）**：关联 Issue 用 `related_issue_nums: [12]`（**Issue 号数组**，如 `["12"]`）+ `auto_close_issues: true`——**不是** `inner_issue_nums`/`close_related_issue`（那是服务端 translate 后的 GitCode 内部名——pydantic 会静默忽略，关联/自动关闭不生效）。⚠️ **不要传 `owner/repo#N` 全限定格式**（实测在 PR 关联阶段不生效，PR 关联不到 Issue）。
 > **设置审查人（assignees）**：grape 0.3.3 无此接口——脚本已跳过该步（原为 curl 直连平台 API，已按纪律移除）。
 
 ### 3.2 Issue 评论（Step 7 硬规则）

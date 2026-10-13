@@ -30,12 +30,12 @@ grape git-repo tree --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}"
 ```bash
 grape git-repo repo --owner "$OWNER" --repo "$REPO" --json-out          # 默认分支
 grape git-repo pulls list --state open --per_page 100 --json-out        # 幂等查重（head.ref 匹配）
-grape git-repo pulls create --json '{"title":"...","head":"...","base":"...","inner_issue_nums":"owner/repo#N","close_related_issue":true}'
-grape git-repo pulls update --number "$PR_NUMBER" --json '{"body":"..."}'   # 补 PR body（create 无 body 字段）
+grape git-repo pulls create --json '{"title":"...","head":"...","base":"...","body":"...","related_issue_nums":["12"],"auto_close_issues":true}'
+grape git-repo pulls update --number "$PR_NUMBER" --json '{"body":"..."}'   # 补 PR body（幂等双保险）
 grape git-repo pulls get --number "$PR_NUMBER" --json-out               # base 校验
 ```
 
-> **pulls create 无 body 字段**（仅 base/close_related_issue/head/inner_issue_nums/title）→ PR 描述用 `pulls update` 补。
+> **字段以契约为准（对齐 coding-cli / common-skill-creator）**：关联 Issue 用 `related_issue_nums`（**Issue 号数组**，如 `["12"]`）+ `auto_close_issues: true`；body 契约已支持直接在 create 传入（update 补写仅作幂等双保险）。**不要传 `inner_issue_nums`/`close_related_issue`（旧字段名，pydantic 静默忽略）或 `owner/repo#N` 全限定格式（PR 关联不生效）。**
 > **设置审查人（assignees）：grape 0.3.3 无此接口**——脚本已跳过该步（原为 curl 直连平台 API，已按纪律移除）。
 
 ### 3.3 Issue 评论（Step 4 硬规则）

@@ -123,7 +123,7 @@ grape tasks complete --json '{...}'                                    # 收尾�
 （PR 创建全走 `scripts/create_rest_api_skill_pr.sh`——内部 pulls list/create/update/get——不手动敲）
 
 **坑点（pulls 契约）**：
-- `pulls create` **无 body 字段**（仅 base/close_related_issue/head/inner_issue_nums/title）→ PR 描述用 `pulls update` 补
+- `pulls create` 契约字段：`title/head/base/body/related_issue_nums/auto_close_issues`（`related_issue_nums` 传 Issue 号数组如 `["12"]`，不要用 `inner_issue_nums`/`close_related_issue` 旧字段或 `owner/repo#N` 全限定格式）→ PR 描述已在 create 的 body 传入（update 补写仅幂等双保险）
 - **设置审查人：grape 0.3.3 无 assignees 接口**——跳过（原 curl 直连已按纪律移除——审查人缺省不影响创建与测试，需要时人工指派）
 
 **目标系统探测（curl——生成器域，合法）**：见 `references/api-research-guide.md`（OpenAPI 解析 / Markdown 提取 / curl 探测三级回退 + 认证探测 + 时间盒）。

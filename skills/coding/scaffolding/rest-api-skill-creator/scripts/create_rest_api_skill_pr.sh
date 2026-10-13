@@ -123,7 +123,7 @@ CREATE_RESP=$(grape git-repo pulls create \
     \"title\": \"feat(skill): 新增 ${SKILL_NAME}\",
     \"head\": \"${BRANCH}\",
     \"base\": \"${BASE_BRANCH}\",
-    \"related_issue_nums\": [\"${OWNER}/${REPO}#${ISSUE_NUM}\"],
+    \"related_issue_nums\": [\"${ISSUE_NUM}\"],
         \"auto_close_issues\": true
   }" 2>/dev/null)
 

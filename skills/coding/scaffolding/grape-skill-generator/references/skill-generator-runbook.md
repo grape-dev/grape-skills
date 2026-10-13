@@ -115,14 +115,14 @@ grape git status   # 确认 M 状态后再 commit；若仍被 ignore 拒绝，�
 grape git commit -m "feat(skills): add {name} skill"
 grape git push origin "feat/issue-$ISSUE_NUMBER"
 
-# 建 PR（base 用 $WORK_BRANCH，不硬编码 main；关联字段用 related_issue_nums/auto_close_issues；body 必带，生成的 PR 才有完整描述）
+# 建 PR（base 用 $WORK_BRANCH，不硬编码 main；关联字段用 related_issue_nums/auto_close_issues——related_issue_nums 传 Issue 号数组如 [12]，非 owner/repo#N；body 必带，生成的 PR 才有完整描述）
 grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json '{
     "title": "feat: add {name} skill",
     "head": "feat/issue-'"$ISSUE_NUMBER"'",
     "base": "'"$WORK_BRANCH"'",
     "body": "## 概述\n\n新增 {agent_type} 技能 {name}：{技能职责一句话}（按 grape-cli skill 撰写规范生成）。\n\n## 改动\n- 新增 `.grape/skills/{agent_type}/{name}/SKILL.md`\n- 新增 `.grape/skills/{agent_type}/{name}/references/`（grape-cli-reference / {业务 guide} 等）\n- 新增 `.grape/docs/{name}/`（spec.md 需求 / plan.md 方案 / task.md 任务拆解）\n\n## 后续\n- 请 QA 审查技能规范合规性（skill 合规检查器验证 frontmatter/安全硬约束/runbook 等）",
-    "related_issue_nums": ["'"$REPO_FULL_NAME"'#'"$ISSUE_NUMBER"'"],
+    "related_issue_nums": ["'"$ISSUE_NUMBER"'"],
     "auto_close_issues": true
   }' --json-out
 ```

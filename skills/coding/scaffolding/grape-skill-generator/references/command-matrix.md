@@ -86,7 +86,7 @@
 | 分支列表 | `git-repo branches --owner {owner} --repo {repo} --json-out` | 查看分支 |
 | 提交历史 | `git-repo commits --owner {owner} --repo {repo} --json-out` | 提交记录 |
 | 本地 git | `grape git add/commit/push` | 本地代码操作 |
-| 创建 PR | `git-repo pulls create --owner {owner} --repo {repo} --json '{"title":"feat: ...","body":"## 概述\n\n{描述}","head":"feat/issue-{n}","base":"{WORK_BRANCH}","related_issue_nums":["{owner}/{repo}#{n}"],"auto_close_issues":true}'` | 提交 PR（base 用 WORK_BRANCH，body 必带） |
+| 创建 PR | `git-repo pulls create --owner {owner} --repo {repo} --json '{"title":"feat: ...","body":"## 概述\n\n{描述}","head":"feat/issue-{n}","base":"{WORK_BRANCH}","related_issue_nums":["{n}"],"auto_close_issues":true}'` | 提交 PR（base 用 WORK_BRANCH，body 必带；`related_issue_nums` 传 Issue 号数组，如 `[12]`） |
 | PR 评论 | `git-repo pulls comments create --owner {owner} --repo {repo} --number {pr} --json '{"body":"..."}'` | 自我审查/告知 |
 | A2A 交接 | `a2a handoff --json '{"agent":"qa","payload":{...}}'` | 交棒 qa agent |
 
