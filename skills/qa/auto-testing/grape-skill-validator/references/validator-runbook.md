@@ -22,6 +22,7 @@ SCENE_NODES="$(grape scenes detail --scene_id "$GRAPE_SCENE_ID" --json-out 2>/de
 echo "scene_agents: $(echo "$SCENE_NODES" | jq -r '[.nodes[]?.tag // .nodes[]?.skill] | unique | join(",")' 2>/dev/null)"
 ```
 - 从 payload/context 提取 `skill_path`（被检查 skill 目录）；缺失 → `grape issues clarify --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} --json '{"message":"需要 skill_path 参数"}'`（--issue_id 优先用注入的 `$GRAPE_ISSUE_ID`）。
+- **提取 `flow_nodes`**（A2A context / Spec「流程设计」段的流程节点：`pending-review`/`awaiting-input`/`tasks notify`，无则 `无`）——供 Step 2 H6 需求追溯核对。
 - 场景未绑定（`$GRAPE_SCENE_ID` 空）→ 跳过核验，按常见约定路由（coding/sre）。
 
 ### Step 1 · 读被检查 skill 文件（必做）
@@ -45,6 +46,7 @@ grape commands | grep {关键词}    # 或对照 reference §4 全量清单
 - **命令一致性**：对照 `grape-cli-reference.md` §4 逐个核对。
 - **schema 字段一致性**：--json body 字段对照 §6（注意 PRCreateBody 用 `related_issue_nums`/`auto_close_issues`，非旧字段）。
 - **不存在能力一致性**：对照 §7。
+- **流程节点一致性（H6）**：用 Step 0 提取的 `flow_nodes` 对照被检查 skill——声明了 `pending-review` 须有审批步骤、`awaiting-input` 须有澄清收尾步骤（且未误用 `issues awaiting-input` 状态接口）、`tasks notify` 仅任务分派语义不得作结果通知。
 
 ### Step 4 · 输出检查报告并发布评论（必做）
 - 按 `references/checklist.md` 末尾「检查报告输出格式」。
@@ -170,6 +172,7 @@ grape tasks complete --json '{
 - ❌ A2A 交办写技能名（如 `grape-skill-generator`）——用 agent 名 `coding`/`sre`。
 - ❌ 编造命令或 schema（交叉验证以事实基线为准）。
 - ❌ 修复 skill 不合规项 / 创建 PR（仅报告与分流）。
+- ❌ **漏检需求单 `flow_nodes` 的流程节点落地**——声明了 `pending-review`/`awaiting-input`/`tasks notify` 却未在 runbook 找到对应步骤/语义时，须按 H6 记 ❌ 或保留提示。
 - ❌ **检查通过 + PR 未合入时，只写"可合入/待合并"就收尾**——必须 `pending-review` 置审核点（触达用户拍板）。
 - ❌ **`pulls merge` 成功后不 A2A 通知 sre**（`git-repo pulls merge` 是显式动作，完成后必须 `a2a handoff agent=sre`，否则 SRE 收不到后续任务）。
 - ❌ 不因"等待"跳过 Step 6（tasks complete）。

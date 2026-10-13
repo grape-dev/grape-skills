@@ -46,6 +46,7 @@ grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --
 对照 `references/skill-requirement-guide.md` §二 要素引导（agent_type / name / description / 目标系统 / 流程审批节点 + **自定义环境变量** / 验收风险）。**服务项目 = 当前项目（环境变量/prompt 已注入），无需引导；触发场景固定（工作流自动调用本技能），无需引导**。
 
 > 💡 **流程审批节点（按需了解）**：判断该技能处理过程中是否需要额外的流程节点——如「用户输入补充（awaiting-input）」「评审审批（pending-review/review-pass）」「任务通知（tasks notify）」等。是否需要由技能职责 + issue 阶段设计决定，**不强制每个技能都要**；只有用户诉求或职责要求时才引导确认。
+> ⚠️ **flow_nodes 透传**：收敛后把流程节点记作 `flow_nodes`（`awaiting-input / pending-review / tasks notify` 多选，无则 `无`），写入需求单「流程审批节点」节，并在 Step 5 A2A context 中携带（`flow_nodes={flow_nodes}`）——**防止下游生成时丢失这些节点**。
 >
 > 💡 **自定义环境变量（按需了解）**：技能是否需要注入自定义 env（如目标系统 API Key、Base URL、配置项）。需要时与用户确认**变量名称**，且命名须遵循 GRAPE 约束（全大写、非空、不以 `GRAPE_` 开头、不与系统保留变量冲突、密钥带 `_KEY/_TOKEN` 等后缀）——**命名违规会被拒绝注入，技能读不到变量**，确认时即校验并给出合规替代名。
 
@@ -120,7 +121,7 @@ grape a2a handoff --json '{
     "account": "'"$ACCOUNT"'",
     "issue_number": '"$ISSUE_NUMBER"',
     "pr_number": 0,
-    "context": "用户要创建/改造一个 grape 技能，需求已收敛为技能需求单（以评论发布）：<agent_type/name/description 等摘要>。请做技能可开发性分析、Spec 生成与门控。"
+    "context": "用户要创建/改造一个 grape 技能，需求已收敛为技能需求单（以评论发布）：<agent_type/name/description 等摘要>。flow_nodes={flow_nodes}。请做技能可开发性分析、Spec 生成与门控。"
   }
 }' --json-out
 ```

@@ -28,7 +28,8 @@ grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_N
 grape events detail --seq {seq} --json-out   # 读前序 A2A payload（vod/issue 交办摘要）
 grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out  # 读技能需求单
 ```
-- 从上下文/评论提取 `agent_type`（chat/vod/issue/coding/qa/sre）+ 技能需求单（name/description/目标系统/验收）。
+- 从上下文/评论提取 `agent_type`（chat/vod/issue/coding/qa/sre）+ 技能需求单（name/description/目标系统/验收）+ **`flow_nodes`（流程审批节点，A2A context / Spec「流程设计」段；无则 `无`）**。
+- ⚠️ **`flow_nodes` 是「审批/澄清/通知」节点清单**（`awaiting-input`/`pending-review`/`tasks notify` 多选）——**必须在生成时落地为 runbook 步骤**（见 Step 3c），防止流程设计随实现丢失。
 - 信息不全 → 澄清追问：`grape issues clarify --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} --json '{"message":"..."}'`（issue_id 优先用注入的 `$GRAPE_ISSUE_ID`，未注入才用 `issues detail` 的 `id`）。
 
 ### Step 1 · 查重（必做）
@@ -71,6 +72,18 @@ mkdir -p .grape/docs/{name}
 ```
 - `{name}` = skill 目录名（kebab-case）；文档只描述开发过程事实，不重复 SKILL.md/references 已固化内容。
 - 说明：`.grape/` 在 .gitignore 中，add 须按文件逐一执行（同 `.grape/skills/`，见 Step 6）。
+
+### Step 3c · 流程节点落地为运行书步骤（按需求单 `flow_nodes`，必做）
+> ⚠️ **依据 Step 0 提取的 `flow_nodes`**：声明了哪个节点，runbook 就必须含对应步骤；`flow_nodes=无` 则跳过本节。产出放生成物 runbook（references/{x}-runbook.md 或 SKILL.md 处理流程段，需 ≤250/≤130 行）。
+
+| flow_nodes | 必须落地的 runbook 步骤 | 关键命令/模式 |
+|-----------|----------------------|--------------|
+| `awaiting-input` 澄清 | 需用户补充输入才能继续的环节：发追问评论 + 本轮收尾 | `grape git-repo issues comments create ... --json '{"body":"[<Agent>] 请补充：{问题}"}'` + `grape tasks complete next_step=reply_comment`（⚠️ `issues awaiting-input` 状态接口仅 vod/issue agent 会话可用，其他 agent 用评论+收尾，勿依赖该接口） |
+| `pending-review` 审批 | 交付决策点（部署前/合入前）需用户拍板：置审核点 → 用户回复 → 通过/驳回 | `grape issues pending-review --issue_id $ISSUE_ID --json '{"review_points":"{审查/审批结论}","references":"{PR/依据}"}'` → 评论续接：`grape issues review-pass --json '{"target":"done/processing",...}'` / `grape issues review-reject --json '{"reason":"..."}'`（幂等，`changed:false` 忽略） |
+| `tasks notify` 通知 | 任务分派/状态通知节点 | ⚠️ **语义澄清**：`tasks notify`（body=assignee/issue_number/repo_key/task_description）仅用于 **issue agent 任务分派**；生成物中**结果/部署/完成通知一律走 `git-repo issues comments create`**，不误用 tasks notify。若需求节点是「完成/结果通知」→ 落评论步骤 |
+
+- 每个节点步骤标注 `（必做）` 与 `next_step` 取值（clarify→`reply_comment`；approve→`done`/`processing`）。
+- 生成后对照检验：runbook 中出现 `pending-review`/`tasks notify`/澄清收尾步骤 与 `flow_nodes` 一一对应。
 
 ### Step 4 · 生成 references/（必做，在 `.grape/skills/{agent_type}/{name}/references/`）
 - `references/grape-cli-reference.md`：按 spec §3（安装/认证/常用命令/限制/退出码/安全）+ 只列该 skill 用到的命令

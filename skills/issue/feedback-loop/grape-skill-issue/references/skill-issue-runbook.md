@@ -35,7 +35,8 @@ grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_N
 grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out   # 防重复 A2A
 grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out  # 读技能需求单（vod 发布）
 ```
-- 从评论中提取 grape-vod-cli 发布的「技能需求单」：agent_type / name / description / 目标系统 / 验收。
+- 从评论中提取 grape-vod-cli 发布的「技能需求单」：agent_type / name / description / 目标系统 / **flow_nodes（流程审批节点）** / 验收。
+- 提取 `flow_nodes` 存入变量（默认 `无`），Spec「流程设计」段逐字写入，并在 Step 5 A2A context 携带（`flow_nodes=...`）。
 - 若缺需求单（vod 未收敛）→ 评论说明并 A2A 交回 vod 澄清，或标「待澄清」。
 
 ### Step 2 · 技能可开发性分析（必做，每次处理都执行）
@@ -118,7 +119,7 @@ grape a2a handoff --json '{
     "account": "'"$ACCOUNT"'",
     "issue_number": '"$ISSUE_NUMBER"',
     "pr_number": 0,
-    "context": "技能需求已收敛并生成 Spec（评论发布）：agent_type={X} name={Y}。<Spec 摘要>{；用户已确认危险操作}。请处理本技能创建/改造开发。"
+    "context": "技能需求已收敛并生成 Spec（评论发布）：agent_type={X} name={Y}。flow_nodes={flow_nodes}<Spec 摘要>{；用户已确认危险操作}。请处理本技能创建/改造开发，注意流程节点按需求单保留。"
   }
 }' --json-out
 ```

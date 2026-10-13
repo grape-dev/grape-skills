@@ -153,7 +153,7 @@
 
 ---
 
-## H. 命令与参数规范检查（5 项）
+## H. 命令与参数规范检查（6 项）
 
 ### H1. 只列实际用到的命令，不列全量
 - **检查**：reference 常用命令是否只列本 skill 实际用到的，不列全量
@@ -180,6 +180,15 @@
 - **检查**：查询命令（list/get/detail 等）是否带 `--json-out`
 - **通过**：查询命令带 --json-out
 - **失败**：查询命令未带 --json-out
+
+### H6. 流程节点与需求单一致（flow_nodes 需求追溯）
+- **检查**：A2A payload / Spec「流程设计」声明了 `flow_nodes`（`pending-review`/`awaiting-input`/`tasks notify`）时，被检查 skill 的 runbook 是否落地了对应步骤
+- **通过**：
+  - `pending-review` → runbook 含「审批节点」：`issues pending-review` → 用户评论续接 `review-pass`/`review-reject`（含收尾 next_step）
+  - `awaiting-input` → runbook 含「澄清节点」：发追问评论 + 收尾（next_step=reply_comment）；**未误用 `issues awaiting-input` 状态接口**（该接口仅 vod/issue agent 会话可调，其余 agent 调用 403）
+  - `tasks notify` → 若用作结果/部署/完成通知则 ❌（应 `git-repo issues comments create`）；仅任务分派语义（assignee/issue_number/repo_key/task_description）可接受
+  - `flow_nodes=无`/未声明 → 不要求（可无流程节点步骤）
+- **失败**：声明了节点但 runbook 无对应步骤，或 `tasks notify` 误作结果通知
 
 ---
 

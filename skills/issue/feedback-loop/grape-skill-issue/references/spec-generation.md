@@ -41,6 +41,20 @@
 |------|------|------|------|
 | {决策点} | {选项A/B} | {选择} | {理由} |
 
+## 流程设计（flow_nodes，必填）
+
+> ⚠️ **从需求单/可开发性分析继承**：技能处理过程中的描述（如「需用户输入补充 / 需评审审批 / 需任务通知」）。**必须逐字保留 `flow_nodes` 值**，并在 A2A context 中携带，防 coding 阶段生成技能时丢失。
+
+```
+flow_nodes: {awaiting-input / pending-review / tasks notify，多选；无则"无"}
+```
+
+| 节点 | 触发时机 | 期望产物 |
+|------|---------|---------|
+| `awaiting-input` | 需要用户补充输入才能继续 | runbook「澄清节点」：发追问评论 + 收尾（next_step=reply_comment） |
+| `pending-review` | 交付决策点需用户拍板 | runbook「审批节点」：pending-review → review-pass/review-reject |
+| `tasks notify` | 任务分派/通知 | runbook「通知节点」：结果通知走 `issues comments create`；`tasks notify` 仅作任务分派（勿作结果通知） |
+
 ## Affected Modules
 
 | 模块 | 改动类型 | 说明 |
