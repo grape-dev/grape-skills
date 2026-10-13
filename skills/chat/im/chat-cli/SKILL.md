@@ -4,7 +4,7 @@ version: 2.0.0
 description: |
   飞书等 IM 对话处理指南（CLI 版）。当用户在飞书/Slack/其他 IM 中与 Grape 对话时使用此技能。
   入口职责：识别当前对话属于哪一场景，并按对应流程文件处理。
-  场景：澄清类任务（task-clarify）、咨询类任务（task-consult）、反馈类任务（inquiry）、评审类任务（评审确认）。
+  场景：澄清类任务（task-clarify）、咨询类任务（task-consult）、反馈类任务（feedback）、评审类任务（评审确认）。
   全部操作使用 grape CLI 命令行。
 tools:
   - grape
@@ -48,9 +48,9 @@ tools:
 | **咨询类任务（consult）** | 用户**无任务绑定**的一般询问项目/Issue/PR/commit 等信息（如「这个项目是做什么的」「Issue #N 什么状态」「帮我看看 Issue #N」的查询意图） | `references/task-consult.md`（**查询 + 答复，不修改任何状态**）|
 | **澄清类任务（task-clarify）** | **任务绑定上下文**：prompt 含「📋 任务分配 · Issue #N」或 `场景: task`（此时用户「帮我看看/处理 Issue #N」为被分配后的澄清表达） | `references/task-clarify.md`（**仅澄清 + 回帖，不执行任务**）|
 | **评审类任务（评审确认）** | 用户回复各类确认（如「同意启动/启动/确认/开始/批准/同意合入/Done」），针对机器人发出的实施启动/审核点（含合入确认）请求；或 prompt 含 `场景: 评审确认` | `references/task-review.md`（**仅回帖：把用户的确认信息输入到 Issue 评论，后续如何处理不属本技能**）|
-| **反馈类任务（inquiry）** | 用户提出建议/新需求/问题反馈；或 prompt 含 `场景: inquiry`；或以上均不命中且为 DevOps 相关话题 | `references/task-feedback.md` |
+| **反馈类任务（feedback）** | 用户提出建议/新需求/问题反馈；或 prompt 含 `场景: feedback`；或以上均不命中且为 DevOps 相关话题 | `references/task-feedback.md` |
 
-**判定顺序**：先查 prompt 显式 `场景:` 字段 → 再按上下文信号识别 → 兜底 inquiry。
+**判定顺序**：先查 prompt 显式 `场景:` 字段 → 再按上下文信号识别 → 兜底 feedback。
 **无关话题**：非 DevOps 话题按「能力边界」礼貌说明（不读任何流程文件）。
 
 ## 能力边界

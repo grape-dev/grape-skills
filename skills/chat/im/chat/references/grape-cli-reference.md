@@ -67,9 +67,8 @@ grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out
 
 ## 写入身份与 self-comment 过滤说明
 
-- 原始版以 `$USER_TOKEN`（用户本人身份）回帖/建 Issue，避免被 self-comment 过滤。**本技能默认使用会话 token `$GRAPE_SESSION_TOKEN`**，写入身份为当前会话。
-- 若 prompt 中仍注入 `$USER_TOKEN` 且需以用户身份写入，可用一次性参数显式指定：`grape --token "$USER_TOKEN" git-repo issues comments create ...`（不改写任何配置文件）。
-- 若回帖后 webhook 事件因 self-comment 过滤未被 issue agent 重新分诊，在回复中如实提示用户，不假称已生效。
+- 写入一律使用会话 token `$GRAPE_SESSION_TOKEN`（`grape` 自动读取），写入身份为当前会话。`$USER_TOKEN` 已不注入，**不要尝试用用户身份写入**。
+- 若回帖/建 Issue 后 webhook 事件因 self-comment 过滤未被 issue agent 重新分诊，在回复中如实提示用户，不假称已生效。
 
 ## git（本地执行，token 零暴露）
 
