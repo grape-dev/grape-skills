@@ -17,30 +17,17 @@ grape --help
 
 ## 2. 认证与配置
 
-### Token 配置
+### Token 配置（只用会话 token）
 
-grape CLI 支持三种认证方式（优先级从高到低）：
-
-| 方式 | 参数 | 说明 |
-|------|------|------|
-| 命令行 | `--token tk_xxx` | 单次最高优先级 |
-| 环境变量 | `GRAPE_API_TOKEN` | 会话级 |
-| 配置文件 | `~/.grape/config.yaml` | 持久化 |
+`$GRAPE_SESSION_TOKEN`（`tk_`，任务级）由服务端注入，`grape` 自动读取，**无需手动配置**；平台 token（`$BOT_GITCODE_TOKEN` 等）已不注入，不读取、不传参。
 
 ```bash
-# 单次使用
-grape --token "$BOT_GITCODE_TOKEN" --base-url https://api.gitcode.com tasks current
-
-# 或设置环境变量
-export GRAPE_API_TOKEN="$BOT_GITCODE_TOKEN"
-grape tasks current
+# 直接执行（token 由 grape 自动从 $GRAPE_SESSION_TOKEN 读取，无需 --token）
+grape tasks current --json-out
+grape git-repo issues list --owner XOcto --repo grape-cli --json-out
 ```
 
-### Base URL
-
-```bash
-grape --base-url https://api.gitcode.com --token "$BOT_GITCODE_TOKEN" git-repo issues list --owner XOcto --repo grape-cli
-```
+> 一次性覆盖可用 `grape --token tk_xxx --base-url https://...`（仅本次进程）；服务端地址自动取注入的 `$GRAPE_SERVER_URL`。
 
 ## 3. 常用命令
 
@@ -74,7 +61,7 @@ grape --base-url https://api.gitcode.com --token "$BOT_GITCODE_TOKEN" git-repo i
 | `grape git-repo commits --owner <o> --repo <r>` | 提交历史 |
 | `grape git-repo contents --owner <o> --repo <r> --path <p>` | 文件内容 |
 
-> ⚠️ `grape git-repo git credential` **不存在**（0.3.3 实测 `No such command`——v2.1.0 契约已移除该端点）——git 克隆/拉取认证统一由 **GIT_ASKPASS 注入**处理，不要引用。
+> ⚠️ `grape git-repo git credential` 契约已移除（0.3.3 实测 `No such command`）——**不要手动引用该端点**；git 克隆/拉取认证统一由 **`grape git`** 透传处理（内部按会话 token 换短期凭证），agent 不接触 `GIT_ASKPASS`/平台 token。
 
 ### Git 透传
 
@@ -150,7 +137,7 @@ v0.2.2 起移除 `grape api` 通用兜底命令（0.3.3 实测 `No such command`
 
 ## 6. 安全与边界
 
-1. **只用系统注入的 token**：`$BOT_GITCODE_TOKEN`，不得从数据库/配置文件/日志/历史中寻找其他 token。
+1. **只用系统注入的 `$GRAPE_SESSION_TOKEN`**（grape 自动读取）；`$BOT_GITCODE_TOKEN` 等平台 token 已不注入，不得读取/传参，也不得从数据库/配置文件/日志/历史中寻找其他 token。
 2. **禁止访问 Grape 内部数据**：不得读取 data/、configs/、sessions.db、user_accounts 等。
 3. **403 处理**：API 返回 403 时停止操作，回复用户「需要管理员/维护者权限」。
 4. **token 不落盘**：`grape git` 进程内注入凭据，不写入 git config；其他命令通过 header 传递。

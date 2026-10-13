@@ -1,4 +1,4 @@
-# grape CLI 命令参考（huawei-cloud-skill-tester 用到的子集）
+﻿# grape CLI 命令参考（huawei-cloud-skill-tester 用到的子集）
 
 > 命令契约以 `grape commands` / `grape <cmd> --help` 为准；本文只列 tester runbook 实际用到且已验证的命令子集。
 > ⚠️ **禁止 curl 直连平台 API**（grape v0.2.2 起已移除 `grape api` 逃生舱，契约未覆盖的端点不可调用）。
@@ -78,7 +78,7 @@ grape refresh        # 契约保鲜（失败重试 ≤2 次后回退内置快照
 
 ## 6. 安全与边界
 
-- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）和 prompt 注入的 `$BOT_GITCODE_TOKEN`。不得从数据库、配置文件、日志、历史中寻找其他 token。
+- **token 使用范围**：只用 `$GRAPE_SESSION_TOKEN`（grape CLI 自动读取）；`$BOT_GITCODE_TOKEN` 等平台 token 已不注入。不得从数据库、配置文件、日志、历史中寻找其他 token。
 - **403/401 处理**：API 返回 403 或权限不足时，停止操作并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，不尝试其他 token 或绕行手段。
 - **token 不写入文件**：不将 token 写进日志、脚本、Issue 评论或工具调用以外的地方。
 - 华为云 AK/SK 只经环境变量 / hcloud CLI profile 读取，绝不要求用户在对话中输入（三选项协议见 SKILL「Agent Protocol」章节）。

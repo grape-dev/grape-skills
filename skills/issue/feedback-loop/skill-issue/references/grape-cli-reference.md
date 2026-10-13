@@ -1,7 +1,7 @@
 ﻿# grape CLI 命令参考（skill-issue 专用）
 
 > 来源：cli-code-analysis-spec.md（CLI v0.3.x，契约经 `grape commands` 核对）
-> 本文件只列 skill-issue 实际用到的命令子集 + 平台交互纪律。云资源操作（terraform/hcloud/obsutil）非本技能范围。git 操作用原生命令 + GIT_ASKPASS。
+> 本文件只列 skill-issue 实际用到的命令子集 + 平台交互纪律。云资源操作（terraform/hcloud/obsutil）非本技能范围。git 操作用 `grape git` 透传（不接触平台 token）。
 
 ## §1 安装与就绪（自愈）
 
@@ -11,7 +11,7 @@
 ## §2 认证（平台注入，自动读取）
 
 - grape CLI **自动读取**服务端注入的 `$GRAPE_SESSION_TOKEN`——不需要也不允许手动传 token
-- git 操作：`GIT_ASKPASS` 已注入（BOT_GITCODE_TOKEN）——`git clone`/`git log` 自动认证，**不写 token**
+- git 操作：用 **`grape git clone/log` 透传**（凭据由 grape 内部换短期凭证）——`$GIT_ASKPASS`/`$BOT_GITCODE_TOKEN` 已不注入，不依赖
 - ❌ 禁止 `curl`/`requests` 直连平台 API（含 api.gitcode.com）——平台交互一律 grape CLI
 
 ## §3 本技能使用子集（照抄执行，不 help 探索）
@@ -50,7 +50,6 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 ```bash
 grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state all --json-out
 grape git-repo commits --owner "$REPO_OWNER" --repo "$REPO_NAME" --per_page 20 --json-out
-# 或本地 git（GIT_ASKPASS 已注入）：git log --oneline -20 --all
 ```
 
 ### 3.5 任务通知（⚠️ 处理结束必做——见 SKILL 硬约束⑧ + 4.8）
@@ -80,8 +79,7 @@ grape tasks complete --json '{"result_text": "<一句话结论>", "actions": ["<
 | `grape api ...`（通用 API 兜底） | 已从 CLI 移除（0.2.2），且平台禁止直连 |
 | `grape knowledge context/content` | 不存在——知识基线由平台 prompt 内联注入（服务端维护，Agent 不自取） |
 | `grape events detail --seq {n}` | 本技能**不需要** events detail——事件 payload 在 `tasks current`/A2A context；`--seq` 参数真实但平台**不注入** `$SEQ`——不可执行死路；`--event_id` 参数**不存在**（--help 示例旧写法误导）|
-| `grape git clone/checkout/...`（git 透传） | 无此机制——git 用原生命令 + GIT_ASKPASS |
-| curl/`requests` 直连平台 API | 禁止（含 api.gitcode.com、`POST /api/a2a`、`POST /api/tasks/notify` 等旧写法） |
+| `curl`/`requests` 直连平台 API | 禁止（含 api.gitcode.com、`POST /api/a2a`、`POST /api/tasks/notify` 等旧写法） |
 
 ## §5 退出码（grape 统一）
 
@@ -95,7 +93,7 @@ grape tasks complete --json '{"result_text": "<一句话结论>", "actions": ["<
 
 ## §6 安全边界
 
-- 只用平台注入 token（`$GRAPE_SESSION_TOKEN` / GIT_ASKPASS）；严禁寻找/读取其他 token
+- 只用平台注入 token（`$GRAPE_SESSION_TOKEN`）；`GIT_ASKPASS`/`BOT_*`/`USER_*` 已不注入，严禁寻找/读取其他 token
 - token 不得落盘（不写文件/日志/评论/脚本）
 - 403/无权限 → 立即停止该操作并回复用户（不找替代 token、不绕行）
 - 长命令（create/update/handoff 等）用 `--json @file.json` 避免转义出错

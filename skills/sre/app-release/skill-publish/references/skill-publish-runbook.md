@@ -39,7 +39,7 @@ find skills/{name}/ -name ".env*" -o -name "id_rsa*" -o -name "id_ed25519*" -o -
 
 ### P3 · 读取各平台令牌
 
-- 凭据分两类：**GitCode** → 运行时 GIT_ASKPASS（不接触值，无需读取）；**GitHub/ClawHub** → 同名 env 直读（场景高级选项配置 name=GITHUB_TOKEN/CLAWHUB_TOKEN → 平台按 name 直注；GITHUB 另有 BOT_GITHUB_TOKEN 兜底——服务端不向 .project-info 物化凭据）
+- 凭据分两类：**GitCode** → 运行时 GIT_ASKPASS（不接触值，无需读取）；**GitHub/ClawHub** → 同名 env 直读（场景高级选项配置 name=GITHUB_TOKEN/CLAWHUB_TOKEN → 平台按 name 直注，**无平台兜底**——服务端不向 .project-info 物化凭据）
 - 配置：项目知识 `.project-info/` 下 JSON 配置文件 config 字段（GITHUB_PUBLISH_REPO / GITCODE_PUBLISH_REPO / CLAWHUB_OWNER_HANDLE——member 非凭据文档），缺失 → 询问用户 / 用默认
 - 均缺失 → 报告「未配置 {平台} 令牌，请到设置页配置」→ **跳过该平台**（不中断其他平台）
 - 401/403 → 按硬约束④区分报告 → 跳过该平台

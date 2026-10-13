@@ -12,7 +12,7 @@
 
 > ⚠️ 两套 token 严格区分：
 > - **平台交互（评论/任务）** → grape CLI 自动读 `$GRAPE_SESSION_TOKEN`，什么都不用配
-> - **外部平台（ClawHub/GitHub/GitCode）发布** → 按 SKILL 硬约束①分两类：GitCode = 运行时 GIT_ASKPASS（不接触值）；ClawHub/GitHub = 用户高级选项配置 name=CLAWHUB_TOKEN/GITHUB_TOKEN（平台按 name 直注同名 env，GitHub 另有 BOT_GITHUB_TOKEN 兜底），供 curl / sync 脚本使用，与 grape token 无关
+> - **外部平台（ClawHub/GitHub/GitCode）发布** → 按 SKILL 硬约束①分两类：GitCode = 运行时 GIT_ASKPASS（不接触值）；ClawHub/GitHub = 用户高级选项配置 name=CLAWHUB_TOKEN/GITHUB_TOKEN（平台按 name 直注同名 env，**无平台兜底**），供 curl / sync 脚本使用，与 grape token 无关
 
 ## 3. 命令子集（本技能真实使用）
 

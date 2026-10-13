@@ -79,6 +79,7 @@ tools:
 ## {核心原则 / 评论前缀规范}（按需）           ← 如评论前缀、项目知识基线、验证 claim 等
 ## 处理流程                                 ← runbook 引用 + 场景/入口判定
 ## {领域规则 / 输出规范}（按需）              ← 如判断标准、报告格式
+## {流程节点}（按需求单 flow_nodes，可选）     ← pending-review 审批 / awaiting-input 澄清 / tasks notify 通知
 ## 操作边界                                 ← 能做/不能做表
 ## 硬约束                                   ← 流程级硬性规则
 ## 参考                                     ← references 索引（含「执行走查表（先读）」）
@@ -86,10 +87,45 @@ tools:
 
 **要点（对齐现有技能）**：
 - **Prerequisites 必含**：`grape --version`（≥最低版本）→ `grape refresh`（刷新契约，⚠️ 契约权威 = `grape commands` 实列）→ env `${VAR:+ok}` 校验 → 未通过输出「前置检查未通过」并结束。
-- **环境变量表必含**：`GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` / `REPO_OWNER` / `REPO_NAME` / `REPO_FULL_NAME` / `ACCOUNT`(actor，仅 A2A) / `ISSUE_NUMBER` / `GRAPE_SCENE_ID` / `BOT_USERNAME` / `GRAPE_ISSUE_ID`（awaiting-input 等 `--issue_id` 用）等，附敏感信息提示。
+- **环境变量表必含**：`GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` / `REPO_OWNER` / `REPO_NAME` / `REPO_FULL_NAME` / `ACCOUNT`(actor，仅 A2A) / `ISSUE_NUMBER` / `GRAPE_SCENE_ID` / `BOT_USERNAME` / `GRAPE_ISSUE_ID`（awaiting-input/pending-review 等 `--issue_id` 用）等，附敏感信息提示。
 - **处理流程 = runbook 引用**：正文写「⚠️ 先读 `references/{x}-runbook.md`，按走查表逐步执行，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**」+「本技能收尾一律用 `grape tasks complete`（情形一）」；详细步骤放 runbook。
 - **正文不改写**（如涉及修改 Issue）：结论/收敛一律 `issues comments create` 发布，`issues update` 不写 body（防覆盖原始描述）。
 - **A2A 交办 agent 名**（`coding`/`qa`/`sre`/`vod`/`issue`），非技能名。
+- **流程节点按需求单落地**：需求单 `flow_nodes` 声明了 `pending-review`/`awaiting-input`/`tasks notify`，runbook 必须含对应审批/澄清/通知步骤（见「流程节点」节）；`tasks notify` 语义为任务分派，结果通知走 `issues comments create`。
+
+#### 流程节点 runbook 标准模板（按需求单 `flow_nodes` 选用）
+
+> 生成时会用：`flow_nodes=无` → 不产生本节；有节点 → 按下列模板写入生成物 runbook。`pending-review`/`awaiting-input` 的 `--issue_id` 用注入的 `$GRAPE_ISSUE_ID`（未注入降级 `issues detail` 的 `id`）。
+
+**① 澄清节点（awaiting-input）** — 需用户补充输入才能继续的环节：
+
+```markdown
+### Step {n} · 澄清追问（必做，仅在信息不足时）
+发送追问评论：
+grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \
+  --json '{"body":"[{Agent}] 请补充：{问题}"}'
+⚠️ `issues awaiting-input` 状态接口仅 vod/issue agent 会话可用，本技能（{agent_type}）不用它——追问走评论 + `grape tasks complete`（next_step=reply_comment）。
+```
+
+**② 审批节点（pending-review）** — 交付决策点需用户拍板：
+
+```markdown
+### Step {n} · 审批/用户确认（必做，交付决策点）
+grape issues pending-review --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} \
+  --json '{"review_points":"{审查/审批结论}","references":"{PR/依据}"}' --json-out
+用户评论续接：grape issues review-pass --json '{"target":"done/processing","evidence":"{评论 id}"}' \
+  或 grape issues review-reject --json '{"reason":"{驳回理由}"}'（幂等，changed:false 忽略）。
+```
+
+**③ 通知节点（tasks notify / 结果通知）** — 处理结果/完成/部署通知：
+
+```markdown
+### Step {n} · 通知（必做，处理结果）
+结果/完成/部署通知一律用 Issue 评论：
+grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \
+  --json '{"body":"[{Agent}] {结果摘要}"}'
+⚠️ `tasks notify`（body=assignee/issue_number/repo_key/task_description）仅用于 **issue agent 任务分派**，本技能不用它作结果通知。
+```
 
 #### 自定义环境变量命名约束（skill 用到场景自定义变量时必遵守）
 

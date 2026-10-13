@@ -103,7 +103,7 @@ fi
 
 ```bash
 DEPLOY_DIR="/opt/$REPO_NAME"
-git clone https://gitcode.com/$REPO_OWNER/$REPO_NAME.git "$DEPLOY_DIR"
+grape git clone https://gitcode.com/"$REPO_FULL_NAME".git "$DEPLOY_DIR"   # 凭据由 grape 内部换（会话 token），不写 token
 cd "$DEPLOY_DIR"
 ```
 

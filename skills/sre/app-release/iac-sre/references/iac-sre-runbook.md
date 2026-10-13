@@ -27,9 +27,9 @@ if [ -z "${HUAWEI_AK}" ] || [ -z "${HUAWEI_SK}" ]; then echo "AK_SK_MISSING"; el
 ### A1 · 拉取代码（必做）
 
 ```bash
-rm -rf /tmp/deploy-ws 2>/dev/null; git clone "https://gitcode.com/$ACCOUNT/$REPO_NAME.git" /tmp/deploy-ws && cd /tmp/deploy-ws   # GIT_ASKPASS 已注入（BOT_GITCODE_TOKEN）——普通 git clone 自动认证，不写 token
-git checkout "$GRAPE_WORK_BRANCH" 2>&1 || git checkout main 2>&1
-git log -1 --format=%H 2>&1   # 部署基线 commit（记录到清单）
+rm -rf /tmp/deploy-ws 2>/dev/null; grape git clone "https://gitcode.com/$REPO_FULL_NAME.git" /tmp/deploy-ws && cd /tmp/deploy-ws   # grape git 凭据内部换（会话 token），不写 token
+grape git checkout "${GRAPE_WORK_BRANCH:-main}" 2>&1 || grape git checkout main 2>&1
+grape git log -1 --format=%H 2>&1   # 部署基线 commit（记录到清单）
 ```
 
 ### A2 · 资源查重（部署前必须——不可跳过）

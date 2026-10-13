@@ -16,7 +16,7 @@ tools:
 
 1. **CLI 优先 + git 透传**：平台操作走 grape CLI；git 操作（clone/checkout/push）用 `grape git` 透传（内部认证）——禁止绕过 CLI 直连平台 API。
    grape CLI 未装/版本过低 → **自动安装/升级**（官方源/签名包优先）→ 装好继续；仅安装失败/环境不可用才报障说明（不降级直连）。⚠️ 安装指引请参考：`references/grape-cli-installation.md`。
-2. **凭据纪律**：GitCode 凭据（平台注入 `$BOT_GITCODE_TOKEN`）由 grape git 透传内部消费——**技能不直接读取/不打印/不写文件/不写评论**；严禁从数据库/configs/日志/历史中寻找其他 token。
+2. **凭据纪律**：VCS 凭据只经 `grape git` / `grape git-repo` 内部消费（会话 token `$GRAPE_SESSION_TOKEN` 驱动，平台 token 已不注入）——**技能不直接读取/不打印/不写文件/不写评论**；严禁从数据库/configs/日志/历史中寻找其他 token。
 3. 严禁读取 data/、configs/、sessions.db、user_accounts 等 Grape 内部数据（data/workspaces/ 项目知识文档除外）。
 4. **403/无权限**：立即停止并回复「该操作需要管理员/维护者权限，请在 GitCode 仓库设置中手动配置后重试」，严禁其他 token 或绕行。
 5. **401（凭据失效）**：任务级 token（tk_）短命，失效属正常机制——说明「凭据已失效」即可，不尝试替换/绕行。

@@ -4,7 +4,7 @@
 
 ## 版本要求
 
-- 最低版本：**0.3.2**（本技能依赖 `issues detail`、`git-repo issues comments create`、`tasks current/complete` 等命令；git 操作用原生命令 + GIT_ASKPASS，云资源操作用 terraform/hcloud/obsutil）。
+- 最低版本：**0.3.2**（本技能依赖 `issues detail`、`git-repo issues comments create`、`tasks current/complete` 等命令；git 操作用 `grape git` 透传，云资源操作用 terraform/hcloud/obsutil）。
 - 检查：`grape --version`。
 
 ## 安装方式（pip 直装，无需手动 clone）
