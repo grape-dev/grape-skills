@@ -78,9 +78,9 @@ mkdir -p .grape/docs/{name}
 
 | flow_nodes | 必须落地的 runbook 步骤 | 关键命令/模式 |
 |-----------|----------------------|--------------|
-| `awaiting-input` 澄清 | 需用户补充输入才能继续的环节：发追问评论 + 本轮收尾 | `grape git-repo issues comments create ... --json '{"body":"[<Agent>] 请补充：{问题}"}'` + `grape tasks complete next_step=reply_comment`（⚠️ `issues awaiting-input` 状态接口仅 vod/issue agent 会话可用，其他 agent 用评论+收尾，勿依赖该接口） |
+| `awaiting-input` 澄清 | 需用户补充输入才能继续的环节：发追问评论 + 本轮收尾 | `grape git-repo issues comments create ... --json '{"body":"[<Agent>] 请补充：{问题}"}'` + `grape tasks complete next_step=reply_comment`（大部分情况 vod/issue 阶段用 awaiting-input，其他 agent 以用户需求为准决定是否置状态） |
 | `pending-review` 审批 | 交付决策点（部署前/合入前）需用户拍板：置审核点 → 用户回复 → 通过/驳回 | `grape issues pending-review --issue_id $ISSUE_ID --json '{"review_points":"{审查/审批结论}","references":"{PR/依据}"}'` → 评论续接：`grape issues review-pass --json '{"target":"done/processing",...}'` / `grape issues review-reject --json '{"reason":"..."}'`（幂等，`changed:false` 忽略） |
-| `tasks notify` 通知 | 任务分派/状态通知节点 | ⚠️ **语义澄清**：`tasks notify`（body=assignee/issue_number/repo_key/task_description）仅用于 **issue agent 任务分派**；生成物中**结果/部署/完成通知一律走 `git-repo issues comments create`**，不误用 tasks notify。若需求节点是「完成/结果通知」→ 落评论步骤 |
+| `tasks notify` 通知 | 任务分派/状态通知节点 | `tasks notify`（body=assignee/issue_number/repo_key/task_description）为**通用接口，任何 agent 可用**，按用户需求/技能职责决定是否用于任务分派；若需求是「完成/结果通知」→ 落地 `git-repo issues comments create` 评论步骤（不用 tasks notify 传结果） |
 
 - 每个节点步骤标注 `（必做）` 与 `next_step` 取值（clarify→`reply_comment`；approve→`done`/`processing`）。
 - 生成后对照检验：runbook 中出现 `pending-review`/`tasks notify`/澄清收尾步骤 与 `flow_nodes` 一一对应。

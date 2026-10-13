@@ -37,11 +37,11 @@
 
 | 场景 | 命令 | 用途与口径 |
 |------|------|-----------|
-| 待用户补充输入 | `grape issues awaiting-input --issue_id {issue_id} --json '{"questions":"...","reason":"..."}' --json-out` | 显式声明「待用户澄清补充」，置 awaiting_input + 触达用户（澄清追问后收尾用）。⚠️ **该状态接口仅 vod/issue agent 会话可调（其余 agent 调用 403）**——其他 agent 用发评论（`git-repo issues comments create`）+ 收尾 |
+| 待用户补充输入 | `grape issues awaiting-input --issue_id {issue_id} --json '{"questions":"...","reason":"..."}' --json-out` | 显式声明「待用户澄清补充」，置 awaiting_input + 触达用户（澄清追问后收尾用）。**大部分情况在 vod/issue 阶段用，但以用户需求为准**，生成 skill 时按 `flow_nodes` 判断是否需要 |
 | 待人工拍板审核点 | `grape issues pending-review --issue_id {issue_id} --json '{"review_points":"...","references":"..."}' --json-out` | 审查通过但 PR 未合入、需用户拍板时置审核点（触达用户）。按需求单 `flow_nodes` 用，不限于 qa |
 | 审核通过（继续/完成） | `grape issues review-pass --issue_id {issue_id} --json '{"target":"done","evidence":"..."}' --json-out` | 用户确认后通过；`target=done` 完成 / `target=processing` 继续。随 pending-review 配套 |
 | 审核驳回 | `grape issues review-reject --issue_id {issue_id} --json '{"reason":"..."}' --json-out` | 用户驳回。随 pending-review 配套 |
-| 任务分派/状态通知 | `grape tasks notify --json '{"assignee":"...","issue_number":{n},"repo_key":"...","task_description":"..."}'` | ⚠️ **仅用于 issue agent 任务分派/改派**（换人自动关旧任务）——**勿作结果/部署/完成通知**（结果通知一律 `git-repo issues comments create`），生成 skill 时按 `flow_nodes` 判断是否需要 |
+| 任务分派/状态通知 | `grape tasks notify --json '{"assignee":"...","issue_number":{n},"repo_key":"...","task_description":"..."}'` | **通用接口，任何 agent 都可用**，按用户需求/技能职责决定是否用于任务分派通知；生成 skill 时按 `flow_nodes` 判断。⚠️ 结果/部署/完成通知建议用 `git-repo issues comments create`，勿用 tasks notify 传结果 |
 
 > **`issue_id` 获取方式（这些命令共用，必填）**：`issue_id` 是需求卡片内部 id（int），**不是 issue 编号**——**优先用已注入的环境变量 `$GRAPE_ISSUE_ID`**；未注入时才降级用 `grape issues detail` 出参的 `id` 字段：
 > ```bash

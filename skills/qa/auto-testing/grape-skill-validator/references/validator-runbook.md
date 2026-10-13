@@ -46,7 +46,7 @@ grape commands | grep {关键词}    # 或对照 reference §4 全量清单
 - **命令一致性**：对照 `grape-cli-reference.md` §4 逐个核对。
 - **schema 字段一致性**：--json body 字段对照 §6（注意 PRCreateBody 用 `related_issue_nums`/`auto_close_issues`，非旧字段）。
 - **不存在能力一致性**：对照 §7。
-- **流程节点一致性（H6）**：用 Step 0 提取的 `flow_nodes` 对照被检查 skill——声明了 `pending-review` 须有审批步骤、`awaiting-input` 须有澄清收尾步骤（且未误用 `issues awaiting-input` 状态接口）、`tasks notify` 仅任务分派语义不得作结果通知。
+- **流程节点一致性（H6）**：用 Step 0 提取的 `flow_nodes` 对照被检查 skill——声明了 `pending-review` 须有审批步骤（pending-review → review-pass/review-reject）；`awaiting-input` 须有澄清收尾步骤（awaited 状态接口通用，以需求为准）；`tasks notify` 可作任务分派通知（通用接口），但结果通知应走 `issues comments create`。
 
 ### Step 4 · 输出检查报告并发布评论（必做）
 - 按 `references/checklist.md` 末尾「检查报告输出格式」。
@@ -172,7 +172,7 @@ grape tasks complete --json '{
 - ❌ A2A 交办写技能名（如 `grape-skill-generator`）——用 agent 名 `coding`/`sre`。
 - ❌ 编造命令或 schema（交叉验证以事实基线为准）。
 - ❌ 修复 skill 不合规项 / 创建 PR（仅报告与分流）。
-- ❌ **漏检需求单 `flow_nodes` 的流程节点落地**——声明了 `pending-review`/`awaiting-input`/`tasks notify` 却未在 runbook 找到对应步骤/语义时，须按 H6 记 ❌ 或保留提示。
+- ❌ **漏检需求单 `flow_nodes` 的流程节点落地**——声明了 `pending-review`/`awaiting-input`/`tasks notify` 却未在 runbook 找到对应步骤/语义（awaiting-input 接口通用，以需求为准；tasks notify 勿作结果通知）时，须按 H6 记 ❌ 或保留提示。
 - ❌ **检查通过 + PR 未合入时，只写"可合入/待合并"就收尾**——必须 `pending-review` 置审核点（触达用户拍板）。
 - ❌ **`pulls merge` 成功后不 A2A 通知 sre**（`git-repo pulls merge` 是显式动作，完成后必须 `a2a handoff agent=sre`，否则 SRE 收不到后续任务）。
 - ❌ 不因"等待"跳过 Step 6（tasks complete）。

@@ -185,10 +185,10 @@
 - **检查**：A2A payload / Spec「流程设计」声明了 `flow_nodes`（`pending-review`/`awaiting-input`/`tasks notify`）时，被检查 skill 的 runbook 是否落地了对应步骤
 - **通过**：
   - `pending-review` → runbook 含「审批节点」：`issues pending-review` → 用户评论续接 `review-pass`/`review-reject`（含收尾 next_step）
-  - `awaiting-input` → runbook 含「澄清节点」：发追问评论 + 收尾（next_step=reply_comment）；**未误用 `issues awaiting-input` 状态接口**（该接口仅 vod/issue agent 会话可调，其余 agent 调用 403）
-  - `tasks notify` → 若用作结果/部署/完成通知则 ❌（应 `git-repo issues comments create`）；仅任务分派语义（assignee/issue_number/repo_key/task_description）可接受
+  - `awaiting-input` → runbook 含「澄清节点」：发追问评论 + 收尾（next_step=reply_comment）或视需求使用 `issues awaiting-input` 状态接口（接口通用，大部分情况 vod/issue 阶段用，以用户需求为准）
+  - `tasks notify` → 可用于任务分派/状态通知（通用接口，任何 agent 均可，按需求）；⚠️ 若被当作结果/部署/完成通知使用（body 应传结果内容而非 assignee/issue_number/repo_key/task_description 分派字段）则 ❌，结果通知应 `git-repo issues comments create`
   - `flow_nodes=无`/未声明 → 不要求（可无流程节点步骤）
-- **失败**：声明了节点但 runbook 无对应步骤，或 `tasks notify` 误作结果通知
+- **失败**：声明了节点但 runbook 无对应步骤，或 `tasks notify` 误用于结果通知
 
 ---
 

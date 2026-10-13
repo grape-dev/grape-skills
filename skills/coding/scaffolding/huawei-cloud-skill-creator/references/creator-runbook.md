@@ -17,7 +17,7 @@
 | PR base 指向仓库默认分支（main） | ✅ **必须做** |
 | 平台 API 调用一律走 grape CLI | ✅ **必须做**（issues comments / pulls / a2a 等） |
 | curl 直连 GitCode API / 找 `grape api` 逃生舱 | ❌ **禁止**（契约外端点不可调用） |
-| 认证只用 `$GRAPE_SESSION_TOKEN`（grape 自动读取）；`$BOT_GITCODE_TOKEN` 等平台 token 已不注入 | ✅ **必须做** |
+| 认证只用 `$GRAPE_SESSION_TOKEN`（grape 自动读取） | ✅ **必须做** |
 | 直接合并 PR | ❌ **禁止**（仅创建，交 tester 判断） |
 | validate-skill.sh 未通过就创建 PR | ❌ **禁止** |
 

@@ -104,7 +104,7 @@ tools:
 发送追问评论：
 grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \
   --json '{"body":"[{Agent}] 请补充：{问题}"}'
-⚠️ `issues awaiting-input` 状态接口仅 vod/issue agent 会话可用，本技能（{agent_type}）不用它——追问走评论 + `grape tasks complete`（next_step=reply_comment）。
+⚠️ `issues awaiting-input` 状态接口大部分情况在 vod/issue 阶段用——本技能（{agent_type}）如不需要置 awaiting_input 状态，追问走评论 + `grape tasks complete`（next_step=reply_comment）；需要用户输入状态则以用户需求为准。
 ```
 
 **② 审批节点（pending-review）** — 交付决策点需用户拍板：
@@ -117,14 +117,14 @@ grape issues pending-review --issue_id ${GRAPE_ISSUE_ID:-{issue_id}} \
   或 grape issues review-reject --json '{"reason":"{驳回理由}"}'（幂等，changed:false 忽略）。
 ```
 
-**③ 通知节点（tasks notify / 结果通知）** — 处理结果/完成/部署通知：
+**③ 通知节点（tasks notify / 结果通知）** — 任务分派通知 / 处理结果通知：
 
 ```markdown
 ### Step {n} · 通知（必做，处理结果）
-结果/完成/部署通知一律用 Issue 评论：
+处理结果/完成/部署通知用 Issue 评论：
 grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \
   --json '{"body":"[{Agent}] {结果摘要}"}'
-⚠️ `tasks notify`（body=assignee/issue_number/repo_key/task_description）仅用于 **issue agent 任务分派**，本技能不用它作结果通知。
+`tasks notify`（body=assignee/issue_number/repo_key/task_description）为**通用任务分派/状态通知接口**（任何 agent 均可用，按需求决定是否用）；如需求为任务分派通知则可用，结果通知走评论。
 ```
 
 #### 自定义环境变量命名约束（skill 用到场景自定义变量时必遵守）
