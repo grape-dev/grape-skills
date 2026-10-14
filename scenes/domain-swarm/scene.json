@@ -1,0 +1,57 @@
+{
+  "name": "domain-swarm",
+  "version": "1.0.0",
+  "display_name": "领域 Swarm 二次开发",
+  "description": "领域 Swarm 二次开发场景：基于 jiuwenswarm 模板仓库二次开发完整领域化 swarm（前端功能页+后端 RPC/REST 落库+领域 Agent+品牌改造），产出即用的领域化多 Agent 协作系统",
+  "category": "swarm-dev",
+  "recommended_template": "jiuwenswarm-develop",
+  "onboarding": "repo-onboarding",
+  "tags": [
+    "domain",
+    "swarm",
+    "jiuwenswarm"
+  ],
+  "author": "grape-team",
+  "nodes": [
+    {
+      "id": "vod",
+      "tag": "vod",
+      "skill": "domain-vod",
+      "mode": "emit",
+      "next": "issue",
+      "handoff": "a2a"
+    },
+    {
+      "id": "issue",
+      "tag": "issue",
+      "skill": "domain-issue",
+      "mode": "emit",
+      "next": "coding",
+      "handoff": "a2a"
+    },
+    {
+      "id": "coding",
+      "tag": "coding",
+      "skill": "domain-coding",
+      "mode": "emit",
+      "next": "qa",
+      "handoff": "a2a"
+    },
+    {
+      "id": "qa",
+      "tag": "qa",
+      "skill": "domain-qa",
+      "mode": "emit",
+      "next": "sre",
+      "handoff": "a2a"
+    },
+    {
+      "id": "sre",
+      "tag": "sre",
+      "skill": "domain-deploy",
+      "mode": "emit",
+      "next": "done",
+      "handoff": "complete"
+    }
+  ]
+}

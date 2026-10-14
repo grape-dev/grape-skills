@@ -300,6 +300,13 @@
     "path": "coding/ai-coding-review/coding-cli",
     "description": "代码实现与 PR 创建/优化（CLI 版）：被 issue skill 调用执行新开发，或按 PR skill 审查意见优化 PR 代码实现。全部操作使用 grape CLI 命令行（含 grape git）"
   },
+  "domain-coding": {
+    "name": "领域 Swarm 二次开发实施",
+    "agent_type": "coding",
+    "sub_scene": "ai-coding-review",
+    "path": "coding/ai-coding-review/domain-coding",
+    "description": "领域 Swarm 二次开发实施（Grape Coding 第三站）：按 domain-issue Spec 在基线 jiuwenswarm 上改造前后端——后端扩展 RPC+SQLite 落库+REST 网关；前端功能页+Api/Store+品牌；领域 Agent+技能。交付自检交 domain-qa，产出须可用（RPC 4 参异步契约、get_config、gateway 生效、前端可编译、页签插任务对话→委派→RPC→落库闭环）"
+  },
   "issue-cli": {
     "name": "Issue 高级运营（CLI 版）",
     "agent_type": "issue",
@@ -314,6 +321,13 @@
     "path": "qa/code-quality/qa-cli",
     "description": "pr 技能的平替与增强（CLI 版）：PR 全流程审查 + Agent Work Loop 五维工作流审查（任务理解/受控执行/变更验证/可靠交付/经验沉淀）。全部操作使用 grape CLI 命令"
   },
+  "domain-qa": {
+    "name": "领域 Swarm 二次开发验收",
+    "agent_type": "qa",
+    "sub_scene": "code-quality",
+    "path": "qa/code-quality/domain-qa",
+    "description": "领域 Swarm 二次开发验收（Grape QA，接管 coding C7）：静态自检 → 后端启动+WS 黑盒 → 前端编译+品牌冒烟 → 对话识别+代办冒烟。断言面板占位与布局排版契约，PASS 出结论，问题 A2A 打回 coding（每项至多 1 次）；严禁 git merge/装依赖/后台常驻/为跑通改仓库；缺依赖即「待部署后冒烟」降级"
+  },
   "chat-cli": {
     "name": "对话助手（CLI 版）",
     "agent_type": "chat",
@@ -327,6 +341,13 @@
     "sub_scene": "app-release",
     "path": "sre/app-release/deploy-cli",
     "description": "华为云部署（CLI 版）：A2A 直连部署或 PR 合并全流程构建→部署→验证，自动识别构建方式并用 hcloud CLI 部署验证。Grape/GitCode 操作使用 grape CLI"
+  },
+  "domain-deploy": {
+    "name": "华为云部署（领域 Swarm 部署站）",
+    "agent_type": "sre",
+    "sub_scene": "app-release",
+    "path": "sre/app-release/domain-deploy",
+    "description": "华为云部署技能：自动构建项目并部署到华为云 ECS——项目结构识别 → 代码获取构建 → hcloud CLI 部署 → HTTP 验证 → 资源释放。经 A2A 触发（部署/资源释放）或 PR 合并 main/master 事件触发"
   },
   "vod-strict": {
     "name": "开发者声音分析（严格版）",
@@ -349,12 +370,26 @@
     "path": "vod/feedback-loop/grape-vod-cli",
     "description": "开发者声音分析技能：从 Issue/飞书收集开发者声音，多轮引导收敛为清晰需求并建 Issue；接管 issue_opened 审视非 VOD 创建的 Issue，澄清后结构化总结并 A2A 交办 Issue Agent"
   },
+  "domain-vod": {
+    "name": "领域 Swarm 二次开发需求引导",
+    "agent_type": "vod",
+    "sub_scene": "feedback-loop",
+    "path": "vod/feedback-loop/domain-vod",
+    "description": "领域 Swarm 二次开发需求引导（Grape VOD 阶段）：把「我要一个 XXswarm」的开发者声音引导收敛为 jiuwenswarm 二次开发需求——领域画像四要素 + 功能模块清单（前端页面/后端 RPC 落库 + 每功能操作方法·数据字段期望 + 对话代办操作期望）+ 品牌改造要求 + 团队倾向；需求就绪度四维分级（ready/almost-ready/needs-discussion），结构化建 Issue，A2A 编排 vod→issue→coding 流水线，产出功能需求文档不写代码"
+  },
   "grape-skill-issue": {
     "name": "Grape Skill 开发 · Issue 运营（含危险操作门控）",
     "agent_type": "issue",
     "sub_scene": "feedback-loop",
     "path": "issue/feedback-loop/grape-skill-issue",
     "description": "skill-dev 专用 Issue 运营：知识基线→可开发性分析→Spec→危险场景识别→用户确认门控→A2A 触发开发。基于 issue skill，新增危险场景识别+用户确认门控+华为云 Spec 字段+skill 路由"
+  },
+  "domain-issue": {
+    "name": "领域 Swarm 二次开发设计",
+    "agent_type": "issue",
+    "sub_scene": "feedback-loop",
+    "path": "issue/feedback-loop/domain-issue",
+    "description": "领域 Swarm 二次开发设计（Grape Issue 阶段）：把 vod 需求深化为可实施规格 spec（领域画像/落地决策/团队角色/技能清单/事件通道/数据对象/功能模块实施规格——每功能产品设计+前后端交互闭环+对话代办操作闭环/品牌规格/验收标准），更新 Issue body，A2A 交办 domain-coding，只输出规格不写代码"
   },
   "grape-skill-generator": {
     "name": "Grape Skill 生成器（grape-cli skill）",
