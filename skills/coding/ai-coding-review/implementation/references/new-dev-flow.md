@@ -113,7 +113,7 @@ git push origin feat/issue-{number}
 
 ```bash
 # 创建 PR
-grape git-repo pulls create --owner {owner} --repo {repo} --json '{"title": "feat: #{number} 标题", "head": "feat/issue-{number}", "base": "main", "inner_issue_nums": "#{owner}/{repo}#{number}", "close_related_issue": true}'
+grape git-repo pulls create --owner {owner} --repo {repo} --json '{"title": "feat: #{number} 标题", "body": "## 概述\n\n自动实现 Issue #{number}", "head": "feat/issue-{number}", "base": "main", "related_issue_nums": ["#{number}"], "auto_close_issues": true}'
 
 # 补充 PR body 与 label
 grape git-repo pulls update --owner {owner} --repo {repo} --number {pr_number} --json '{"body": "## 概述\n\n自动实现 Issue #{number}", "labels": "auto-pr"}'

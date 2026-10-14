@@ -1,4 +1,4 @@
-# VCS API 参考
+﻿# VCS API 参考
 
 ## Base URL
 
@@ -138,4 +138,4 @@ Default: 400 req/min, 4000 req/hour. Returns `429 Too Many Requests` when exceed
 | Create label | form-encoded | JSON body |
 | Add labels to issue | 通过 `PATCH /issues/:n` 的 `labels` 字段 | `POST /issues/:n/labels`（专用端点） |
 | Rate limit | 400 req/min | 5000 req/hour（认证用户） |
-| 关联 Issue | `inner_issue_nums` / `close_related_issue` | PR body 中 `Closes #N` / `Fixes #N` |
+| 关联 Issue | `related_issue_nums`（Issue 号数组，如 `[12]`）/ `auto_close_issues` | PR create 的 `related_issue_nums` 字段关联（勿用 `inner_issue_nums`/`close_related_issue` 旧字段） |

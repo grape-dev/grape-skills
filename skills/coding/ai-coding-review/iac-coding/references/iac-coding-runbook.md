@@ -98,12 +98,12 @@ git add -A && git commit -m "feat(issue-$ISSUE_NUMBER): {变更说明}" 2>&1 | t
 git push -u origin feat/issue-$ISSUE_NUMBER 2>&1 | tail -3
 # ⚠️ 先查同分支 open MR（防重复创建）：
 grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -20
-# 创建 PR（契约字段：title/head/base/inner_issue_nums/close_related_issue——create 无 body 字段，@file 防转义）：
-printf '%s' '{"title":"feat(issue-{n}): {变更说明}","head":"feat/issue-{n}","base":"'"$GRAPE_WORK_BRANCH"'","inner_issue_nums":"'"$ACCOUNT/$REPO_NAME"'#{n}","close_related_issue":true}' > /tmp/pr-body.json
+# 创建 PR（契约字段：title/head/base/body/related_issue_nums/auto_close_issues——related_issue_nums 传 Issue 号数组如 [12]，非 owner/repo#N；body 直接在 create 传入，@file 防转义）：
+printf '%s' '{"title":"feat(issue-{n}): {变更说明}","head":"feat/issue-{n}","base":"'"$GRAPE_WORK_BRANCH"'","body":"## 概述\n\n{描述}","related_issue_nums":["'"$ISSUE_NUMBER"'"],"auto_close_issues":true}' > /tmp/pr-body.json
 grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json @/tmp/pr-body.json --json-out 2>&1 | head -30
 # 从返回取 PR 编号（$PR_NUMBER 未注入时）——后续 update 与 A8 交办必须用真实编号
-# PR 描述四段（变更说明/资源清单/文件变更/后续步骤）——create 后 pulls update 补 body：
+# PR 描述四段（变更说明/资源清单/文件变更/后续步骤）——create 已带 body，此处 update 补写详细描述（幂等双保险）：
 printf '%s' '{"body":"### 变更说明\n{...}\n\n### 资源清单\n{...}\n\n### 文件变更\n{...}\n\n### 后续步骤\n{...}"}' > /tmp/pr-body-desc.json
 grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {真实 PR 编号} --json @/tmp/pr-body-desc.json --json-out 2>&1 | head -20
 # PR 链接用 Web 页面 /pull/（单数）markdown 格式——不得用 API 路径

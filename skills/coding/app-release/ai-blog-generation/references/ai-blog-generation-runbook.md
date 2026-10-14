@@ -97,12 +97,12 @@ git commit -m "docs(blog): add article '$TOPIC_SLUG'" 2>&1 | tail -2
 git push -u origin "$BRANCH_NAME" 2>&1 | tail -3
 # ⚠️ 先查同分支 open PR（防重复创建）：
 grape git-repo pulls list --owner "$REPO_OWNER" --repo "$REPO_NAME" --state open --json-out 2>&1 | head -20
-# 创建 PR（契约字段：title/head/base/inner_issue_nums——create 无 body 字段，@file 防转义）：
-printf '%s' '{"title":"docs(blog): {主题}","head":"'$BRANCH_NAME'","base":"dev","inner_issue_nums":"'$ACCOUNT/$REPO_NAME'#'$ISSUE_NUMBER'","close_related_issue":true}' > /tmp/pr-body.json
+# 创建 PR（契约字段：title/head/base/body/related_issue_nums/auto_close_issues——related_issue_nums 传 Issue 号数组如 [12]，非 owner/repo#N；body 直接在 create 传入，@file 防转义）：
+printf '%s' '{"title":"docs(blog): {主题}","head":"'$BRANCH_NAME'","base":"dev","body":"## 概述\n\n发布博客：{主题}","related_issue_nums":["'"$ISSUE_NUMBER"'"],"auto_close_issues":true}' > /tmp/pr-body.json
 grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
   --json @/tmp/pr-body.json --json-out 2>&1 | head -30
 # 从返回取 PR 编号（$PR_NUMBER 未注入时）——后续 update 与 A8 交办必须用真实编号
-# PR 描述四段（变更说明/产物清单/文件变更/后续步骤）——create 后 pulls update 补 body：
+# PR 描述四段（变更说明/产物清单/文件变更/后续步骤）——create 已带 body，此处 update 补写详细描述（幂等双保险）：
 printf '%s' '{"body":"### 变更说明\n新增博客文章：{主题}\n\n### 产物清单\n- HTML 文章：blog/{slug}/index.html\n- 封面+配图：{N} 张（cover.png + images/）\n- 介绍视频：intro.mp4（{有/无}）\n- 元数据：meta.json\n\n### 文件变更\n| 文件 | 说明 |\n|------|------|\n| `blog/{slug}/` | 博客产物目录 |\n| `blog/_tools/` | 博客通用工具（首次创建时）|\n\n### 后续步骤\n创建后 A2A 交办 SRE Agent 发布博客（跳过 QA——内容产物无需代码审查）。"}' > /tmp/pr-body-desc.json
 grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {真实 PR 编号} --json @/tmp/pr-body-desc.json --json-out 2>&1 | head -20
 # PR 链接用 Web 页面 /pull/（单数）markdown 格式——不得用 API 路径
@@ -185,7 +185,7 @@ grape tasks complete --json '{
 | `No such command 'X'` | 命令名抄错，核对本 runbook；仍不确定再 `grape commands <关键词>` |
 | `unknown request field(s): ...` | `--json` 有契约不允许字段 → `grape <group> <verb> --help` 看 Body fields |
 | `comments create` 失败（长 body 转义）| 改用 `--json @file`（body 先写文件）|
-| `pulls create` 报字段错误 | 契约无 body/assignees——只用 title/head/base/inner_issue_nums；描述用 pulls update 补 |
+| `pulls create` 报字段错误 | 关联字段用 `related_issue_nums`（Issue 号数组）/`auto_close_issues`；报错删掉留 title/head/base 精简重试 |
 | git push 失败 | 检查分支状态后重试 ≤1 次；仍失败报告 |
 | 图片生成 API 403/429 | **停止重试**——评论报告，纯色占位图「待生成」→ 继续 |
 | 视频生成 API 失败 | 跳过视频——文章标注「无视频版本」→ 继续提交 PR |

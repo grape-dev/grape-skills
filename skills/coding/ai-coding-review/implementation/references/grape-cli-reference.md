@@ -59,7 +59,7 @@ grape --version      # 确认版本
 
 | 命令 | 用途 |
 |------|------|
-| `grape git-repo pulls create --owner {owner} --repo {repo} --json '{"title":"...","head":"feat/issue-{n}","base":"main","inner_issue_nums":"{owner}/{repo}#{n}","close_related_issue":true}'` | 创建 PR |
+| `grape git-repo pulls create --owner {owner} --repo {repo} --json '{"title":"...","body":"...","head":"feat/issue-{n}","base":"main","related_issue_nums":["12"],"auto_close_issues":true}'` | 创建 PR（related_issue_nums 传 Issue 号数组，勿用 owner/repo#N） |
 | `grape git-repo pulls update --owner {owner} --repo {repo} --number {pn} --json '{"body":"...","labels":"auto-pr"}'` | 更新 PR（body/labels/title） |
 | `grape git-repo pulls get --owner {owner} --repo {repo} --number {pn} --json-out` | 单 PR 信息 |
 | `grape git-repo pulls list --owner {owner} --repo {repo} --state all --json-out` | PR 列表（幂等检查：同源 PR 是否已存在） |
@@ -85,7 +85,7 @@ grape --version      # 确认版本
 
 | Body schema | 使用命令 | 必填 | 可选 |
 |-------------|---------|------|------|
-| `PullRequestCreateBody` | `git-repo pulls create` | — | `base`, `close_related_issue`, `head`, `inner_issue_nums`, `title`（`head`/`base`/`title` 实际必填） |
+| `PullRequestCreateBody` | `git-repo pulls create` | — | `title`, `body`, `head`, `base`, `related_issue_nums`, `auto_close_issues`（`head`/`base`/`title` 实际必填） |
 | `PullRequestUpdateBody` | `git-repo pulls update` | — | `body`, `labels`, `title` |
 | `CommentBody` | `git-repo pulls comments create` / `git-repo issues comments create` | `body` | — |
 | `A2AHandoffBody` | `a2a handoff` | — | `agent`, `payload` |
@@ -126,7 +126,7 @@ implementation 引用的命令子集（§3.1-§3.6）经 `grape commands` + `gra
 | `grape git-repo issues get` | GET | ✅ 可执行 |
 | `grape git-repo issues comments list` | GET | ✅ 可执行 |
 | `grape git-repo issues comments create` | POST | ✅ 可执行（body: `body`） |
-| `grape git-repo pulls create` | POST | ✅ 可执行（body: `base/close_related_issue/head/inner_issue_nums/title`，session-only） |
+| `grape git-repo pulls create` | POST | ✅ 可执行（body: `title/body/head/base/related_issue_nums/auto_close_issues`，session-only） |
 | `grape git-repo pulls update` | PATCH | ✅ 可执行（body: `body/labels/title`，session-only） |
 | `grape git-repo pulls get` | GET | ✅ 可执行 |
 | `grape git-repo pulls list` | GET | ✅ 可执行（`--state`） |

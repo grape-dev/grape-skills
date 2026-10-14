@@ -60,8 +60,8 @@ git push origin feat/issue-$ISSUE_NUMBER
 ### A6 · 创建 PR（必做）
 ```bash
 grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" \
-  --json '{"title":"feat: #'$ISSUE_NUMBER' {标题}","head":"feat/issue-'$ISSUE_NUMBER'","base":"'${GRAPE_WORK_BRANCH:-main}'","inner_issue_nums":"#'"$ACCOUNT/$REPO_NAME"'#'$ISSUE_NUMBER'","close_related_issue":true}'
-# 补充 PR body 与 label：
+  --json '{"title":"feat: #'$ISSUE_NUMBER' {标题}","body":"## 概述\n\n自动实现 Issue #'$ISSUE_NUMBER'","head":"feat/issue-'$ISSUE_NUMBER'","base":"'${GRAPE_WORK_BRANCH:-main}'","related_issue_nums":["'"$ISSUE_NUMBER"'"],"auto_close_issues":true}'
+# 补充 PR body 与 label（create 已带 body，此处补写为幂等双保险）：
 grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "${PR_NUMBER:-$PR_NUMBER_FROM_CREATE}" \
   --json '{"body":"## 概述\n\n自动实现 Issue #'$ISSUE_NUMBER'","labels":"auto-pr"}'
 # 从 pulls create 返回值取 PR 编号（若 $PR_NUMBER 未注入）
@@ -177,7 +177,7 @@ grape tasks complete --json '{
 |------|------|
 | `No such command 'X'` | 命令名抄错，核对 runbook/reference；仍不确定再 `grape commands <关键词>` |
 | `unknown request field(s): ...` | `--json` 有契约不允许字段（如 `pulls update` 的 `state`）→ `--help` 看 Body fields 删多余 |
-| `pulls create` 返回异常 | ①去掉 tail 看完整错误 ②核对 base（`$GRAPE_WORK_BRANCH`/跨依赖所依赖分支）③精简 JSON（去 `inner_issue_nums`/`close_related_issue`）再试 |
+| `pulls create` 返回异常 | ①去掉 tail 看完整错误 ②核对 base（`$GRAPE_WORK_BRANCH`/跨依赖所依赖分支）③精简 JSON（关联字段用 `related_issue_nums`/`auto_close_issues`，报错删掉留 title/head/base）再试 |
 | `pulls create` 成功但 head/base 不对 | 误建 PR → 不尝试 `state:closed`；`pulls update` 补 body 标注「误建/废弃」，另建正确 PR（见 A6）|
 | 关联仓库 no worktree / 已检出在基线分支 | 若 `$GRAPE_LINKED_WORKTREES` 为空 → `git clone` 到受控目录 + `git checkout -b feat/issue-{n}`；若当前在基线分支 → `git checkeout -b feat/issue-{n} origin/<base>`（严禁直接在基线分支改动）|
 | 关联仓库 `git push` 被拒 / 无权限 | 确认分支=feat/issue-{n}（非基线）；被 403 说明无该仓库写权限，评论告知 |

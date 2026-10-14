@@ -119,7 +119,7 @@ tools:
 | 坑点 | 正确做法 |
 |------|---------|
 | PR 链接路径 | Web 链接用 `/pull/`（单数）markdown 格式：`https://gitcode.com/{owner}/{repo}/pull/{pn}`——不得用 API 路径 |
-| pulls create 字段 | 必带 title/head/base；`inner_issue_nums` 用 `#{owner}/{repo}#{n}` 格式；`close_related_issue` 按需 |
+| pulls create 字段 | 必带 title/head/base/body；关联用 `related_issue_nums`（Issue 号数组如 `["12"]`）+ `auto_close_issues`——勿用 `inner_issue_nums`/`close_related_issue`/`owner/repo#N` |
 | pulls update 不允许 state | 只更新 body/labels 等允许字段——不传 `state`（误建 PR 用补 body「误建/废弃」另建，不尝试关闭）|
 | git 身份 | 首次 commit 前 `grape git config user.name/user.email`（`$BOT_USERNAME`）|
 | 分支纪律 | 直接用平台预置 worktree 分支 `feat/issue-{n}`——不另建分支（另建会与 PR head 不一致）|

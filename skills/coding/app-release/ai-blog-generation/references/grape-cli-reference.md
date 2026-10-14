@@ -33,7 +33,7 @@ grape issues pipeline --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE
 
 ```bash
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json '{"body":"[coding Agent] ..."}'   # 发评论（长 body 用 --json @file）
-grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"title":"docs(blog): {主题}","head":"feat/blog-{slug}-{date}","base":"dev","inner_issue_nums":"owner/repo#{n}","close_related_issue":true}'   # 创建 PR（无 body 字段）
+grape git-repo pulls create --owner "$REPO_OWNER" --repo "$REPO_NAME" --json '{"title":"docs(blog): {主题}","body":"## 概述\n\n发布博客：{主题}","head":"feat/blog-{slug}-{date}","base":"dev","related_issue_nums":["{n}"],"auto_close_issues":true}'   # 创建 PR（related_issue_nums 传 Issue 号数组）
 grape git-repo pulls update --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {n} --json '{"body":"### 变更说明\n{...}"}'                          # 补 PR 描述（四段）
 grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number {n} --json '{"body":"[coding Agent] ..."}'                    # PR 评论（优化场景）
 grape a2a handoff --json '{"agent":"sre","payload":{"repository":"owner/repo","account":"owner","issue_number":N,"pr_number":N,"context":"..."}}'   # A2A 交办 SRE（跳过 QA）

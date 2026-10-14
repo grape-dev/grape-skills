@@ -1,4 +1,4 @@
-# VCS API 参考
+﻿# VCS API 参考
 
 ## 使用规则（必须遵守）
 
@@ -66,15 +66,17 @@ Token 已在 prompt 中给出：`$BOT_TOKEN`
 - `title`：PR 标题（如 `feat: #{issue} 标题`）
 - `head`：源分支（如 `feat/issue-{issue}`，即你 push 的分支）
 - `base`：目标分支（通常 `main` / `master`）
-- `inner_issue_nums`：关联 Issue（格式 `{owner}/{repo}#{issue}`，用于 PR 关联 Issue）
-- `close_related_issue`：`true` 表示 PR 合并后自动关闭关联 Issue
+- `related_issue_nums`：关联 Issue（**Issue 号数组**，如 `[12]`，用于 PR 关联 Issue）
+- `auto_close_issues`：`true` 表示 PR 合并后自动关闭关联 Issue
+
+> ⚠️ 历史 VCS 直连文档：正式走 `grape git-repo pulls create`（CLI 优先，字段同上）；下列 curl 示例仅保留用于理解字段语义，勿在生产使用直连。
 
 > 完整调用示例：
 > ```bash
 > curl -sL -X POST -H "Authorization: Bearer $BOT_TOKEN" \
 >   -H "Content-Type: application/json" \
 >   -d '{"title": "feat: #7 标题", "head": "feat/issue-7", "base": "main",
->        "inner_issue_nums": "Jason7602/gitcode-pr-assistant#7", "close_related_issue": true}' \
+>        "related_issue_nums": [7], "auto_close_issues": true}' \
 >   $VCS_API_BASE/repos/Jason7602/gitcode-pr-assistant/pulls
 > ```
 
@@ -161,4 +163,4 @@ Default: 400 req/min, 4000 req/hour. Returns `429 Too Many Requests` when exceed
 | Create label | form-encoded | JSON body |
 | Add labels to issue | 通过 `PATCH /issues/:n` 的 `labels` 字段 | `POST /issues/:n/labels`（专用端点） |
 | Rate limit | 400 req/min | 5000 req/hour（认证用户） |
-| 关联 Issue | `inner_issue_nums` / `close_related_issue` | PR body 中 `Closes #N` / `Fixes #N` |
+| 关联 Issue | `related_issue_nums`（Issue 号数组，如 `[12]`）/ `auto_close_issues` | PR create 的 `related_issue_nums` 字段关联（勿用 `inner_issue_nums`/`close_related_issue` 旧字段） |

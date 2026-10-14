@@ -61,10 +61,10 @@ grape commands     # 可选：命令发现
    ```bash
    grape git-repo repo --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" --json-out
    ```
-4. **创建 PR**（`pulls create` 无 body 字段——body 用下一步 `pulls update` 补）：
+4. **创建 PR**（契约字段 title/head/base/body/related_issue_nums/auto_close_issues——body 直接在 create 传，update 补写为幂等双保险）：
    ```bash
    grape git-repo pulls create --owner "${REPO_FULL_NAME%/*}" --repo "${REPO_FULL_NAME#*/}" \
-     --json '{"title":"feat(skill): 新增 {skill-name}","head":"feat/issue-'"$ISSUE_NUMBER"'","base":"'"${BASE_BRANCH:-main}"'","inner_issue_nums":"'"$REPO_FULL_NAME"'#'"$ISSUE_NUMBER"'","close_related_issue":true}'
+     --json '{"title":"feat(skill): 新增 {skill-name}","body":"## 概述\n\n新增华为云 {skill-name} skill","head":"feat/issue-'"$ISSUE_NUMBER"'","base":"'"${BASE_BRANCH:-main}"'","related_issue_nums":["'"$ISSUE_NUMBER"'"],"auto_close_issues":true}'
    ```
 5. **补 PR body** + **base 校验**：
    ```bash
