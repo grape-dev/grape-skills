@@ -17,7 +17,7 @@
     {
       "id": "vod",
       "tag": "vod",
-      "skill": "vod-strict",
+      "skill": "vod-advance",
       "mode": "emit",
       "next": "issue",
       "handoff": "a2a"
@@ -33,7 +33,7 @@
     {
       "id": "coding",
       "tag": "coding",
-      "skill": "implementation",
+      "skill": "coding-cli",
       "mode": "emit",
       "next": "qa",
       "handoff": "a2a"
@@ -41,7 +41,7 @@
     {
       "id": "qa",
       "tag": "qa",
-      "skill": "pr",
+      "skill": "qa-cli",
       "mode": "emit",
       "next": "sre",
       "handoff": "a2a"

@@ -4,10 +4,10 @@
 
 ## 技能链路
 
-1. **VOD** — 需求收集与声音分析（`vod-strict`）
+1. **VOD** — 需求收集与声音分析（`vod-advance`，功能/Bug/咨询/任务型四分类）
 2. **Issue** — 技能任务规划（`issue-advance`）
-3. **Coding** — 代码实现（`implementation`）
-4. **QA** — 代码审查（`pr`）
+3. **Coding** — 代码实现（`coding-cli`）
+4. **QA** — 代码审查（`qa-cli`）
 5. **SRE** — DevBridge 部署（`devbridge-deploy`）
 
 ## 推荐模板
