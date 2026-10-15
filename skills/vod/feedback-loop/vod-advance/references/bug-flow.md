@@ -38,16 +38,26 @@ grape issues awaiting-input --issue_id "$ISSUE_ID" \
 - `awaiting-input` 提交后即触达用户（飞书卡片），无需等待/A2A；用户 `clarify` 回复后 `awaiting_input → processing` 新一轮继续。
 - ⚠️ **本轮仍需回收尾**（`tasks complete`，next_step=`a2a_need_clarify`）——澄清追问也算本轮完成。
 
-## 3. 结构化收敛（以评论发布，不改写原始 Issue）
+## 3. 收敛门禁（必做，先判定「可推断 vs 必澄清」再收敛）
+
+> ⚠️ **核心意图歧义必须澄清，不得直接收敛/A2A**。收敛前自检：Bug 的**现象是否明确**、**根因是否唯一可定位**？
+
+**判定分档**：
+- **调查可定位/单解**（代码/提交可确认根因或现象明确）→ 可直接收敛，根因推断标注「调查推断，待确认」。
+- **影响定位方向的歧义**（现象描述含糊到无法确定复现路径、根因存在多个候选分支但用户意图不明、复现条件缺失且调查无法还原）→ **必须转澄清**：走近 §2「引导」的对方澄清分支（追问评论 + `awaiting-input` + `next_step=a2a_need_clarify`），**不发布收敛评论、不 A2A**；用户补充后下一轮再收敛。
+
+> ⚠️ **自检规则**：收敛结论中若出现「可能/疑似是 A 或 B」「暂无法确定现象」「复现待确认」这类多解表述，视为**收敛门禁未通过**——立即改走澄清分支。
+
+## 4. 结构化收敛（以评论发布，不改写原始 Issue，仅在收敛门禁通过后）
 
 按 `requirement-elicit-guide.md` §四 Bug 模板（现象/复现步骤/期望 vs 实际/影响范围/环境/日志报错/优先级/来源）生成收敛正文，评论发布：
 ```bash
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[VOD Agent] 已结构化收敛 Bug 需求：\n\n{§四 Bug 模板结构}"}' --json-out
 ```
-- 调查所得的疑似根因/影响面在收敛中注明（标注「调查推断，待确认」），不谎称已确认。
+- 仅对**调查可定位的根因推断**（非核心意图歧义）在收敛中注明「调查推断，待确认」，不谎称已确认。
 
-## 4. A2A 交办 issue agent（必做）
+## 5. A2A 交办 issue agent（必做）
 
 ```bash
 # ≤3 次重试；交办后回 runbook Step 4 收尾（next_step=a2a_issue）

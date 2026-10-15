@@ -6,6 +6,13 @@
 > **评论前缀硬规**：评论 body 一律以 `[VOD Agent]` 开头。
 > 命令取舍速查：读 Issue 聚合用 `issues detail`；评论用 `git-repo issues comments create`；列目录/查文件用 `git-repo tree`（`--depth single`）/ `contents --path ... --raw`。
 
+### 防抖纪律（必须遵守）
+
+1. **owner 只用 `$REPO_OWNER`**：不要把它换成 `Jason7602` 等猜测值；若命令报错/403，先核对 `$REPO_OWNER` 是否注入为空（环境问题），**不要改 owner 重复试错**。
+2. **一条命令取到即继续**：`issues detail` 已含阶段/事件/路线图；`tree --depth single` 一次看清结构，再按需读 2-3 个文件；**不要重复 `tree`/`list` 换参数折腾**。
+3. **命令失败先看完整错误**：先看 `--help` 或完整 stderr，**不重复相同命令试错**；不确定命令/参数先 `grape <组> --help` 一次确认。
+4. **收敛门禁**：功能/Bug 收敛前必须先做「可推断 vs 必澄清」判定（见对应 flow 与 `requirement-elicit-guide.md` §二）；并列歧义 → 澄清分支。
+
 ---
 
 ## 统一流程

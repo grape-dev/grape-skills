@@ -37,16 +37,26 @@ grape issues awaiting-input --issue_id "$ISSUE_ID" \
 - `awaiting-input` 提交后即触达用户（飞书卡片），无需等待/A2A；用户 `clarify` 回复后 `awaiting_input → processing` 新一轮继续。
 - ⚠️ **本轮仍需回收尾**（`tasks complete`，next_step=`a2a_need_clarify`）——澄清追问也算本轮完成。
 
-## 3. 结构化收敛（以评论发布，不改写原始 Issue）
+## 3. 收敛门禁（必做，先判定「可推断 vs 必澄清」再收敛）
+
+> ⚠️ **核心意图歧义必须澄清，不得直接收敛/A2A**。收敛前先自检：期望行为是否仍存在**并列路径/多解**（如「可能指 A 或 B」「点击生成或开局自动生成」「数量几个」）？
+
+**判定分档**：
+- **工程可推断**（碰撞判定、重开清理合理性、吸附网格、实现参数细节）→ 可直接收敛，注明假设让用户确认（见 §4）。
+- **影响功能形态的用户偏好歧义**（生成方式二选一、数量/范围、开关取舍等——代码查不出用户意图）→ **必须转澄清**：走近 §2「引导」的对方澄清分支（追问评论 + `awaiting-input` + `next_step=a2a_need_clarify`），**不发布收敛评论、不 A2A**；用户回答后下一轮再收敛。
+
+> ⚠️ **自检规则**：收敛结论中若出现「可能指 A 或 B」「A/B 两条路径」「暂定/先按…」这类并列歧义表述，**视为收敛门禁未通过**——立即改走澄清分支。
+
+## 4. 结构化收敛（以评论发布，不改写原始 Issue，仅在收敛门禁通过后）
 
 按 `requirement-elicit-guide.md` §四 功能模板（目标/现状/期望/验收/优先级/来源）生成收敛正文，评论发布：
 ```bash
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
   --json '{"body":"[VOD Agent] 已结构化收敛需求：\n\n{§四 模板结构}"}' --json-out
 ```
-- 拿不准但可合理推断 → 在收敛结论中注明假设，让用户确认，而非空白提问。
+- 仅对**工程可推断假设**（非核心意图）在收敛结论中注明「假设：…」，让用户确认。
 
-## 4. A2A 交办 issue agent（必做）
+## 5. A2A 交办 issue agent（必做）
 
 ```bash
 # ≤3 次重试；交办后回 runbook Step 4 收尾（next_step=a2a_issue）
