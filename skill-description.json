@@ -418,5 +418,11 @@
     "sub_scene": "app-release",
     "path": "sre/app-release/grape-skill-uploader",
     "description": "skill 上传注册技能：在 skill 创建流水线末端将新 skill 打包 ZIP 并上传为仓库级 skill。QA 审查通过后预注册上传；PR 合并后正式上传，scope=repo"
+  },
+  "_template": {
+    "name": "技能模板",
+    "description": "官方技能模板（skills/_template），供技能创建向导下载",
+    "agent_type": "_template",
+    "path": "_template/my-skill"
   }
 }
