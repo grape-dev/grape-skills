@@ -1,0 +1,58 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "display_name": "Hello World 部署",
+  "description": "Hello World 快速体验场景：从需求到部署，演示完整流水线（含 DevBridge 部署）。适合首次体验与模板验证。",
+  "category": "general",
+  "recommended_template": "hello-flask",
+  "onboarding": "repo-onboarding",
+  "tags": [
+    "hello-world",
+    "quickstart",
+    "demo",
+    "deploy"
+  ],
+  "author": "grape-team",
+  "nodes": [
+    {
+      "id": "vod",
+      "tag": "vod",
+      "skill": "vod-strict",
+      "mode": "emit",
+      "next": "issue",
+      "handoff": "a2a"
+    },
+    {
+      "id": "issue",
+      "tag": "issue",
+      "skill": "issue-advance",
+      "mode": "emit",
+      "next": "coding",
+      "handoff": "a2a"
+    },
+    {
+      "id": "coding",
+      "tag": "coding",
+      "skill": "implementation",
+      "mode": "emit",
+      "next": "qa",
+      "handoff": "a2a"
+    },
+    {
+      "id": "qa",
+      "tag": "qa",
+      "skill": "pr",
+      "mode": "emit",
+      "next": "sre",
+      "handoff": "a2a"
+    },
+    {
+      "id": "sre",
+      "tag": "sre",
+      "skill": "devbridge-deploy",
+      "mode": "emit",
+      "next": "done",
+      "handoff": "complete"
+    }
+  ]
+}
