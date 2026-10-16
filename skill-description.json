@@ -424,5 +424,12 @@
     "description": "官方技能模板（skills/_template），供技能创建向导下载",
     "agent_type": "_template",
     "path": "_template/my-skill"
+  },
+  "huawei-cloud-devbridge-deploy": {
+    "name": "华为云 DevBridge 部署",
+    "agent_type": "sre",
+    "sub_scene": "app-release",
+    "path": "sre/app-release/huawei-cloud-devbridge-deploy",
+    "description": "DevBridge 统一部署（自动路由）：Route A（jobenv 环境）agent 运行环境预装 DevBridge tunnel skill 时本机直部，WebUI API 认证；Route B（本地环境）走华为云沙箱 MCP 工具，仅用 AK/SK STS 凭据。全流程：clone 仓库、识别项目类型（Flask/Node.js/静态）、装依赖、起服务、建隧道、返回公网 URL。"
   }
 }
