@@ -17,7 +17,7 @@
     {
       "id": "vod",
       "tag": "vod",
-      "skill": "vod-advance",
+      "skill": "vod-strict",
       "mode": "emit",
       "next": "issue",
       "handoff": "a2a"
@@ -49,7 +49,7 @@
     {
       "id": "sre",
       "tag": "sre",
-      "skill": "devbridge-deploy",
+      "skill": "huawei-cloud-devbridge-deploy",
       "mode": "emit",
       "next": "done",
       "handoff": "complete"
