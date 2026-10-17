@@ -152,7 +152,7 @@ sleep 1
 
 # Get tunnel URL
 LOGS=$(db_process_logs "$PROCESS_ID")
-TUNNEL_URL=$(echo "$LOGS" | grep -oP 'https://[a-z0-9-]+\.devbridge[^"]+' | head -1)
+TUNNEL_URL=$(echo "$LOGS" | grep -oP 'https://[a-z0-9-]+\.devbridge[a-z0-9.-]+' | head -1)
 
 echo ""
 echo "=== Deployment Complete ==="
