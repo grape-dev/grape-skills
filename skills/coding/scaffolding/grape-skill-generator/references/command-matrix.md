@@ -21,7 +21,7 @@
 | Issue 事件 | `issues events --owner {owner} --repo {repo} --number {n} --json-out` | 事件流 |
 | Issue 评论列表 | `git-repo issues comments list --owner {owner} --repo {repo} --number {n} --json-out` | 读取讨论上下文 |
 | 事件详情 | `events detail --seq {seq} --json-out` | 读取前序 A2A 交接 payload |
-| Issue 评论 | `git-repo issues comments create --owner {owner} --repo {repo} --number {n} --json '{"body":"..."}'` | 评论/收敛结论 |
+| Issue 评论 | `git-repo issues comments create --owner {owner} --repo {repo} --number {n} --json '{"body":"..."}' --json-out` | 评论/收敛结论（**写命令带 `--json-out` 确认返回 comment id**） |
 | 任务完成 | `tasks complete --json '{"result_text":"...","next_step":"..."}'` | 自报完成（结构化字段必填） |
 | A2A 交接 | `a2a handoff --json '{"agent":"{目标agent}","payload":{...}}'` | 交棒下游 agent（非技能名） |
 | 命令发现 | `grape commands [pattern]` | 列出可调用命令 |

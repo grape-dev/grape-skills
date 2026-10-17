@@ -26,9 +26,9 @@ grape issues list --owner "$REPO_OWNER" --repo "$REPO_NAME" --json-out          
 - 提问结合调查线索、具体、每次 1-3 个；≤3 轮；超限 → 评论列缺失项标「待澄清」。
 
 ```bash
-# ① 发追问评论（body 以 [VOD Agent] 开头，结合调查线索 1-3 个具体问题）
+# ① 发追问评论（body 以 [VOD Agent] 开头，结合调查线索 1-3 个具体问题；返回 comment id 即成功，无输出先看完整 stderr，不重复盲试）
 grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
-  --json '{"body":"[VOD Agent] 结合代码情况，需要补充确认：{结合调查线索的具体问题 1-3 个}"}'
+  --json '{"body":"[VOD Agent] 结合代码情况，需要补充确认：{结合调查线索的具体问题 1-3 个}"}' --json-out
 
 # ② 显式声明待澄清（awaiting-input 置状态 + 触达用户；--issue_id 用注入 $GRAPE_ISSUE_ID，未注入用 issues detail 的 id；questions 与追问一致）
 ISSUE_ID="${GRAPE_ISSUE_ID:-$(grape issues detail --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" --json-out | jq -r '.id')}"

@@ -4,7 +4,7 @@
 > 环境变量可直接使用：`$REPO_OWNER`（owner）、`$REPO_NAME`（repo 名）、`$ISSUE_NUMBER`、`$REPO_FULL_NAME`、`$GRAPE_SESSION_TOKEN`/`$GRAPE_SERVER_URL`。
 > ⚠️ **owner 只用 `$REPO_OWNER`**；`$ACCOUNT` 是触发人 actor，仅用于 A2A payload `account`。
 > **评论前缀硬规**：评论 body 一律以 `[VOD Agent]` 开头。
-> 命令取舍速查：读 Issue 聚合用 `issues detail`；评论用 `git-repo issues comments create`；列目录/查文件用 `git-repo tree`（`--depth single`）/ `contents --path ... --raw`。
+> 命令取舍速查：读 Issue 聚合用 `issues detail`；评论用 `git-repo issues comments create`（⚠️ **必须带 `--json-out`**，返回 `comment id` 即成功；无输出先看完整 stderr，不重复盲试）；列目录/查文件用 `git-repo tree`（`--depth single`）/ `contents --path ... --raw`。
 
 ### 防抖纪律（必须遵守）
 
@@ -84,6 +84,7 @@ grape tasks complete --json '{
 | `No such command 'X'` | 命令名错，核对 runbook/flow 抄写；仍不确定 `grape commands <关键词>` |
 | `unknown request field(s): ...` | `--json` 字段不在允许集，看 `grape <g> <v> --help` Body fields 删多余字段 |
 | `contents` 路径不存在 | 用 `tree --depth single` / `contents --path ""` 定位 |
+| `comments create` 无成功输出（看不到 comment id） | **不是重试**——确认命令带 `--json-out` 并完整执行（`2>&1` 保留 stderr）；返回 `comment id` 才判定成功 |
 | 401 凭据失效 | 说明"凭据已失效"，不换 token |
 | 403 账户/平台类 | 说明需 `grape_`/JWT，本技能不涉及 |
 | A2A 交办失败 | 重试 ≤3 次；仍失败 → 评论说明 + next_step 标注人工介入 |
@@ -95,4 +96,5 @@ grape tasks complete --json '{
 - ❌ 危险任务（删除/重启/付费/不可逆/合并未审）直交后端 agent——委婉答复不在职责范围。
 - ❌ 咨询类 A2A / 建 Issue（VOD 闭环）。
 - ❌ 用裸 `git`（一律 `grape git`，保证凭据注入）。
+- ❌ **`comments create` 不带 `--json-out` 或失败后反复盲试**——先确认 `--json-out` + 完整错误。
 - ❌ 不因"等待用户回复"跳过 Step 收尾（tasks complete）。

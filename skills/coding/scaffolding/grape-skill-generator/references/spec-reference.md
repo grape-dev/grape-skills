@@ -87,10 +87,11 @@ tools:
 
 **要点（对齐现有技能）**：
 - **Prerequisites 必含**：`grape --version`（≥最低版本）→ `grape refresh`（刷新契约，⚠️ 契约权威 = `grape commands` 实列）→ env `${VAR:+ok}` 校验 → 未通过输出「前置检查未通过」并结束。
-- **环境变量表必含**：`GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` / `REPO_OWNER` / `REPO_NAME` / `REPO_FULL_NAME` / `ACCOUNT`(actor，仅 A2A) / `ISSUE_NUMBER` / `GRAPE_SCENE_ID` / `BOT_USERNAME` / `GRAPE_ISSUE_ID`（awaiting-input/pending-review 等 `--issue_id` 用）等，附敏感信息提示。
+- **环境变量表必含**：`GRAPE_SERVER_URL` / `GRAPE_SESSION_TOKEN` / `REPO_OWNER` / `REPO_NAME` / `REPO_FULL_NAME` / `ACCOUNT`(actor，仅 A2A) / `ISSUE_NUMBER` / `GRAPE_SCENE_ID` / `BOT_USERNAME` / `GRAPE_ISSUE_ID`（awaiting-input 等 `--issue_id` 用）等，附敏感信息提示。
 - **处理流程 = runbook 引用**：正文写「⚠️ 先读 `references/{x}-runbook.md`，按走查表逐步执行，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**」+「本技能收尾一律用 `grape tasks complete`（情形一）」；详细步骤放 runbook。
 - **正文不改写**（如涉及修改 Issue）：结论/收敛一律 `issues comments create` 发布，`issues update` 不写 body（防覆盖原始描述）。
 - **A2A 交办 agent 名**（`coding`/`qa`/`sre`/`vod`/`issue`），非技能名。
+- **写命令带 `--json-out` 确认结果**：评论/建/更新等写命令也加 `--json-out`，以返回的 `comment id` / 状态确认成功（`issues comments create`、`pulls create` 等）；无成功输出先看完整 stderr（`2>&1`），**不重复相同命令盲试**。
 - **流程节点按需求单落地**：需求单 `flow_nodes` 声明了 `pending-review`/`awaiting-input`/`tasks notify`，runbook 必须含对应审批/澄清/通知步骤（见「流程节点」节）；`tasks notify` 语义为任务分派，结果通知走 `issues comments create`。
 
 #### 流程节点 runbook 标准模板（按需求单 `flow_nodes` 选用）
@@ -280,7 +281,8 @@ grape <group> <verb> --help       # 查参数列表
 | SKILL.md 长度 | ≤130 行，超出拆到 references |
 | reference 文件长度 | ≤250 行 |
 | 命令示例 | 只列本 skill 用到的，不列全量 |
-| 查询输出 | 加 `--json-out` |
+| 查询输出 | 加 `--json-out`（省 token） |
+| 写命令确认 | **写命令也加 `--json-out`**（评论/建/更新以返回 `comment id`/状态确认成功，避免无输出盲试） |
 | 默认参数 | 有默认值的省略不写 |
 | 命令发现 | 不在 SKILL.md 列全量命令树，用 `grape commands` 按需发现 |
 | 重复内容 | grape-cli-reference.md 多 skill 可共用 |
@@ -325,7 +327,7 @@ skill 编写完成后，逐项检查：
 - [ ] 只列本 skill 实际用到的命令，不列全量
 - [ ] path 参数用下划线名，wait 参数用连字符名
 - [ ] --json body 只用规范 §3.5 列出的字段
-- [ ] 查询命令带 --json-out
+- [ ] 命令带 `--json-out`（查询省 token；**写命令如 comments create / pulls create 也带 `--json-out` 确认成功，不重复盲试**）
 - [ ] 涉及 Issue body 修改时：用 `issues comments create` 发布，`issues update` 不写 body（回填原始 body）
 - [ ] 用到场景自定义变量时：变量名全大写（`[A-Z][A-Z0-9_]*`）、非空、不以 `GRAPE_` 开头、不与系统保留变量冲突（REPO_* / ISSUE_NUMBER / GRAPE_* / BOT_USERNAME / ACCOUNT 等）；密钥变量带 `_KEY/_SK/_TOKEN/_PASSWORD` 等后缀
 - [ ] 已上收的能力在 SKILL.md 和 reference 中都做了声明

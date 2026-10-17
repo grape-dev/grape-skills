@@ -50,17 +50,17 @@ grape git-repo issues comments list --owner {owner} --repo {repo} --number {n} -
 grape git-repo issues create --owner {owner} --repo {repo} \
   --json '{"title":"...","body":"..."}'
 
-# 结构化收敛需求：以评论发布，不改写原始 Issue body（VOD 原则）
+# 结构化收敛需求：以评论发布，不改写原始 Issue body（VOD 原则；返回 comment id 即成功，无输出先看完整 stderr，不重复盲试）
 grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \
-  --json '{"body":"[VOD Agent] 已结构化收敛需求：\n\n## 目标\n…\n## 现状\n…\n## 期望行为\n…\n## 验收标准\n…\n## 优先级\n…"}'   # 长文用 --json @file.json
+  --json '{"body":"[VOD Agent] 已结构化收敛需求：\n\n## 目标\n…\n## 现状\n…\n## 期望行为\n…\n## 验收标准\n…\n## 优先级\n…"}' --json-out   # 长文用 --json @file.json
 
 # 仅当需改标签/分配/关闭等元数据时用 issues update（不涉及 body 收敛）
 grape git-repo issues update --owner {owner} --repo {repo} --number {n} \
   --json '{"labels":"feature","assignee":"<user>"}'
 
-# 评论（澄清追问等反馈；body 以 [VOD Agent] 开头）
+# 评论（澄清追问等反馈；body 以 [VOD Agent] 开头；返回 comment id 即成功）
 grape git-repo issues comments create --owner {owner} --repo {repo} --number {n} \
-  --json '{"body":"[VOD Agent] 这是 VOD 的答复内容。"}'                    # 长文用 --json @file.json
+  --json '{"body":"[VOD Agent] 这是 VOD 的答复内容。"}' --json-out   # 长文用 --json @file.json
 
 # 项目知识基线（Step 0 首选；支持会话 token，仓库作用域匹配即可；命令名因契约版本可能为 repos project info）
 grape repos project info --owner {owner} --repo {repo} --json-out   # project-graph.md + project-capabilities.md 全文 + meta(degraded/commit/branches)

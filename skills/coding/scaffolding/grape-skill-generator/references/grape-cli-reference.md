@@ -182,7 +182,8 @@
 - **内置 wait 参数**：连字符名（`--task-id`）
 - **query 参数**：可选，空值自动丢弃；有默认值的可省略
 - **requestBody**：`--json '<JSON字符串>'`
-- **机器可读输出**：查询命令加 `--json-out`（省 30-50% token）
+- **参数规则会生成到技能**：默认参数（有默认值）省略；`--json-out` 用于**机器可读输出**——查询命令加它省 30-50% token；
+  **写命令（issues/pulls comments create、pulls create、issues update 等）也应加 `--json-out` 确认结果**（返回 `comment id`/状态即成功；无输出先看完整 stderr，不重复盲试）。
 - **contents 解码**：`--raw` 直接输出解码内容
 - **命令验证**：`grape commands | grep <keyword>` 或 `grape <group> <verb> --help`
 
