@@ -65,7 +65,7 @@ Git Repo → Clone → Detect Type → Install Deps → Start Server → Create 
 - DevBridge wrapper script: `source <devbridge_skill_dir>/scripts/devbridge_cmd.sh`
 - Bash, curl, git available
 - Python/Node.js available depending on project type
-- `JOB_ENV_HW_DEVBRIDGE_API_KEY` available **inside the sandbox** (injected by jobenv). Note: auth is **NOT always automatic** — the sandbox may not have `HW_ACCESS_KEY`/`HW_SECRET_KEY`/`HW_SECURITY_TOKEN` set. Step 3 includes an automated auth check and recovery using this API key. See [Authentication Failure Recovery](#authentication-failure-recovery-route-a) for details.
+- `JOB_ENV_HW_DEVBRIDGE_API_KEY` available **inside the sandbox** (injected by jobenv). Note: auth is **NOT always automatic** — the sandbox may not have `HW_ACCESS_KEY`/`HW_SECRET_KEY`/`HW_SECURITY_TOKEN` set. Step 3 includes an automated auth check and recovery using this API key. If the API key itself is missing (empty), recovery requires first running `POST /api/v1/debug/env-sync`; see [Authentication Failure Recovery](#authentication-failure-recovery-route-a) for details.
 
 ## Step 1: Clone the Repository
 
@@ -113,6 +113,21 @@ db_init
 AUTH_STATUS=$(db_auth_status 2>/dev/null || echo "")
 if echo "$AUTH_STATUS" | grep -q "Not logged in"; then
     echo "Auth expired, re-authenticating with JOB_ENV_HW_DEVBRIDGE_API_KEY..."
+
+    # First: is the API key even present in the sandbox?
+    KEY_CHECK=$(curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
+        -H 'Content-Type: application/json' \
+        -d '{"cmd":["bash","-c","echo API=${JOB_ENV_HW_DEVBRIDGE_API_KEY:+set}"]}')
+    if echo "$KEY_CHECK" | grep -q 'API=set'; then
+        echo "  API key present in sandbox."
+    else
+        # Key was never injected — ask jobenv to sync HW credentials first.
+        # Do NOT self-sign IAM tokens or probe DevStation here.
+        echo "  API key missing; triggering jobenv credential sync..."
+        curl -s -X POST "http://127.0.0.1:8090/api/v1/debug/env-sync" \
+            -H 'Content-Type: application/json' >/dev/null 2>&1
+    fi
+
     curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
         -H 'Content-Type: application/json' \
         -d '{"cmd":["bash","-c","devbridge auth login --api-key $JOB_ENV_HW_DEVBRIDGE_API_KEY 2>&1"]}' >/dev/null 2>&1
@@ -121,7 +136,7 @@ if echo "$AUTH_STATUS" | grep -q "Not logged in"; then
     AUTH_STATUS=$(db_auth_status 2>/dev/null || echo "")
     if echo "$AUTH_STATUS" | grep -q "Not logged in"; then
         echo "ERROR: DevBridge auth recovery failed."
-        echo "       JOB_ENV_HW_DEVBRIDGE_API_KEY may be expired or missing in sandbox."
+        echo "       Tried POST /api/v1/debug/env-sync; JOB_ENV_HW_DEVBRIDGE_API_KEY still not usable."
         exit 1
     fi
     echo "Auth restored."
@@ -209,6 +224,7 @@ kill <server_pid>
 - ❌ Opening a browser to the DevStation console (`https://devstation.connect.huaweicloud.com/space/devbridge/apikey`) — headless environments have no browser.
 - ❌ Using `webfetch` on the DevStation API key page — it requires login session, returns empty.
 - ❌ Calling DevStation REST API directly to create an API key — auth signing format doesn't match.
+- ❌ Trying to synthesize the DevBridge API key yourself when it is missing — hand-signing IAM AK/SK requests, fetching an IAM token, or probing/binary-diving DevStation endpoints. These CANNOT yield a DevBridge API key. Use `POST /api/v1/debug/env-sync` (see [If the API key is MISSING](#if-the-api-key-is-missing-trigger-a-jobenv-credential-sync-first)).
 - ❌ Manually `undeploy`/`deploy` the sandbox — undeploy fails when sandbox is in `running` state.
 - ❌ Switching to Route B — Route A auth expiry is fixed by the procedure below, not by re-routing.
 
@@ -233,6 +249,55 @@ db_auth_status
 TUNNEL_ID=$(db_create "<name>" "<description>" <expiration>)
 ```
 
+### Precondition: the API key must ALREADY be in the sandbox
+
+The recovery above **only works if `JOB_ENV_HW_DEVBRIDGE_API_KEY` is already present inside the sandbox**. Confirm this BEFORE running `devbridge auth login`:
+
+```bash
+curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
+    -H 'Content-Type: application/json' \
+    -d '{"cmd":["bash","-c","echo API=${JOB_ENV_HW_DEVBRIDGE_API_KEY:+set}"]}'
+# Expected: {"stdout":"API=set\n", ...}
+```
+
+- If the output is `API=set` → the key is present; just re-login as shown in "The Correct Way".
+- If the output is `API=` (empty) → **the key was never injected**; the jobenv deploy log will show `WARN: keyring 中未找到 HW_DEVBRIDGE_API_KEY，跳过 auth login`. The sandbox has no usable kernel keyring (`keyctl` is not installed), so waiting for the keyring-rotate daemon will NOT help. Go to the next section.
+
+### If the API key is MISSING: trigger a jobenv credential sync first
+
+When the key is absent, **do NOT** try to synthesize it yourself. Specifically, do NOT:
+
+- ❌ hand-sign Huawei Cloud IAM AK/SK requests trying to mint a token,
+- ❌ fetch an IAM token or call `KeystoneCreateToken`-style APIs,
+- ❌ probe / scrape / binary-dive the DevStation or devbridge endpoints (`/open-api-inner/...`, `devstation.connect.huaweicloud.com`, etc.).
+
+None of these can produce a **DevBridge API key** — it is a separate credential issued by DevStation/DevSpace, distinct from IAM AK/SK. The correct fix is to ask jobenv to inject it:
+
+```bash
+# 1. Force one round of HW credential sync. This writes the DevBridge API key
+#    into the sandbox environment (env vars) and the kernel keyring.
+curl -s -X POST "http://127.0.0.1:8090/api/v1/debug/env-sync" \
+    -H 'Content-Type: application/json'
+
+# 2. Re-check that the key is now visible inside the sandbox.
+curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
+    -H 'Content-Type: application/json' \
+    -d '{"cmd":["bash","-c","echo API=${JOB_ENV_HW_DEVBRIDGE_API_KEY:+set}"]}'
+# Expected: {"stdout":"API=set\n", ...}
+
+# 3. Now re-run the standard recovery from "The Correct Way" above.
+curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
+    -H 'Content-Type: application/json' \
+    -d '{"cmd":["bash","-c","devbridge auth login --api-key $JOB_ENV_HW_DEVBRIDGE_API_KEY 2>&1"]}'
+db_auth_status   # Expected: {"success":true,"data":{"status":"Logged in (Huawei Cloud IAM)"}}
+```
+
+`POST /api/v1/debug/env-sync` is documented in the `job-environment` skill. It returns `{keyring, cached, envs}` with redacted values and re-syncs every running env; after it, `JOB_ENV_HW_DEVBRIDGE_API_KEY` is available in the sandbox env.
+
+> **Decide in one step:**
+> - `Not logged in` **and** `JOB_ENV_HW_DEVBRIDGE_API_KEY` is set → just re-login ("The Correct Way").
+> - `Not logged in` **and** the key is missing/empty → run `POST /api/v1/debug/env-sync` first, then re-login. This is the ONLY supported way to recover a missing key inside the jobenv — never improvise an IAM/DevStation workaround.
+
 ### Key Distinction: Three Different Credential Types
 
 | Env Var | Type | Purpose | Works as `--api-key`? |
@@ -253,6 +318,14 @@ db_init
 AUTH_STATUS=$(db_auth_status 2>/dev/null)
 if echo "$AUTH_STATUS" | grep -q "Not logged in"; then
     echo "Auth expired, re-authenticating with JOB_ENV_HW_DEVBRIDGE_API_KEY..."
+
+    # If the key is not injected yet, sync it first (never self-sign IAM/DevStation).
+    KEY_CHECK=$(curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
+        -H 'Content-Type: application/json' \
+        -d '{"cmd":["bash","-c","echo API=${JOB_ENV_HW_DEVBRIDGE_API_KEY:+set}"]}')
+    echo "$KEY_CHECK" | grep -q 'API=set' || \
+        curl -s -X POST "http://127.0.0.1:8090/api/v1/debug/env-sync" -H 'Content-Type: application/json' >/dev/null
+
     curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
         -H 'Content-Type: application/json' \
         -d '{"cmd":["bash","-c","devbridge auth login --api-key $JOB_ENV_HW_DEVBRIDGE_API_KEY 2>&1"]}' >/dev/null
@@ -435,6 +508,7 @@ Then close the sandbox session using devkit's sandbox close tool.
 |---------|-------|-----|
 | `db_auth_status` → `Not logged in` | Cached credentials expired | Run [Authentication Failure Recovery](#authentication-failure-recovery-route-a) — re-login with `JOB_ENV_HW_DEVBRIDGE_API_KEY` |
 | `api key is invalid or disabled` | Huawei Cloud AK passed as `--api-key` | Use `JOB_ENV_HW_DEVBRIDGE_API_KEY`, never `JOB_ENV_HW_ACCESS_KEY` |
+| `JOB_ENV_HW_DEVBRIDGE_API_KEY` empty in sandbox (`API=`), deploy log shows `keyring 中未找到 HW_DEVBRIDGE_API_KEY` | jobenv did not inject the DevBridge API key at sandbox startup | Run `POST /api/v1/debug/env-sync`, then re-login with `--api-key $JOB_ENV_HW_DEVBRIDGE_API_KEY`. Do NOT self-sign IAM tokens or probe DevStation — see [If the API key is MISSING](#if-the-api-key-is-missing-trigger-a-jobenv-credential-sync-first) |
 | Tunnel creation rejected | Description contains spaces | Use only Chinese chars, digits, letters (max 64), e.g. `Web项目部署隧道` |
 | Max 10 active tunnels | Workspace tunnel quota reached | `db_list` then `db_delete` unused tunnels |
 | Local server not reachable | Server died or wrong port | `curl http://localhost:<port>/`; check `/tmp/<project>.log` |
@@ -454,7 +528,7 @@ Then close the sandbox session using devkit's sandbox close tool.
 
 # Key Notes
 
-- **Route A auth**: use `JOB_ENV_HW_DEVBRIDGE_API_KEY` (DevBridge API Key) — never confuse it with IAM AK/SK (`JOB_ENV_HW_ACCESS_KEY`/`JOB_ENV_HW_SECRET_KEY`).
+- **Route A auth**: use `JOB_ENV_HW_DEVBRIDGE_API_KEY` (DevBridge API Key) — never confuse it with IAM AK/SK (`JOB_ENV_HW_ACCESS_KEY`/`JOB_ENV_HW_SECRET_KEY`). If it is missing in the sandbox, run `POST /api/v1/debug/env-sync` to inject it, then re-login — do NOT self-sign IAM requests or probe DevStation.
 - **Route B auth — AK/SK only, no API Key needed**: pass AK/SK directly to `devbridge auth login --access-key <AK> --secret-key <SK>` inside the sandbox. The sandbox's preinstalled devbridge supports these flags. Do NOT use `--security-token` (not supported).
 - **Route B prerequisite**: huaweicloud-devkit provides the sandbox tools. Specific tool names/parameters may vary by devkit version — let devkit guide execution. The stable parts are the devbridge CLI commands run inside the sandbox.
 - **Sandbox lifecycle (Route B)**: sandbox session expires (check `expiresAt`). Long-running tunnels need the sandbox to stay alive. Use `-e <hours>` to set tunnel duration.
