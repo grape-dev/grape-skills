@@ -11,4 +11,4 @@ grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" 
 
 - body 引用用户原文，注明补充人与来源。
 - 不执行合并 / 启动开发 / 打标签 / 加 PATCH 等任何动作——均属 pipeline 相应 agent（coding/qa/sre）职责。
-- 会话绑定任务时，按 SKILL「任务完成流程」调用 `grape tasks complete` 自报完成。
+- 会话绑定任务时，完成业务动作后正常结束回复即可，**不要调用 `grape tasks complete`**（会报 404，见 SKILL「任务完成流程」）。

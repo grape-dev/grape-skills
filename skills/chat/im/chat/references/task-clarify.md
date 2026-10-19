@@ -83,4 +83,4 @@ grape git-repo issues comments create --owner {owner} --repo {repo} --number {nu
 
 ## 7. 收尾
 
-会话由任务中心触发（任务绑定）时，按 SKILL「任务完成流程」调用 `grape tasks complete` 自报完成。
+会话由任务中心触发（任务绑定）时，完成业务动作后正常结束回复即可，**不要调用 `grape tasks complete`**（chat 会话调用会报 404「任务不存在」，见 SKILL「任务完成流程」）。
