@@ -54,8 +54,7 @@ grape git-repo issues update --owner {owner} --repo {repo} --number {number} \
 grape git-repo pulls get --owner {owner} --repo {repo} --number {pr} --json-out
 grape git-repo commits --owner {owner} --repo {repo} --per_page 20 --json-out
 
-# 任务自报完成（会话绑定任务时收尾必做，见 SKILL「任务完成流程」）
-grape tasks complete --json '{"result_text":"结论：...","next_step":"done"}'
+# 任务自报完成——chat 会话禁止调用（session_key 非 task_id，必报 404；见 SKILL「任务完成流程」）。此命令仅供非 chat 的 devops 任务使用。
 
 # 轮询任务至终态
 grape tasks wait --task-id t_xxx --timeout 120 --interval 3 --json-out

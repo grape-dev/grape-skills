@@ -58,4 +58,4 @@ grape git-repo contents --owner "$REPO_OWNER" --repo "$REPO_NAME" --path CODEOWN
 
 ## 4. 收尾
 
-咨询为纯用户主动对话（无任务绑定）时，正常回复即可，**不调用 `grape tasks complete`**；若本会话由任务中心触发（含「📋 任务分配」）→ 按 SKILL「任务完成流程」自报完成。
+无论是否任务绑定，均正常回复结束即可，**一律不调用 `grape tasks complete`**（chat 会话 token 定位不到任务，调用会报 404，见 SKILL「任务完成流程」）。

@@ -144,14 +144,10 @@ Chat 对话只做查询和回答，**不修改任何 GitCode 仓库状态**：
 **用户命名规范：**
 - ❌ 禁止在卡片回复中出现 GitCode `login`/`username`（如 `Jason7602`、`younger_eric`）
 
-## 任务完成流程（会话绑定任务时必做）
+## 任务完成流程
 
-- 若本次会话由任务中心触发（上下文含「📋 任务分配 · Issue #N」）或为评审确认流程，完成全部业务动作（含回帖用户确认信息到 Issue 评论）后，**调用 `grape tasks complete` 自报完成（必做）**。会话 token 自动定位当前任务，无需 --task-id；若返回 `already:true`（任务已终态），属正常，忽略即可。
-- 纯用户主动对话（无任务绑定）正常回复即可，不调用。
-
-```bash
-grape tasks complete --json '{"result_text":"结论：已澄清 Issue #N 需求并回帖 / 已创建 Issue / 已回传评审确认（合入/启动）信息。","next_step":"done"}'
-```
+- 完成全部业务动作（含回帖用户确认信息到 Issue 评论）后，正常结束回复即可，**不要调用 `grape tasks complete` 自报完成**——chat 会话 token 的 session_key 是 `conv:<会话id>`，不是 agent_tasks 任务 id，该端点按 task_id 定位任务，chat 会话调用必报 404「任务不存在」。
+- 纯用户主动对话（无任务绑定）正常回复即可，同样不调用。
 
 ## 参考
 
