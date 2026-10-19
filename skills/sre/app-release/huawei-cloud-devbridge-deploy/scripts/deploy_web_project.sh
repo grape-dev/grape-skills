@@ -118,6 +118,20 @@ db_init
 AUTH_STATUS=$(db_auth_status 2>/dev/null || echo "")
 if echo "$AUTH_STATUS" | grep -q "Not logged in"; then
     echo "  Auth expired, re-authenticating with JOB_ENV_HW_DEVBRIDGE_API_KEY..."
+
+    # If the API key was never injected, ask jobenv to sync HW credentials first.
+    # Do NOT self-sign IAM tokens or probe DevStation — neither yields a DevBridge API key.
+    KEY_CHECK=$(curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
+        -H 'Content-Type: application/json' \
+        -d '{"cmd":["bash","-c","echo API=${JOB_ENV_HW_DEVBRIDGE_API_KEY:+set}"]}')
+    if echo "$KEY_CHECK" | grep -q 'API=set'; then
+        echo "  API key present in sandbox."
+    else
+        echo "  API key missing; triggering jobenv credential sync (POST /api/v1/debug/env-sync)..."
+        curl -s -X POST "http://127.0.0.1:8090/api/v1/debug/env-sync" \
+            -H 'Content-Type: application/json' >/dev/null 2>&1
+    fi
+
     curl -s -X POST "http://127.0.0.1:8090/api/v1/envs/devbridge/exec" \
         -H 'Content-Type: application/json' \
         -d '{"cmd":["bash","-c","devbridge auth login --api-key $JOB_ENV_HW_DEVBRIDGE_API_KEY 2>&1"]}' >/dev/null 2>&1
@@ -125,8 +139,8 @@ if echo "$AUTH_STATUS" | grep -q "Not logged in"; then
     # Verify recovery
     AUTH_STATUS=$(db_auth_status 2>/dev/null || echo "")
     if echo "$AUTH_STATUS" | grep -q "Not logged in"; then
-        echo "ERROR: DevBridge auth recovery failed. JOB_ENV_HW_DEVBRIDGE_API_KEY may be expired."
-        echo "       Manual fix: obtain a new API key from https://devstation.connect.huaweicloud.com/space/devbridge/apikey"
+        echo "ERROR: DevBridge auth recovery failed even after POST /api/v1/debug/env-sync."
+        echo "       JOB_ENV_HW_DEVBRIDGE_API_KEY is still not usable inside the sandbox."
         exit 1
     fi
     echo "  Auth restored."
