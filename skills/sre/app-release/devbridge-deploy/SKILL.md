@@ -282,6 +282,21 @@ cat /tmp/${REPO_NAME}-tunnel.log   # 隧道日志
 # 在 Issue 评论中附上错误日志并结束
 ```
 
+### 5.5 部署结果回帖（成功路径必做，与 deploy-cli 规范一致）
+
+健康检查通过后，**必须把部署结果回帖到本需求（Issue）下**再收尾——用户不应需要翻任务详情找链接。评论 body 一律以 `[SRE Agent]` 开头；凭据纪律：token/AK-SK/API Key 不 printenv、不写日志、不写评论、不落盘。
+
+```bash
+grape git-repo issues comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" --number "$ISSUE_NUMBER" \
+  --json '{"body": "[SRE Agent] 部署完成，服务已上线。访问地址：'"$TUNNEL_URL"'（有效期 2 小时，到期后可重新发起部署）。"}'
+```
+
+- `ISSUE_NUMBER` 来自 A2A context / 事件 payload（见「入口判定」）；缺失（非事件触发场景）则跳过回帖，仅在任务结果（outputSchema）中报告。
+- 回帖内容给用户话术：部署完成 + 访问 URL + 有效期；不展开隧道/端口等内部细节。
+- 回帖失败（网络/权限）不阻断任务：记 warning 后继续收尾。
+
+> ⚠️ **收尾一律用 `grape tasks complete`（情形一）**：回帖完成后**必须**调用；**评论发完 ≠ 任务完成**；调完即结束，不再输出 JSON 块。
+
 ### 6. 清理旧隧道（可选）
 
 部署完成后，检查是否有同仓库的旧隧道残留：
@@ -375,6 +390,7 @@ done
 | 写操作 | nohup 启动服务 | 自动执行 |
 | 写操作 | devbridge create / port create 创建隧道 | 自动执行 |
 | 写操作 | devbridge host 托管端口 | 自动执行 |
+| 写操作 | Issue 评论回帖部署结果（grape git-repo issues comments create） | 自动执行（成功路径必做，见 5.5） |
 | 删除操作 | devbridge delete 清理旧隧道 | 需确认目标 ID 正确后再执行 |
 | 删除操作 | kill 停止旧进程 | 自动执行（增量更新时重启服务） |
 
@@ -404,7 +420,7 @@ done
 | 断点续跑（resume） | 支持中间状态恢复：增量更新模式检查 /opt/{repo} 目录是否存在，已有则走 update 路径；隧道复用检查 devbridge list 已有隧道 |
 | 重试幂等 | 部署操作幂等：重复 clone 覆盖目录；重复 start 先 kill 旧进程；隧道复用避免重复创建 |
 | 资源清理 | 步骤 6 清理旧隧道；PID 文件管理进程生命周期；日志文件在 /tmp/ 下可定期清理 |
-| 降级策略 | devbridge 未安装/未登录时报告环境异常；clone/pip 失败在 Issue 评论说明；隧道创建失败检查配额 |
+| 降级策略 | devbridge 未安装/未登录时报告环境异常；clone/pip 失败在 Issue 评论说明；隧道创建失败检查配额；回帖失败（网络/权限）不阻断任务，记 warning 后继续收尾 |
 
 ## 依赖兼容
 
