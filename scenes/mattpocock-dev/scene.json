@@ -1,0 +1,50 @@
+{
+  "name": "mattpocock-dev",
+  "version": "1.0.0",
+  "display_name": "MattPocock 开发",
+  "description": "MattPocock 开发场景：内化 mattpocock/skills 核心方法论（Grilling 澄清→Spec 用户故事→垂直切片 tickets→TDD+可红反馈环→两轴审查），vod→issue→coding→qa 四节点（无 sre，合入/部署交人工或后续扩展）。",
+  "category": "general",
+  "recommended_template": "hello-flask",
+  "onboarding": "repo-onboarding",
+  "tags": [
+    "mattpocock",
+    "methodology",
+    "tdd",
+    "spec-driven"
+  ],
+  "author": "grape-team",
+  "nodes": [
+    {
+      "id": "vod",
+      "tag": "vod",
+      "skill": "vod-mattpocock",
+      "mode": "emit",
+      "next": "issue",
+      "handoff": "a2a"
+    },
+    {
+      "id": "issue",
+      "tag": "issue",
+      "skill": "issue-mattpocock",
+      "mode": "emit",
+      "next": "coding",
+      "handoff": "a2a"
+    },
+    {
+      "id": "coding",
+      "tag": "coding",
+      "skill": "coding-mattpocock",
+      "mode": "emit",
+      "next": "qa",
+      "handoff": "a2a"
+    },
+    {
+      "id": "qa",
+      "tag": "qa",
+      "skill": "qa-mattpocock",
+      "mode": "emit",
+      "next": "done",
+      "handoff": "complete"
+    }
+  ]
+}

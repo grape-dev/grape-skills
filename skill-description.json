@@ -342,6 +342,34 @@
     "path": "vod/feedback-loop/vod-advance",
     "description": "开发者声音分析（需求场景化增强版）：功能/Bug/咨询/任务型四分类路由。功能/Bug 先自主调查再最小打扰引导→结构化收敛→A2A issue；咨询 VOD 闭环不 A2A；任务型只识别/边界答复（安全类直 A2A coding/qa/sre，危险类委婉答复不在职责范围），VOD 不执行任何任务。接管 issue_opened。全部操作使用 grape CLI"
   },
+  "vod-mattpocock": {
+    "name": "开发者声音分析（mattpocock 版）",
+    "agent_type": "vod",
+    "sub_scene": "feedback-loop",
+    "path": "vod/feedback-loop/vod-mattpocock",
+    "description": "开发者声音分析（mattpocock 理念，mattpocock-dev 场景）：Grilling 澄清至无歧义——动手前逼问收敛需求，每轮列已确认/未确认+新问题（≤3 轮），领域词汇对齐（GLOSSARY 意识），收敛输出结构需求单（目标/用户故事/验收/Out of Scope）→ A2A issue-mattpocock。全部操作使用 grape CLI，评论以 [VOD Agent] 开头"
+  },
+  "issue-mattpocock": {
+    "name": "Issue 运营（mattpocock 版）",
+    "agent_type": "issue",
+    "sub_scene": "feedback-loop",
+    "path": "issue/feedback-loop/issue-mattpocock",
+    "description": "Issue 运营（mattpocock 理念，mattpocock-dev 场景）：Triage 分诊（查重按域概念/验证 claim）→ Spec 生成（用户故事长表+实现/测试决策+Out of Scope）→ 垂直切片 tickets 拆解（阻断边 Blocked-by）→ A2A coding-mattpocock。全部操作使用 grape CLI，评论以 [issue agent] 开头"
+  },
+  "coding-mattpocock": {
+    "name": "代码实现（mattpocock 版）",
+    "agent_type": "coding",
+    "sub_scene": "ai-coding-review",
+    "path": "coding/ai-coding-review/coding-mattpocock",
+    "description": "代码实现（mattpocock 理念，mattpocock-dev 场景）：按 Spec/tickets 实现——先协商测试 seams→TDD 红-绿（一竖切片一测试）→bug 先建可红反馈环再修（diagnosing-bugs）→设计不确定先原型→建 PR（Evidence+Merge Danger）→A2A qa-mattpocock。全部操作使用 grape CLI，评论以 [Coding Agent] 开头"
+  },
+  "qa-mattpocock": {
+    "name": "代码审查（mattpocock 版）",
+    "agent_type": "qa",
+    "sub_scene": "code-quality",
+    "path": "qa/code-quality/qa-mattpocock",
+    "description": "PR 审查（mattpocock 理念，mattpocock-dev 场景）：两轴并行审查（Standards 规范+异味 vs Spec 需求忠实度），分轴报告不合并排名，merge-danger 门（单向/双向+blast radius）显式标注；有问题 A2A coding 修复，通过评论合入提示。全部操作使用 grape CLI，评论以 [QA Agent] 开头"
+  },
   "deploy-cli": {
     "name": "云部署（CLI 版）",
     "agent_type": "sre",
