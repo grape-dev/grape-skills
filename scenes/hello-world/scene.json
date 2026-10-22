@@ -49,7 +49,7 @@
     {
       "id": "sre",
       "tag": "sre",
-      "skill": "huawei-cloud-devbridge-deploy",
+      "skill": "devbridge-deploy",
       "mode": "emit",
       "next": "done",
       "handoff": "complete"
