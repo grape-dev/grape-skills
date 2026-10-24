@@ -132,7 +132,7 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
 
 ## 处理流程
 
-> ⚠️ **先读 `references/coding-runbook.md`**：先判断触发场景（新开发 / 代码优化），再按 runbook 对应场景的走查表逐步骤执行（场景 A：Step 0 前置 → 1 读上下文 → 2 需求分析 → 3 文档/方案 → 4 编码/测试 → 5 自审查 → 6 建 PR+评论 → 7 A2A QA → 8 收尾；场景 B：Step 0 前置 → 1 读审查反馈 → 2 修改方案 → 3 PR 评论 → 4 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
+> ⚠️ **先读 `references/coding-runbook.md`**：先判断触发场景（新开发 / 代码优化），再按 runbook 对应场景的走查表逐步骤执行（场景 A：Step 0 前置+代码就绪门 → 1 读上下文 → 2 需求分析 → 3 代码线索考察+文档/方案 → 4 编码/测试 → 5 自审查 → 6 建 PR+评论 → 7 A2A QA → 8 收尾；场景 B：Step 0 前置 → 1 读审查反馈 → 2 修改方案 → 3 PR 评论 → 4 收尾）。每个步骤的任意命令 runbook 已给出，**照抄执行，不要 `grape --help` / `grape commands` 逐条探索**。
 >
 > ⚠️ **本技能收尾一律用 `grape tasks complete`（情形一）**：无论哪个分支，最后一步必须按 runbook 调用 `grape tasks complete` 自报完成，**评论发完 ≠ 任务完成**；调完即结束，不要再输出额外的处理记录 JSON 块。
 
@@ -181,6 +181,10 @@ grape git-repo pulls comments create --owner "$REPO_OWNER" --repo "$REPO_NAME" -
 7. **只用一个 token**：只用注入的 `$GRAPE_SESSION_TOKEN`，不探测 `BOT_*`/`USER_*`/其它 token，token 不落日志/评论/文件。
 8. **git 身份预置**：进入 worktree 后、首次 `grape git commit` 前先 `grape git config user.name/user.email`（见 Prerequisites 4 / runbook Step 0），避免 commit 被拒。
 9. **命令出错先看完整错误**：runbook 命令失败先去 `tail` 截断看完整 stderr，再按「错误排查速查」处理，**不反复盲试**同一命令。
+10. **代码探索优先读本地 worktree**：用 `read`/`grep`/`sed`/`ls` 直接读工作区文件定位实现/调用链/测试；**不逐文件走 `grape git-repo contents` 拉远端**（慢、废 token）。仅当本地缺文件/降级（非 git 目录）时，才用 `grape git-repo contents --path ... --raw` 兜底。
+11. **读代码前先过「代码就绪门」**：Step 0 已确保 `.git` 存在、分支为 `feat/issue-{N}`、并同步到最新（`fetch -q` + `merge --ff-only`）——保证读到的代码是当前最新，不基于过时代码开发。
+12. **TDD 红/绿分提交（默认拆分）**：一竖切片一测试——先提交失败测试（`test(...)`，证明"先有契约"），再提交最小实现使其通过（`feat(...)`）；极小改动可合并，默认拆分。git log 可追溯/bisect 定位，防"实现后补测凑数"。
+13. **测试 seam 先协商**：编码前明确公开接口/测试边界（复用已有 seam > 新建，放尽量高），必要时在方案/评论声明；bug 修复**先写能复现症状的失败测试（红）**→修→绿→回归，无红测试不修复。
 
 ## §4.9 关联仓库多仓库开发（当 `$GRAPE_LINKED_REPOS` 非空时）
 

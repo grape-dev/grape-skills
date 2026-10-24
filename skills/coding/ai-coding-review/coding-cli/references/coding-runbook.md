@@ -57,7 +57,21 @@ grape git status
   grape git config user.name  "$BOT_USERNAME"
   grape git config user.email "$BOT_USERNAME@noreply.git.com"
   ```
-- ③ 基线同步（可选，避免 base 过期）：`grape git fetch origin "$WORK_BRANCH" && grape git rebase "origin/$WORK_BRANCH"`
+- ③ 基线同步（读代码/写方案前必做，避免读到过时代码；非"可选"）：
+  ```bash
+  # ⚠️ coding 工作目录 git 状态不保证最新：可能已由服务端预置 clone（旧 commit）、可能空目录、可能镜像检出。
+  #    读代码前必须做「代码就绪门」：探测 .git → 验分支 → 同步到最新（都用 grape git，不用裸 git）。
+  # ① 目录即 git 仓库（否则降级 clone；test 无输出，幂等）
+  test -d .git || grape git clone "https://gitcode.com/$REPO_FULL_NAME.git" . >/dev/null
+  # ② 分支应为 feat/issue-{N}（不另造分支名；空/错分支时重建）
+  test "$(grape git branch --show-current 2>/dev/null)" = "feat/issue-$ISSUE_NUMBER" \
+    || grape git checkout -b "feat/issue-$ISSUE_NUMBER" "origin/$WORK_BRANCH"
+  # ③ 同步到最新（-q 抑制输出省 token；优先 ff-only，冲突再 rebase）
+  grape git fetch origin -q
+  grape git merge --ff-only "origin/feat/issue-$ISSUE_NUMBER" -q 2>/dev/null \
+    || grape git rebase "origin/feat/issue-$ISSUE_NUMBER"
+  ```
+  > 成本说明：test/checkout 为本地近零成本；fetch 用 `-q` 抑制输出（少 token、秒级）；ff-only 无变化时瞬间完成。一次性执行可**避免基于旧代码开发 → QA 打回 → 全流程返工**（十几分钟 + 数万 token）。
 
 ```bash
 # ④ 项目知识基线（解题背景；⚠️ 权威源 = grape repos project info，不用 cat 本地 .project-info 文件）
@@ -90,20 +104,41 @@ grape git-repo issues comments list --owner "$REPO_OWNER" --repo "$REPO_NAME" --
 - **技术可行性**：需外部 API / 第三方服务 → 先取 API 文档；文档缺失 → **评论说明暂缓，等待补充**。
 - **任务类型 / 复杂度评估**：见 `new-dev-flow.md` §3/§4。⚠️ 涉及架构变更或新增外部服务集成的必归「大型」，不得低估。
 
-### Step 3 · 文档 + 方案（所有 feature 开发必做）
+### Step 3 · 代码线索考察 + 文档 + 方案（所有 feature 开发必做）
+> ⚠️ **代码探索优先读本地 worktree**（`read`/`grep`/`sed`/`ls`）：不逐文件走 `grape git-repo contents` 拉远端（慢、废 token）。仅本地缺文件/降级（非 git 目录）时才用 `contents --path ... --raw` 兜底。
+
+```bash
+# 一次批量考察（本地；一次跑完，避免分批试错），再按需读 2-3 个关键文件：
+ls src/ tests/ | head -60
+grep -rn "{核心符号|模块}" src/ tests/ --include=*.py | grep -v test | head -30   # 实现/调用链
+grep -rln "{领域概念}" src/ tests/ --include=*.py | head                          # 定位领域文件
+ls tests | grep -i "{对应模块}"                                                   # 先例测试
+```
+
 ```bash
 # 分别读取 references/spec-driven-development.md、planning-and-task-breakdown.md 后编写
 # 产出 docs/issue-$ISSUE_NUMBER/spec.md（需求文档）、plan.md（方案设计）、task.md（任务拆解），并在 Issue 评论告知（body 以 [Coding Agent] 开头）
+# ⚠️ 读完首批关键文件即开始写文档（spec/plan/task），再按文档缺口补 1-2 次线索考察——不要无限探代码、攒到尾声才出方案。
 ```
 
-### Step 4 · 编码 + 测试（所有开发任务必做）
+### Step 4 · 测试 seam 协商 + 编码 + 测试（所有开发任务必做）
+- **先明确测试 seam（编码前必做）**：对每个切片，确定**公开接口/测试边界**（用户可见行为，不测内部细节）——复用已有 seam > 新建，新 seam 放尽量高处；必要时在方案/评论中声明 seam 计划（"本切片在 {接口} seam 上测试"）。
 - 测试先行：`references/test-driven-development.md`（RED→GREEN→REFACTOR）
 - 增量实现：`references/incremental-implementation.md`
-- 原子提交：
+- ⚠️ **TDD 红/绿分提交（默认拆分，一竖切片一测试一提交）**：
   ```bash
-  grape git add -A && grape git commit -m "feat: #$ISSUE_NUMBER 描述"
+  # ① 红：先提交失败测试（能对当前行为/症状变红的断言，证明"先有契约"）
+  grape git add tests/... && grape git commit -m "test(#$ISSUE_NUMBER): {切片} 先写失败测试"
+  # ② 绿：最小实现使其通过，再提交实现
+  grape git add src/... && grape git commit -m "feat(#$ISSUE_NUMBER): {切片} 最小实现使其通过"
+  # ③ 推送
   grape git push origin "feat/issue-$ISSUE_NUMBER"
   ```
+  - **为何拆提交**：让 git log 可证明"先有红（契约）→ 后有绿（实现）"，可追溯、可 bisect 定位到引入实现的那个提交、防"实现后补测试凑数"与同义反复测试。
+  - **例外**：极小改动（测试与实现同属一个天然原子变更）可合并一次提交，但**默认拆分**；未通过"先红"的测试不提交绿实现。
+- **bug 修复路径（修 bug 时必做，先可红反馈环）**：
+  - 修 bug 前**先写能复现用户症状的失败测试（红）**，再最小化假设/定位 → 修复 → 测试转绿 → 回归测试（原复现场景重跑）。
+  - 无红测试不进修复；无法建红测试（缺环境/artifact）→ 显式说明并求环境/日志，不盲改。
 
 ### Step 5 · 自审查（创建 PR 前必须，不可跳过）
 读取 `references/code-review-and-quality.md` 按 5 轴审查，修复发现的问题；审查通过才进入 Step 6。
